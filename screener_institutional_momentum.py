@@ -322,10 +322,25 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
             if meta['total_5d_lots'] <= 0:
                 continue
 
+            # -------------------------------------------------------------
+            # 策略實戰操盤四大價位試算 (進場、加碼、停利、停損)
+            # -------------------------------------------------------------
+            entry_p = round(curr_close, 2)
+            addon_raw = max(q['high'] * 1.005, curr_close * 1.03)
+            addon_p = round(min(addon_raw, ma20_curr * 1.10), 2)
+            tp1_p = round(ma20_curr * 1.12, 2)
+            tp2_p = round(ma20_curr * 1.20, 2)
+            sl_p = round(max(ma20_curr * 0.98, q['low'] * 0.99), 2)
+
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
                 '收盤價': round(curr_close, 2),
+                '進場參考': entry_p,
+                '加碼價位': addon_p,
+                '停利TP1': tp1_p,
+                '停利TP2': tp2_p,
+                '停損價位': sl_p,
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線乖離%': round(bias_ma20_pct, 2),
                 '當日成交量(張)': q['volume'] // 1000,
@@ -405,23 +420,24 @@ def main():
             from line_sender import send_to_line
             target_date = args.date or (results[0]['證券代號'] and datetime.date.today().strftime('%Y%m%d')) or "今日"
             msg_lines = [
-                "📊【台股盤後選股】法人籌碼集中起漲清單",
+                "📊【台股盤後選股】法人籌碼集中起漲日報",
                 f"📅 基準日期：{target_date}",
-                f"🎯 篩選標準：外資/投信3日累計>1000張｜法人佔比>10%｜站上月線且上揚｜5日均量>1000張｜正乖離<8%｜無長上影線",
-                f"🔥 今日共篩選出 {len(df_res)} 檔法人起漲焦點標的：",
+                f"🎯 核心濾網：外資投信3日>1000張｜法人佔比>10%｜站上月線且上揚｜乖離<8%｜無長上影線",
+                f"🔥 今日共篩選出 {len(df_res)} 檔起漲焦點股（附進場/加碼/停利/停損價位）：",
                 "─────────────────────"
             ]
-            for i, r in enumerate(df_res.head(10).to_dict(orient='records'), 1):
+            for i, r in enumerate(df_res.head(8).to_dict(orient='records'), 1):
                 msg_lines.append(
-                    f"{i}. {r['證券代號']} {r['證券名稱']} ({r['收盤價']}元)\n"
-                    f"   • 月線乖離: +{r['月線乖離%']}% (20MA: {r['月線(20MA)']})\n"
-                    f"   • 法人佔比: {r['法人買超佔比%']}% (當日買超: +{r['當日法人買超(張)']:,}張)\n"
-                    f"   • 3日買超: 外資+{r['外資3日買超(張)']:,}張 | 投信+{r['投信3日買超(張)']:,}張"
+                    f"{i}. 📍 {r['證券代號']} {r['證券名稱']} (現價 {r['收盤價']}元)\n"
+                    f"   🟢 進場：{r['收盤價']} 元 (月線 {r['月線(20MA)']}，乖離 +{r['月線乖離%']}%)\n"
+                    f"   🔵 加碼：{r['加碼價位']} 元 ｜ 🛑 停損：{r['停損價位']} 元\n"
+                    f"   🔴 停利：TP1 {r['停利TP1']} 元 ｜ TP2 {r['停利TP2']} 元\n"
+                    f"   🏦 籌碼：佔比 {r['法人買超佔比%']}% (外資+{r['外資3日買超(張)']:,}張, 投信+{r['投信3日買超(張)']:,}張)\n"
+                    "─────────────────────"
                 )
-            if len(df_res) > 10:
-                msg_lines.append(f"...\n(其餘 {len(df_res)-10} 檔請查看 CSV / Markdown 報表)")
-            msg_lines.append("─────────────────────")
-            msg_lines.append("💡 操作紀律：起漲安全區進場，破月線無條件停損！")
+            if len(df_res) > 8:
+                msg_lines.append(f"(其餘 {len(df_res)-8} 檔完整名單請查看電腦 CSV 報表)")
+            msg_lines.append("💡 交易紀律：起漲安全區進場，跌破停損價無條件執行！")
             
             print("[*] 正在發送選股清單至 LINE...")
             send_to_line("\n".join(msg_lines))

@@ -179,17 +179,30 @@ def send_intraday_alert(code, meta, rt):
     dist_pct = (rt['price'] - meta['lower_band']) / meta['lower_band'] * 100.0
     dist_sign = "+" if dist_pct > 0 else ""
     
+    # 操盤實戰四大價位試算
+    entry_val = f"{rt['price']:.2f} 元 (下軌支撐區 {meta['lower_band']:.2f}~{rt['price']:.2f} 元分批)"
+    addon_val = f"{round(rt['price'] * 1.03, 2)} 元 (反彈突破 5MA 續攻確認)"
+    tp_val = f"TP1 {meta['middle_band']:.2f} 元 (中軌MA20) ｜ TP2 {meta['upper_band']:.2f} 元 (上軌)"
+    sl_val = f"{round(meta['lower_band'] * 0.95, 2)} 元 (跌破下軌-5%破底無條件停損)"
+
     msg_lines = [
         "⚡【台股盤中即時雷達】布林下軌觸底轉折點",
         "─────────────────",
         f"📍 標的：{code} {meta['name']}",
         f"💰 即時現價：{rt['price']:.2f} 元 (距下軌 {dist_sign}{dist_pct:.2f}%)",
         f"📊 盤中成交量：{rt['volume']:,} 張 (已大於 1000 張門檻)",
-        f"📐 布林軌道：下軌 {meta['lower_band']:.2f}｜中軌 {meta['middle_band']:.2f}",
+        f"📐 布林軌道：下軌 {meta['lower_band']:.2f}｜中軌 {meta['middle_band']:.2f}｜上軌 {meta['upper_band']:.2f}",
+        "─────────────────",
+        "🎯【實戰操盤四價位建議】",
+        f"  🟢 進場價位：{entry_val}",
+        f"  🔵 加碼價位：{addon_val}",
+        f"  🔴 停利價位：{tp_val}",
+        f"  🛑 停損價位：{sl_val}",
+        "─────────────────",
         f"🏦 法人背景：昨日買超 +{meta['total_lots']:,} 張 (外資+{meta['foreign_lots']:,}, 投信+{meta['trust_lots']:,})",
         f"⏰ 偵測時間：{rt.get('time', datetime.datetime.now().strftime('%H:%M:%S'))}",
         "─────────────────",
-        "💡 策略提示：股價急跌至下軌支撐區但籌碼有主力撐腰，注意低接轉折與停損防守！"
+        "💡 策略提示：股價急跌至下軌支撐區但籌碼有主力撐腰，嚴格遵守破底停損紀律！"
     ]
     message = "\n".join(msg_lines)
     print(f"\n[!] 觸發盤中警報: {code} {meta['name']} 現價 {rt['price']} (距下軌 {dist_sign}{dist_pct:.2f}%)")

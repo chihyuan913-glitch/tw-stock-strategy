@@ -304,6 +304,27 @@ def send_intraday_momentum_alert(code, meta, rt):
     body = abs(price - open_p)
     upper_shadow = high_p - max(open_p, price)
 
+    # -------------------------------------------------------------
+    # 策略實戰操盤四大價位試算 (進場、加碼、停利、停損)
+    # -------------------------------------------------------------
+    # 1. 進場價位：現價或回測月線區間
+    entry_desc = f"{price:.2f} 元 (回測 {ma20:.2f}~{price:.2f} 元分批佈局)"
+
+    # 2. 加碼價位：放量突破當日高點 1 檔或突破續攻 +3% (不超過月線正乖離 10%)
+    addon_raw = max(high_p * 1.005, price * 1.03)
+    addon_price = round(min(addon_raw, ma20 * 1.10), 2)
+
+    # 3. 停利價位：
+    #    TP1: 月線正乖離 +12% 短波段滿足點 (分批停利 1/3~1/2)
+    #    TP2: 月線正乖離 +20% 波段噴出滿足點
+    tp1_price = round(ma20 * 1.12, 2)
+    tp2_price = round(ma20 * 1.20, 2)
+
+    # 4. 停損價位：
+    #    跌破月線 2% 或跌破今日最低點 -1% (嚴格停損，保護本金)
+    low_ref = rt['low'] if rt.get('low') else price * 0.98
+    sl_price = round(max(ma20 * 0.98, low_ref * 0.99), 2)
+
     msg_lines = [
         "🎯【台股盤中即時雷達】法人籌碼起漲發動點！",
         "─────────────────────",
@@ -312,6 +333,12 @@ def send_intraday_momentum_alert(code, meta, rt):
         f"📐 月線乖離：+{bias_pct:.2f}% (起漲安全區間內)",
         f"📊 盤中成交量：{rt['volume']:,} 張 (5日均量: {meta['v5_avg']:,} 張)",
         f"📈 均線防線：月線 {ma20:.2f} (上揚助漲)｜上限 {meta['ceiling_price']:.2f}",
+        "─────────────────────",
+        "🎯【實戰操盤四價位建議】",
+        f"  🟢 進場價位：{entry_desc}",
+        f"  🔵 加碼價位：{addon_price:.2f} 元 (突破日高續攻確認)",
+        f"  🔴 停利價位：TP1 {tp1_price:.2f} 元 (+12%) ｜ TP2 {tp2_price:.2f} 元 (+20%)",
+        f"  🛑 停損價位：{sl_price:.2f} 元 (跌破月線-2%無條件離場)",
         "─────────────────────",
         f"🏦 籌碼背景：",
         f"  • 外資3日累計：{meta['f_3d']:+,} 張",

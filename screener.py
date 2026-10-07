@@ -192,10 +192,24 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
 
             # 條件 2: 位於布林下軌 1% 之內或是跌破 5% 之內
             if lower_dist_min <= dist_pct <= lower_dist_max:
+                # -------------------------------------------------------------
+                # 策略實戰操盤四大價位試算 (進場、加碼、停利、停損)
+                # -------------------------------------------------------------
+                entry_p = round(curr_close, 2)
+                addon_p = round(curr_close * 1.03, 2)
+                tp1_p = round(float(ma20), 2)
+                tp2_p = round(float(upper_band), 2)
+                sl_p = round(float(lower_band) * 0.95, 2)
+
                 results.append({
                     '證券代號': code,
                     '證券名稱': meta['name'],
                     '收盤價': round(curr_close, 2),
+                    '進場參考': entry_p,
+                    '加碼價位': addon_p,
+                    '停利TP1': tp1_p,
+                    '停利TP2': tp2_p,
+                    '停損價位': sl_p,
                     '布林下軌': round(float(lower_band), 2),
                     '布林中軌(20MA)': round(float(ma20), 2),
                     '布林上軌': round(float(upper_band), 2),
@@ -288,7 +302,7 @@ def format_line_message(results, date_str, args):
         "─────────────────"
     ]
     
-    for i, r in enumerate(sorted_res[:12], 1):
+    for i, r in enumerate(sorted_res[:8], 1):
         name = r['證券名稱']
         code = r['證券代號']
         close = r['收盤價']
@@ -307,14 +321,16 @@ def format_line_message(results, date_str, args):
         detail_str = f" ({', '.join(detail_items)})" if detail_items else ""
         
         msg_lines.append(
-            f"{i}. {code} {name}\n"
-            f"   • 收盤: {close} 元 (距下軌 {dist_sign}{dist}%)\n"
-            f"   • 成交量: {vol:,} 張\n"
-            f"   • 法人買超: +{tot_inst:,} 張{detail_str}"
+            f"{i}. 📍 {code} {name} (現價 {close}元)\n"
+            f"   🟢 進場：{close} 元 (距下軌 {dist_sign}{dist}%)\n"
+            f"   🔵 加碼：{r['加碼價位']} 元 ｜ 🛑 停損：{r['停損價位']} 元 (破下軌-5%)\n"
+            f"   🔴 停利：TP1 {r['停利TP1']} 元 (中軌) ｜ TP2 {r['停利TP2']} 元 (上軌)\n"
+            f"   🏦 籌碼：法人買超 +{tot_inst:,} 張{detail_str} (日成交量 {vol:,} 張)\n"
+            "─────────────────"
         )
         
-    if len(sorted_res) > 12:
-        msg_lines.append(f"...\n(其餘 {len(sorted_res)-12} 檔請查看電腦 result.csv 報表)")
+    if len(sorted_res) > 8:
+        msg_lines.append(f"(其餘 {len(sorted_res)-8} 檔完整名單請查看電腦 result.csv 報表)")
         
     msg_lines.append("─────────────────")
     msg_lines.append("💡 交易紀律：跌破下軌逾 5% 嚴格停損；反彈第一目標看 20MA 布林中軌！")
