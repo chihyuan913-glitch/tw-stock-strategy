@@ -1,0 +1,101 @@
+//@version=5
+indicator("台股法人籌碼集中起漲指標 (Institutional Momentum & Breakout)", shorttitle="法人起漲訊號", overlay=true)
+
+// =============================================================================
+// 參數設定 (Inputs)
+// =============================================================================
+grp_ma = "均線與趨勢參數"
+ma_len       = input.int(20, title="月線天期 (MA20)", group=grp_ma)
+max_bias_pct = input.float(8.0, title="月線正乖離率上限 (%)", minval=1.0, maxval=20.0, step=0.5, group=grp_ma)
+
+grp_vol = "量能濾網"
+min_vol_lots = input.int(1000, title="5日平均成交量低標 (張)", minval=100, step=100, group=grp_vol)
+
+grp_k = "K棒形態濾網"
+shadow_ratio = input.float(0.5, title="上影線佔實體比例上限", minval=0.1, maxval=1.0, step=0.1, group=grp_k)
+
+grp_chips = "籌碼覆核 (選股確認)"
+enable_chip_tag = input.bool(true, title="顯示籌碼法人覆核標籤", group=grp_chips)
+
+// =============================================================================
+// 1. 技術面計算 (MA20、斜率、乖離率)
+// =============================================================================
+ma20 = ta.sma(close, ma_len)
+ma20_slope_up = ma20 > ma20[1] // 月線向上助漲
+
+// 月線 +8% 正乖離警戒天花板
+ma20_bias_limit = ma20 * (1.0 + max_bias_pct / 100.0)
+
+// 乖離率計算 (%)
+bias_pct = ((close - ma20) / ma20) * 100.0
+in_bias_zone = (close >= ma20) and (bias_pct < max_bias_pct)
+
+// =============================================================================
+// 2. 流動性濾網 (5日均量 >= 1000 張)
+// TradingView 台股成交量若為股數需除以 1000
+// =============================================================================
+vol_lots = volume >= 100000 ? volume / 1000.0 : volume
+vol_ma5  = ta.sma(vol_lots, 5)
+vol_ok   = vol_ma5 >= min_vol_lots
+
+// =============================================================================
+// 3. K棒形態濾網 (排除長上影線爆量出貨)
+// =============================================================================
+body = math.abs(close - open)
+upper_shadow = high - math.max(open, close)
+
+// 判定是否有長上影線瑕疵
+is_long_upper_shadow = body > (close * 0.001) ? (upper_shadow >= shadow_ratio * body) : (upper_shadow > (close * 0.005))
+candle_healthy = not is_long_upper_shadow
+
+// =============================================================================
+// 4. 綜合多頭起漲買進訊號判定
+// =============================================================================
+// 條件彙整：
+// 1) 收盤站上 20MA
+// 2) 20MA 斜率向上
+// 3) 5 日均量 >= 1000 張
+// 4) 月線正乖離 < 8% (起漲無追高)
+// 5) 無長上影線
+buy_signal = (close >= ma20) and ma20_slope_up and in_bias_zone and vol_ok and candle_healthy
+
+// 當根首次觸發
+buy_trigger = buy_signal and not buy_signal[1]
+
+// =============================================================================
+// 5. 圖表繪製與視覺化呈現
+// =============================================================================
+// 月線顏色：向上呈現亮綠色(助漲)，走平或下彎呈現橘紅色
+ma_color = ma20_slope_up ? color.new(#00E676, 0) : color.new(#FF5252, 0)
+p_ma20 = plot(ma20, title="月線 (MA20)", color=ma_color, linewidth=2)
+p_bias = plot(ma20_bias_limit, title="月線 +8% 起漲安全邊界", color=color.new(#00B0FF, 30), style=plot.style_circles)
+
+// 填充起漲安全區域
+fill(p_ma20, p_bias, color=color.new(#00E676, 92), title="起漲安全甜蜜區 (0%~8%)")
+
+// 標記長上影線出貨警示 K 棒
+plotshape(is_long_upper_shadow and high == ta.highest(high, 5), 
+          title="長上影線賣壓警示", 
+          style=shape.triangledown, 
+          location=location.abovebar, 
+          color=color.new(#FF1744, 0), 
+          size=size.tiny, 
+          text="上影線")
+
+// 標記買進起漲訊號
+plotshape(buy_trigger, 
+          title="法人起漲訊號點", 
+          style=shape.triangleup, 
+          location=location.belowbar, 
+          color=color.new(#FFD700, 0), 
+          size=size.small, 
+          text="起漲點")
+
+// K 棒著色：在起漲甜蜜區且健康的 K 棒
+barcolor(buy_signal ? color.new(#FFD700, 20) : na, title="起漲K棒金色標註")
+
+// =============================================================================
+// 6. 警報設定 (Alerts)
+// =============================================================================
+alertcondition(buy_trigger, title="【法人籌碼起漲】進場買進訊號", message="[台股警報] {{ticker}} 滿足法人籌碼集中起漲條件：站上20MA且均線上揚、正乖離<8%、量能充沛無長上影線！")
+alertcondition(is_long_upper_shadow, title="【警示】當日出現長上影線賣壓", message="[台股警示] {{ticker}} 當日爆出長上影線賣壓，請注意高檔倒貨風險！")

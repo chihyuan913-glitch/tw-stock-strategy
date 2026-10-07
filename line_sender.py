@@ -103,9 +103,9 @@ def send_to_line(message: str) -> bool:
     其次嘗試 LINE Notify
     """
     env = load_env()
-    line_token = env.get("LINE_CHANNEL_ACCESS_TOKEN") or os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-    line_user_id = env.get("LINE_USER_ID") or os.environ.get("LINE_USER_ID")
-    notify_token = env.get("LINE_NOTIFY_TOKEN") or os.environ.get("LINE_NOTIFY_TOKEN")
+    line_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or env.get("LINE_CHANNEL_ACCESS_TOKEN")
+    line_user_id = os.environ.get("LINE_USER_ID") or env.get("LINE_USER_ID")
+    notify_token = os.environ.get("LINE_NOTIFY_TOKEN") or env.get("LINE_NOTIFY_TOKEN")
 
     if line_token and line_user_id:
         return send_line_messaging_api(line_token, line_user_id, message)
