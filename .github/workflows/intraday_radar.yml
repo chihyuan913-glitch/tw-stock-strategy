@@ -1,0 +1,32 @@
+name: 台股盤中即時雷達 (開盤自動巡邏推播)
+
+on:
+  schedule:
+    # 台灣時間週一至週五 09:05 (UTC 01:05) 自動啟動開盤監控
+    - cron: '5 1 * * 1-5'
+  workflow_dispatch: # 支援在 GitHub 網頁手動一鍵啟動
+
+jobs:
+  run-intraday:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300 # 最長執行 5 小時 (直到收盤)
+    steps:
+      - name: 簽出專案代碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 環境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝相依套件
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 啟動盤中雷達 (監控至 13:35 收盤自動安全退出)
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: |
+          python intraday_scanner.py

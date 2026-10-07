@@ -1,0 +1,10 @@
+# 排除環境變數憑證
+.env
+*.log
+
+# Python 快取
+__pycache__/
+*.pyc
+
+# 暫存結果
+*.tmp
