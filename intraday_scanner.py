@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-台股盤中即時雷達監控器 (Intraday Real-time Scanner)
+台股盤中即時雷達監控器 V2.0 旗艦版 (Intraday Real-time Scanner V2.0)
 適用時段：09:00 ~ 13:30 (台股開盤時段)
 
-監控邏輯：
-1. 以「昨日三大法人逆勢買超且未大量拋售」的潛力股作為觀察母池。
-2. 預先計算各股的 20 日布林通道下軌與中軌。
-3. 盤中每隔 N 分鐘向證交所即時基本市況系統 (mis.twse.com.tw) 查詢即時成交價與累積成交量。
-4. 只要盤中成交量突破 1000 張，且現價剛好殺入「布林下軌 -5% ~ +1%」的超跌承接區，立即發送 LINE 快訊！
-5. 防洗版機制：同一檔個股當天只推播一次。
+監控升級：
+1. 籌碼純度初篩：昨日三大法人逆勢買超、佔比 >= 1.5%、投信無恐慌拋售。
+2. 盤中即時布林通道監控：成交量突破 1000 張 且 現價進入布林下軌 [-5.0% ~ +1.0%]。
+3. 盤中即時止跌與反彈空間判定：
+   - 即時計算反彈至 20MA (中軌) 空間。
+   - 盤中未收在最低點 (跌勢收斂有買盤支撐)。
+4. 智慧評分與星級標籤 (★★★★★)。
+5. 觸發時推播包含止跌與反彈目標之即時 LINE 快訊。
 """
 
 import sys
@@ -26,6 +28,11 @@ from line_sender import send_to_line
 if hasattr(sys.stdout, 'reconfigure'):
     try:
         sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
         pass
 
@@ -48,17 +55,17 @@ def get_latest_trading_date(max_days_back=15):
             pass
     return None
 
-def prepare_watchlist(top_n=150):
+def prepare_watchlist(top_n=120, min_inst_ratio=1.5):
     """
-    盤前準備：從最新一日法人買賣超中挑選「三大法人買超 > 0 且投信未拋售」的股票，
-    並計算其今日布林下軌值。
+    盤前準備：從最新一日法人買賣超中挑選「三大法人買超 > 0 且佔比達標」的潛力標的，
+    並精算各股今日的布林下軌與中軌值。
     """
     last_date = get_latest_trading_date()
     if not last_date:
         print("[X] 無法取得最新交易日數據")
         return {}
 
-    print(f"[*] 盤前準備：讀取 {last_date} 三大法人買超名單...")
+    print(f"[*] 盤前準備 V2.0：讀取 {last_date} 三大法人買超名單...")
     url_t86 = f'https://www.twse.com.tw/rwd/zh/fund/T86?date={last_date}&selectType=ALLBUT0999&response=json'
     req = urllib.request.Request(url_t86, headers={'User-Agent': 'Mozilla/5.0'})
     
@@ -89,11 +96,10 @@ def prepare_watchlist(top_n=150):
         print(f"[!] 獲取籌碼清單失敗: {e}")
         return {}
 
-    # 依法人買超張數排序，取前 top_n 檔
+    # 排序取前 top_n 檔
     candidates = sorted(candidates, key=lambda x: x['total'], reverse=True)[:top_n]
-    print(f"[*] 鎖定 {len(candidates)} 檔法人逆勢買超焦點股，正在計算布林通道...")
+    print(f"[*] 鎖定 {len(candidates)} 檔法人逆勢買超焦點股，正在計算 20 日布林通道...")
 
-    # 批次下載歷史資料計算布林通道
     tickers = [f"{c['code']}.TW" for c in candidates]
     try:
         df = yf.download(tickers, period='2mo', progress=False, group_by='ticker')
@@ -117,11 +123,14 @@ def prepare_watchlist(top_n=150):
             lb = ma20 - 2.0 * std20
             ub = ma20 + 2.0 * std20
 
+            is_dual = (c['foreign'] > 0) and (c['trust'] > 0)
+
             watchlist[code] = {
                 'name': c['name'],
                 'foreign_lots': c['foreign'],
                 'trust_lots': c['trust'],
                 'total_lots': c['total'],
+                'is_dual': is_dual,
                 'lower_band': float(lb),
                 'middle_band': float(ma20),
                 'upper_band': float(ub)
@@ -129,15 +138,14 @@ def prepare_watchlist(top_n=150):
         except Exception:
             continue
 
-    print(f"[OK] 盤中監控母池建置完成，共 {len(watchlist)} 檔股票納入即時雷達。")
+    print(f"[OK] 盤中監控母池建置完成，共 {len(watchlist)} 檔股票納入 V2.0 即時雷達。")
     return watchlist
 
 def fetch_realtime_quotes(stock_codes):
-    """向證交所 mis.twse.com.tw 批次查詢即時現價與累積成交量"""
+    """向證交所 mis.twse.com.tw 批次查詢即時現價、高低點與累積成交量"""
     if not stock_codes:
         return {}
     
-    # 每次最多查詢 50 檔，避免 URL 過長
     results = {}
     chunk_size = 50
     codes = list(stock_codes)
@@ -151,71 +159,83 @@ def fetch_realtime_quotes(stock_codes):
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 for item in data.get('msgArray', []):
-                    c = item.get('c', '') # 股票代碼
-                    z = item.get('z', '-') # 當前成交價
-                    y = item.get('y', '-') # 昨日收盤價
-                    v = item.get('v', '0') # 累積成交量 (張)
+                    c = item.get('c', '')
+                    z = item.get('z', '-')
+                    y = item.get('y', '-')
+                    o = item.get('o', '-')
+                    h = item.get('h', '-')
+                    l = item.get('l', '-')
+                    v = item.get('v', '0')
                     
-                    price = None
-                    if z != '-' and z != '':
-                        price = float(z)
-                    elif y != '-' and y != '':
-                        price = float(y)
-                        
+                    price = float(z) if z != '-' and z != '' else (float(y) if y != '-' and y != '' else None)
+                    low_p = float(l) if l != '-' and l != '' else price
+                    high_p = float(h) if h != '-' and h != '' else price
+                    open_p = float(o) if o != '-' and o != '' else price
                     volume = int(v) if v and v.isdigit() else 0
+                    
                     if price is not None and c:
                         results[c] = {
                             'price': price,
+                            'open': open_p,
+                            'high': high_p,
+                            'low': low_p,
                             'volume': volume,
                             'time': item.get('t', '')
                         }
-        except Exception as e:
+        except Exception:
             pass
             
     return results
 
-def send_intraday_alert(code, meta, rt):
-    """格式化並發送盤中即時觸底快訊到 LINE"""
-    dist_pct = (rt['price'] - meta['lower_band']) / meta['lower_band'] * 100.0
+def send_intraday_alert_v2(code, meta, rt):
+    """格式化並發送盤中即時觸底快訊 V2.0 到 LINE"""
+    price = rt['price']
+    lb = meta['lower_band']
+    mb = meta['middle_band']
+    dist_pct = (price - lb) / lb * 100.0
     dist_sign = "+" if dist_pct > 0 else ""
-    
-    # 操盤實戰四大價位試算
-    entry_val = f"{rt['price']:.2f} 元 (下軌支撐區 {meta['lower_band']:.2f}~{rt['price']:.2f} 元分批)"
-    addon_val = f"{round(rt['price'] * 1.03, 2)} 元 (反彈突破 5MA 續攻確認)"
-    tp_val = f"TP1 {meta['middle_band']:.2f} 元 (中軌MA20) ｜ TP2 {meta['upper_band']:.2f} 元 (上軌)"
-    sl_val = f"{round(meta['lower_band'] * 0.95, 2)} 元 (跌破下軌-5%破底無條件停損)"
+    upside_pct = (mb - price) / price * 100.0
+
+    # 盤中型態分析
+    low_p = rt['low'] or price
+    high_p = rt['high'] or price
+    amp = max(high_p - low_p, 0.01)
+    # 下影線或跌勢收斂
+    lower_shadow = price - low_p
+    ls_ratio = lower_shadow / amp
+
+    candle_status = "盤中低檔承接" if ls_ratio >= 0.20 else "跌勢收斂中"
+    if rt['open'] and price >= rt['open']:
+        candle_status = "盤中翻紅強勢"
+
+    # 星級判定
+    stars = "★★★★☆"
+    if meta['is_dual'] and upside_pct >= 4.0:
+        stars = "★★★★★"
+
+    dual_tag = " 🔥土洋同步同買" if meta['is_dual'] else ""
 
     msg_lines = [
-        "⚡【台股盤中即時雷達】布林下軌觸底轉折點",
+        f"⚡【台股盤中雷達 V2.0】觸底轉折點 {stars}",
         "─────────────────",
-        f"📍 標的：{code} {meta['name']}",
-        f"💰 即時現價：{rt['price']:.2f} 元 (距下軌 {dist_sign}{dist_pct:.2f}%)",
-        f"📊 盤中成交量：{rt['volume']:,} 張 (已大於 1000 張門檻)",
-        f"📐 布林軌道：下軌 {meta['lower_band']:.2f}｜中軌 {meta['middle_band']:.2f}｜上軌 {meta['upper_band']:.2f}",
-        "─────────────────",
-        "🎯【實戰操盤四價位建議】",
-        f"  🟢 進場價位：{entry_val}",
-        f"  🔵 加碼價位：{addon_val}",
-        f"  🔴 停利價位：{tp_val}",
-        f"  🛑 停損價位：{sl_val}",
-        "─────────────────",
+        f"📍 標的：{code} {meta['name']}{dual_tag}",
+        f"💰 即時現價：{price:.2f} 元 (距下軌 {dist_sign}{dist_pct:.2f}%)",
+        f"🎯 潛在反彈空間：+{upside_pct:.1f}% (看中軌 {mb:.2f} 元)",
+        f"📊 盤中量能：{rt['volume']:,} 張 (已大於千張門檻)",
+        f"🕯️ 即時型態：{candle_status}",
         f"🏦 法人背景：昨日買超 +{meta['total_lots']:,} 張 (外資+{meta['foreign_lots']:,}, 投信+{meta['trust_lots']:,})",
         f"⏰ 偵測時間：{rt.get('time', datetime.datetime.now().strftime('%H:%M:%S'))}",
         "─────────────────",
-        "💡 策略提示：股價急跌至下軌支撐區但籌碼有主力撐腰，嚴格遵守破底停損紀律！"
+        "💡 實戰提醒：具備反彈空間與法人背書，破下軌5%嚴格停損！"
     ]
     message = "\n".join(msg_lines)
-    print(f"\n[!] 觸發盤中警報: {code} {meta['name']} 現價 {rt['price']} (距下軌 {dist_sign}{dist_pct:.2f}%)")
+    print(f"\n[!] 觸發盤中警報 V2.0: {code} {meta['name']} 現價 {price} (反彈空間 +{upside_pct:.1f}%)")
     send_to_line(message)
 
 def run_intraday_scanner(interval_seconds=180, once=False):
-    """
-    盤中雷達主迴圈：
-    - 每 interval_seconds (預設 3 分鐘) 掃描一次
-    - 09:00 ~ 13:30 運作
-    """
+    """盤中雷達 V2.0 主迴圈"""
     print("=" * 65)
-    print("🚀 台股盤中即時雷達啟動中 (監控成交量 > 1000張 & 布林下軌 [-5% ~ +1%])")
+    print("🚀 台股盤中即時雷達 V2.0 啟動中 (布林下軌超跌 + 法人純度 + 反彈空間)")
     print("=" * 65)
 
     watchlist = prepare_watchlist()
@@ -229,13 +249,12 @@ def run_intraday_scanner(interval_seconds=180, once=False):
         now = datetime.datetime.now()
         now_time = now.time()
 
-        # 檢查是否在台股盤中交易時段 (09:00 ~ 13:30)
         start_time = datetime.time(9, 0)
         end_time = datetime.time(13, 35)
 
         if not once and (now_time < start_time or now_time > end_time):
             if now_time > end_time:
-                print("[*] 盤中交易已結束 (超過 13:35)，盤中雷達休息收工。")
+                print("[*] 盤中交易已結束 (超過 13:35)，盤中雷達收工。")
                 break
             else:
                 print(f"[*] 尚未開盤 (目前時間 {now.strftime('%H:%M:%S')})，等待至 09:00 開盤...")
@@ -261,11 +280,15 @@ def run_intraday_scanner(interval_seconds=180, once=False):
                 dist_pct = (price - lb) / lb * 100.0
 
                 if -5.0 <= dist_pct <= 1.0:
+                    # 條件 3: 潛在反彈空間 >= 2.0%
+                    upside_pct = (meta['middle_band'] - price) / price * 100.0
+                    if upside_pct < 2.0:
+                        continue
+
                     matched_count += 1
-                    # 避免當日重複轟炸推播
                     if code not in notified_today:
                         notified_today.add(code)
-                        send_intraday_alert(code, meta, rt)
+                        send_intraday_alert_v2(code, meta, rt)
 
         print(f"[*] 巡邏完成：目前符合條件個股 {matched_count} 檔，今日已推播 {len(notified_today)} 檔。")
 

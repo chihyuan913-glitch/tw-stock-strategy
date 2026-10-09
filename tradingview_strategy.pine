@@ -1,14 +1,15 @@
 //@version=5
-indicator("TW Stock - Bollinger Lower Band Reversal (台股布林下軌逆勢反彈指標)", overlay=true)
+indicator("TW Stock - Bollinger Lower Band Reversal V2.0 (台股布林下軌逆勢反彈旗艦指標)", overlay=true)
 
 // ==========================================
 // 參數設定
 // ==========================================
 length      = input.int(20, minval=1, title="布林通道週期 (Length)")
 mult        = input.float(2.0, minval=0.1, maxval=50, title="標準差倍數 (StdDev)")
-minVolume   = input.int(1000, title="最低日成交量(張)") // TradingView 台灣股票 volume 通常單位為股 (share) 或張 (lot)，需依數據源確認
+minVolume   = input.int(1000, title="最低日成交量(張)")
 maxUpperPct = input.float(1.0, title="下軌上方容許偏離% (Max Above LB %)")
 minLowerPct = input.float(-5.0, title="跌破下軌容許偏離% (Max Below LB %)")
+minUpside   = input.float(2.0, title="距20MA中軌最低反彈空間% (Min Upside %)")
 
 // ==========================================
 // 布林通道計算
@@ -18,8 +19,9 @@ dev   = mult * ta.stdev(close, length)
 upper = basis + dev
 lower = basis - dev
 
-// 計算收盤價相對下軌偏離率
-biasLB = (close - lower) / lower * 100.0
+// 計算指標
+biasLB  = (close - lower) / lower * 100.0
+upside  = (basis - close) / close * 100.0
 
 // 繪製軌道
 plot(basis, "中軌 (20MA)", color=color.gray, linewidth=1)
@@ -28,22 +30,28 @@ p_lower = plot(lower, "下軌 (Lower Band)", color=color.teal, linewidth=2)
 fill(p_upper, p_lower, color=color.new(color.teal, 93), title="布林通道區間")
 
 // ==========================================
+// K線止跌型態判定 (V2.0 升級)
+// ==========================================
+amplitude    = math.max(high - low, 0.001)
+lowerShadow  = math.min(open, close) - low
+shadowRatio  = lowerShadow / amplitude
+
+// 止跌條件：留下影線(>=25%) 或 收紅K落底 或 未收在最低
+isCandleReversal = (shadowRatio >= 0.25) or (close >= open) or (close > (low + amplitude * 0.15))
+
+// ==========================================
 // 觸發條件判定
 // ==========================================
-// 1. 成交量檢核 (以 1000 張 / 1,000,000 股為基準，適應不同 TV 數據源單位)
 isVolumeValid = volume >= (minVolume >= 100000 ? minVolume : minVolume * 1000) or volume >= minVolume
-
-// 2. 股價位於下軌 1% 位置或是跌破 5% 之內
 isPriceInZone = (biasLB >= minLowerPct) and (biasLB <= maxUpperPct)
+isUpsideValid = upside >= minUpside
 
-// 訊號觸發 (註：TradingView Pine Script 免費圖表未內嵌三大法人數據，此處為技術面進場區間警示)
-buySignal = isPriceInZone and isVolumeValid
+// 訊號觸發
+buySignal = isPriceInZone and isVolumeValid and isCandleReversal and isUpsideValid
 
 // 繪製進場買訊標籤
-plotshape(buySignal, title="布林下軌觸發點", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, text="觸軌承接")
+plotshape(buySignal, title="V2.0 轉折承接點", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal, text="V2.0止跌買訊")
+bgcolor(buySignal ? color.new(color.green, 85) : na, title="反彈觀察區背景色")
 
-// 填色背景提示
-bgcolor(buySignal ? color.new(color.green, 90) : na, title="反彈觀察區背景色")
-
-// 快訊警示通知
-alertcondition(buySignal, title="台股布林下軌逆勢觀察點警示", message="【布林下軌逆勢反彈訊號】{{ticker}} 股價進入下軌支撐區間 (距下軌 {{plot_3}}%)，成交量達標！")
+// 快訊警示
+alertcondition(buySignal, title="台股布林下軌 V2.0 旗艦買訊", message="【布林下軌V2.0旗艦買訊】{{ticker}} 觸及下軌支撐且浮現止跌型態，距中軌反彈空間充足！")
