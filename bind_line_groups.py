@@ -156,6 +156,9 @@ def check_webhook_events(token, seen_req_ids, bound_groups):
                     elif any(k in text_to_check for k in ["03", "3", "做空", "放空", "避險", "股期", "破線"]):
                         assigned_strat = "LINE_TARGET_STRATEGY_03"
                         strat_title = "策略 03：弱勢破線做空避險 (股票期貨)"
+                    elif any(k in text_to_check for k in ["04", "4", "可轉債", "cb", "定價", "伏擊", "閉鎖"]):
+                        assigned_strat = "LINE_TARGET_STRATEGY_04"
+                        strat_title = "策略 04：可轉債定價伏擊與區間博弈"
                     else:
                         # 依照尚未綁定的順序自動配對
                         env = load_env()
@@ -168,6 +171,9 @@ def check_webhook_events(token, seen_req_ids, bound_groups):
                         elif not env.get("LINE_TARGET_STRATEGY_03"):
                             assigned_strat = "LINE_TARGET_STRATEGY_03"
                             strat_title = "策略 03：弱勢破線做空避險 (股票期貨)"
+                        elif not env.get("LINE_TARGET_STRATEGY_04"):
+                            assigned_strat = "LINE_TARGET_STRATEGY_04"
+                            strat_title = "策略 04：可轉債定價伏擊與區間博弈"
 
                     if assigned_strat:
                         save_env_var(assigned_strat, gid)

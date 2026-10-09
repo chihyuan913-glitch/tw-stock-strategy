@@ -40,6 +40,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "03_short_momentum" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "04_cb_pricing_ambush",
+        "name": "可轉債 (CB) 定價伏擊與區間博弈策略",
+        "script": ROOT_DIR / "strategies" / "04_cb_pricing_ambush" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False):

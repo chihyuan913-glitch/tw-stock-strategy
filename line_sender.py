@@ -60,8 +60,7 @@ def resolve_target_id(strategy: str = None, target_id: str = None, env: dict = N
 
     if strategy:
         strat_key = str(strategy).strip()
-        # 正規化策略編號 (如 1 -> 01, "01_bollinger" -> "01")
-        if strat_key in ["1", "2", "3"]:
+        if strat_key.isdigit() and len(strat_key) == 1:
             strat_num = f"0{strat_key}"
         elif len(strat_key) >= 2 and strat_key[:2].isdigit():
             strat_num = strat_key[:2]

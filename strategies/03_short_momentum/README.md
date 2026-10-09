@@ -32,6 +32,8 @@
 ```text
 strategies/03_short_momentum/
 ├── screener.py          # 盤後放空選股器 (支援 --line 與 --export)
+├── intraday_scanner.py  # 盤中到價即時雷達與推播系統 (支援 --line 與四大價位比對)
+├── start_intraday.bat   # 一鍵啟動盤中到價即時雷達
 ├── stock_futures_list.json # 期交所股票期貨標的對應庫
 ├── run_daily.bat        # 盤後手動執行批次檔
 ├── result.csv           # 最新選股清單報表 (UTF-8-BOM)
@@ -48,6 +50,12 @@ strategies/03_short_momentum/
 # 執行盤後選股並匯出報表
 python screener.py --export result.csv
 
-# 執行盤後選股並即時推播至 LINE
+# 執行盤後選股並即時推播至 LINE (策略03群組)
 python screener.py --line --export result.csv
+
+# 啟動盤中做空到價即時雷達 (每 60 秒巡邏)
+python intraday_scanner.py --interval 60
+
+# 測試盤中做空到價推播 (發送模擬到價快訊至 LINE)
+python intraday_scanner.py --test-push
 ```

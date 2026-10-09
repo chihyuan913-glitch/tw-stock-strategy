@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-台股策略 02：法人籌碼集中起漲 - 盤中即時雷達與到價推播系統 (Intraday Momentum Scanner)
+台股策略 03：法人出貨破線做空與個股期貨避險 - 盤中即時雷達與到價推播系統 (Intraday Short Scanner)
 適用時段：09:00 ~ 13:35 (台股盤中交易時段)
 核心功能：
-1. 自動載入最新盤後選股名單 (result.csv)，鎖定四大操盤防線。
-2. 盤中即時連線證交所/櫃買行情，精準偵測到價事件：
-   - 🟢【起漲進場觸發】：現價落入月線起漲安全建倉區。
-   - 🔵【突破加碼觸發】：現價帶量突破加碼價位 (破今日高點/突破前高續攻)。
-   - 🔴【分批停利觸發】：現價攻抵 TP1 (+12%) 或 TP2 (+20%)。
-   - 🛑【破線停損警戒】：現價跌破關鍵停損點 (跌破月線 -2%)。
-3. 防重複洗版：同一標的同事件類型，當日僅推播一次。
-4. 支援獨立 LINE 視窗分流 (strategy="02")。
+1. 自動載入最新做空選股名單 (result.csv)，鎖定四大操盤防線與個股期貨合約。
+2. 盤中即時連線證交所/櫃買行情，精準偵測空方到價事件：
+   - 🟢【起跌建倉觸發】：現價落入空單標準進場區間。
+   - 🔵【破低加空觸發】：現價摜破加碼價位 (破今日低點續崩加空)。
+   - 🔴【分批停利觸發】：現價下殺攻抵 TP1 (-12%) 或 TP2 (-20%) 空單回補點。
+   - 🛑【破線停損警戒】：現價突破月線反壓與停損價位，強制停損回補。
+3. 整合個股期貨保證金試算 (一口表彰2張現貨，保證金約現值 13.5%)。
+4. 防重複洗版：同一標的同事件類型，當日僅推播一次。
+5. 支援獨立 LINE 視窗分流 (strategy="03")。
 """
 
 import sys
@@ -46,7 +47,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 CSV_FILE = os.path.join(os.path.dirname(__file__), 'result.csv')
 
 def load_targets():
-    """優先自 result.csv 載入最新選股名單與四大價位"""
+    """優先自 result.csv 載入最新做空選股名單與四大價位"""
     targets = {}
     if os.path.exists(CSV_FILE):
         try:
@@ -54,39 +55,42 @@ def load_targets():
             for _, row in df.iterrows():
                 code = str(row['證券代號']).strip()
                 close_p = float(row['收盤價'])
-                entry_p = float(row.get('進場價位', row.get('進場參考', close_p)))
-                addon_p = float(row.get('加碼價位', round(close_p * 1.02, 2)))
-                tp1_p = float(row.get('停利TP1', round(close_p * 1.12, 2)))
-                tp2_p = float(row.get('停利TP2', round(close_p * 1.20, 2)))
-                sl_p = float(row.get('停損價位', round(close_p * 0.98, 2)))
-                ma20 = float(row.get('月線(20MA)', round(close_p * 0.98, 2)))
-                bias_pct = float(row.get('月線乖離%', round((close_p - ma20) / ma20 * 100, 2)))
+                entry_p = float(row.get('進場價位', row.get('空單進場', close_p)))
+                addon_p = float(row.get('加碼價位', row.get('加空價位', round(close_p * 0.985, 2))))
+                tp1_p = float(row.get('停利TP1', round(close_p * 0.88, 2)))
+                tp2_p = float(row.get('停利TP2', round(close_p * 0.80, 2)))
+                sl_p = float(row.get('停損價位', row.get('停損回補', round(close_p * 1.025, 2))))
+                ma20 = float(row.get('月線(20MA)', round(close_p * 1.02, 2)))
+                neg_bias = float(row.get('月線負乖離%', round((close_p - ma20) / ma20 * 100, 2)))
+                contract = str(row.get('期貨契約', '--')).strip()
+                margin = int(row.get('1口保證金(約)', int(round(close_p * 2000 * 0.135, -1))))
 
                 targets[code] = {
                     'code': code,
                     'name': str(row['證券名稱']).strip(),
+                    'contract': contract,
+                    'margin_1lot': margin,
                     'entry_price': entry_p,
                     'addon_price': addon_p,
                     'tp1_price': tp1_p,
                     'tp2_price': tp2_p,
                     'sl_price': sl_p,
                     'ma20': ma20,
-                    'bias_pct': bias_pct,
+                    'neg_bias': neg_bias,
                     'v5_avg': int(row.get('5日均量(張)', 1000)),
-                    'inst_ratio': float(row.get('法人買超佔比%', 10.0)),
-                    'f_3d': int(row.get('外資3日買超(張)', 0)),
-                    't_3d': int(row.get('投信3日買超(張)', 0)),
-                    'inst_today': int(row.get('當日法人買超(張)', 0))
+                    'inst_sell_ratio': float(row.get('法人賣超佔比%', 10.0)),
+                    'f_3d': int(row.get('外資3日賣超(張)', 0)),
+                    't_3d': int(row.get('投信3日賣超(張)', 0))
                 }
             if targets:
-                print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔法人起漲精選標的。")
+                print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔做空避險精選標的。")
                 return targets
         except Exception as e:
             print(f"[!] 讀取 result.csv 失敗: {e}，將建立備用母池...")
 
-    # 若無 result.csv 則建立代表性標的池
-    print("[*] 查無 result.csv，從市場焦點股建立起漲監控母池...")
-    demo_codes = ['2851', '2515', '1605', '1608', '1102']
+    # 若無 result.csv 則建立代表性做空標的池
+    print("[*] 查無 result.csv，從市場弱勢焦點股建立做空監控母池...")
+    demo_codes = ['2603', '2609', '2615']
     tickers = [f"{c}.TW" for c in demo_codes]
     try:
         df_yf = yf.download(tickers, period='2mo', progress=False, group_by='ticker')
@@ -102,19 +106,20 @@ def load_targets():
             c_p = float(close_s.iloc[-1])
             targets[c] = {
                 'code': c,
-                'name': f'起漲焦點_{c}',
+                'name': f'弱勢焦點_{c}',
+                'contract': 'CZF',
+                'margin_1lot': int(round(c_p * 2000 * 0.135, -1)),
                 'entry_price': round(c_p, 2),
-                'addon_price': round(c_p * 1.025, 2),
-                'tp1_price': round(ma20 * 1.12, 2),
-                'tp2_price': round(ma20 * 1.20, 2),
-                'sl_price': round(ma20 * 0.98, 2),
+                'addon_price': round(c_p * 0.985, 2),
+                'tp1_price': round(c_p * 0.88, 2),
+                'tp2_price': round(c_p * 0.80, 2),
+                'sl_price': round(ma20 * 1.01, 2),
                 'ma20': round(ma20, 2),
-                'bias_pct': round((c_p - ma20) / ma20 * 100, 2),
-                'v5_avg': 3000,
-                'inst_ratio': 15.0,
-                'f_3d': 2500,
-                't_3d': 500,
-                'inst_today': 1500
+                'neg_bias': round((c_p - ma20) / ma20 * 100, 2),
+                'v5_avg': 5000,
+                'inst_sell_ratio': 15.0,
+                'f_3d': -3500,
+                't_3d': -1200
             }
     except Exception as e:
         print(f"[!] 建立備用母池失敗: {e}")
@@ -193,51 +198,51 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
     """發送盤中到價 LINE 推播卡片 (採用旗艦卡片 UI 與操盤四大防線)"""
     code = target['code']
     name = target['name']
+    contract = target['contract']
     price = rt['price']
     high_p = rt['high']
     low_p = rt['low']
-    vol = rt['volume']
     ma20 = target['ma20']
-    bias_pct = round((price - ma20) / ma20 * 100, 2)
+    neg_bias = round((price - ma20) / ma20 * 100, 2)
 
     # 動態指引標籤
-    entry_tag = " ◄◄ 【到達建倉區！】" if event_type == "ENTRY" else ""
-    addon_tag = " ◄◄ 【突破加碼點！】" if event_type == "ADDON" else ""
-    tp1_tag = " ◄◄ 【TP1達標(+12%)！】" if event_type == "TP1" else ""
-    tp2_tag = " ◄◄ 【TP2達標(+20%)！】" if event_type == "TP2" else ""
-    sl_tag = " ◄◄ 【破線停損警戒！】" if event_type == "STOP_LOSS" else ""
+    entry_tag = " ◄◄ 【空單進場基準！】" if event_type == "ENTRY" else ""
+    addon_tag = " ◄◄ 【破低加空追擊！】" if event_type == "ADDON" else ""
+    tp1_tag = " ◄◄ 【TP1達標(-12%)！】" if event_type == "TP1" else ""
+    tp2_tag = " ◄◄ 【TP2達標(-20%)！】" if event_type == "TP2" else ""
+    sl_tag = " ◄◄ 【站上月線停損！】" if event_type == "STOP_LOSS" else ""
 
     msg_lines = [
         "╔═══════════════════════╗",
-        "║  🚨【盤中雷達】法人起漲到價即時快訊  ║",
+        "║  🚨【盤中雷達】弱勢做空到價即時快訊  ║",
         "╚═══════════════════════╝",
-        f"📍 監控標的：{code} {name} ｜ 🚀 強勢起漲",
+        f"📍 監控標的：{code} {name} ｜ ⚡ 股期: {contract}",
         f"🔥 觸發事件：【{event_title}】",
         f"💵 即時現價：{price:.2f} 元 (今日高: {high_p:.2f} / 低: {low_p:.2f})",
         "━━━━━━━━━━━━━━━━━━━━",
         "🎯 實戰操盤四大防線：",
-        f"├ 🟢 進場價位：{target['entry_price']:.2f} 元 (起漲安全區){entry_tag}",
-        f"├ 🔵 加碼價位：{target['addon_price']:.2f} 元 (突破日高續攻){addon_tag}",
-        f"├ 🔴 停利目標：TP1 {target['tp1_price']:.2f} (+12%){tp1_tag} ｜ TP2 {target['tp2_price']:.2f} (+20%){tp2_tag}",
-        f"└ 🛑 停損防守：{target['sl_price']:.2f} 元 (跌破月線-2%){sl_tag}",
+        f"├ 🟢 進場價位：{target['entry_price']:.2f} 元 (空單進場基準){entry_tag}",
+        f"├ 🔵 加碼價位：{target['addon_price']:.2f} 元 (破低加空追擊){addon_tag}",
+        f"├ 🔴 停利目標：TP1 {target['tp1_price']:.2f} (-12%){tp1_tag} ｜ TP2 {target['tp2_price']:.2f} (-20%){tp2_tag}",
+        f"└ 🛑 停損防守：{target['sl_price']:.2f} 元 (站上月線反壓){sl_tag}",
         "────────────────────",
-        "🏦 法人主力吃貨與均線：",
-        f"• 盤中量能：{vol:,} 張 (5日均量: {target['v5_avg']:,} 張)",
-        f"• 均線防線：月線 {ma20:.2f} 元 (上揚助漲) ｜ 乖離 +{bias_pct:.2f}%",
-        f"• 法人背景：外資3日 {target['f_3d']:+,}張 ｜ 投信3日 {target['t_3d']:+,}張 (佔比 {target['inst_ratio']:.1f}%)",
+        "💰 股期保證金與籌碼：",
+        f"• 1口保證金：約 {target['margin_1lot']:,} 元 (表彰2張現貨)",
+        f"• 均線反壓：月線 {ma20:.2f} 元 (下彎蓋頭反壓) ｜ 負乖離 {neg_bias:.2f}%",
+        f"• 法人賣超：佔比 {target['inst_sell_ratio']:.1f}% (外資3日{target['f_3d']:,}張, 投信3日{target['t_3d']:,}張)",
         "────────────────────",
         f"💡【實戰指引】{event_desc}",
         f"⏰ 偵測時間：{rt.get('time', datetime.datetime.now().strftime('%H:%M:%S'))}",
         "━━━━━━━━━━━━━━━━━━━━"
     ]
     message = "\n".join(msg_lines)
-    print(f"\n[!] 觸發盤中到價警報 (策略02): {code} {name} 事件: {event_title} 現價: {price:.2f}")
-    send_to_line(message, strategy="02")
+    print(f"\n[!] 觸發盤中做空到價警報 (策略03): {code} {name} 事件: {event_title} 現價: {price:.2f}")
+    send_to_line(message, strategy="03")
 
 def scan_once(targets, notified_events, force_test=False):
     """執行一次全體標的盤中到價掃描"""
     now_str = datetime.datetime.now().strftime('%H:%M:%S')
-    print(f"\n[*] [{now_str}] 正在檢查 {len(targets)} 檔法人起漲標的盤中到價情況...")
+    print(f"\n[*] [{now_str}] 正在檢查 {len(targets)} 檔弱勢做空標的盤中到價情況...")
 
     codes = list(targets.keys())
     rt_quotes = fetch_realtime_quotes(codes)
@@ -247,52 +252,52 @@ def scan_once(targets, notified_events, force_test=False):
         if not rt or rt.get('price') is None:
             continue
         price = rt['price']
-        print(f"  • {code} {target['name']}: 現價 {price:.2f} (進場 {target['entry_price']:.2f}, 加碼 {target['addon_price']:.2f}, TP1 {target['tp1_price']:.2f}, 停損 {target['sl_price']:.2f})")
+        print(f"  • {code} {target['name']}: 現價 {price:.2f} (進場 {target['entry_price']:.2f}, 加空 {target['addon_price']:.2f}, TP1 {target['tp1_price']:.2f}, 停損 {target['sl_price']:.2f})")
 
         events_for_code = notified_events.setdefault(code, set())
 
-        # 1. 停損警戒判定 (優先級最高: 現價 <= 停損價)
-        if price <= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
+        # 1. 停損回補判定 (優先級最高: 現價 >= 停損價 / 站上月線)
+        if price >= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
             events_for_code.add('STOP_LOSS')
             send_intraday_price_alert(
-                target, rt, 'STOP_LOSS', '🛑 跌破月線防線 - 停損離場警報',
-                '股價已跌破月線-2%關鍵風控位！法人防守失守，請嚴守紀律立即執行停損離場保護本金！'
+                target, rt, 'STOP_LOSS', '🛑 突破月線反壓 - 空單停損回補警報',
+                '股價已強勢站上月線反壓防線！下跌慣性破壞，請嚴守紀律立即回補空單停損，絕不死抗！'
             )
             continue
 
-        # 2. 停利 TP2 判定 (現價 >= TP2)
-        if price >= target['tp2_price'] and 'TP2' not in events_for_code:
+        # 2. 停利 TP2 判定 (現價 <= TP2)
+        if price <= target['tp2_price'] and 'TP2' not in events_for_code:
             events_for_code.add('TP2')
             send_intraday_price_alert(
-                target, rt, 'TP2', '🔴 達成第二停利目標 TP2 (+20%)',
-                '股價強勢噴發達標波段目標 TP2 (+20%)！主升段利潤豐厚，建議再獲利了結部位，落袋為安！'
+                target, rt, 'TP2', '🔴 空單達成第二停利目標 TP2 (-20%)',
+                '股價重挫達標波段回補目標 TP2 (-20%)！利潤豐厚，建議大幅獲利了結回補空單部位！'
             )
             continue
 
-        # 3. 停利 TP1 判定 (現價 >= TP1)
-        if price >= target['tp1_price'] and 'TP1' not in events_for_code:
+        # 3. 停利 TP1 判定 (現價 <= TP1)
+        if price <= target['tp1_price'] and 'TP1' not in events_for_code:
             events_for_code.add('TP1')
             send_intraday_price_alert(
-                target, rt, 'TP1', '🔴 達成第一停利目標 TP1 (+12%)',
-                '股價攻抵第一波段目標 TP1 (+12%)！起漲動能達標，建議分批獲利了結 1/3 至 1/2 部位！'
+                target, rt, 'TP1', '🔴 空單達成第一停利目標 TP1 (-12%)',
+                '股價下殺達標第一停利目標 TP1 (-12%)！短線跌勢滿足，建議分批回補 1/3 至 1/2 空單！'
             )
             continue
 
-        # 4. 突破加碼判定 (現價 >= 加碼價位)
-        if price >= target['addon_price'] and 'ADDON' not in events_for_code:
+        # 4. 破低加空判定 (現價 <= 加碼加空價位)
+        if price <= target['addon_price'] and 'ADDON' not in events_for_code:
             events_for_code.add('ADDON')
             send_intraday_price_alert(
-                target, rt, 'ADDON', '🔵 突破關鍵高點 - 右側加碼點',
-                '現價帶量突破今日高點/關鍵壓力，法人主力吃貨發動，可依操盤計畫加碼乘勝追擊！'
+                target, rt, 'ADDON', '🔵 摜破關鍵低點 - 空單加空追擊',
+                '現價摜破關鍵低點，破線殺盤動能再起！可依操盤計畫加碼放空 1 口股票期貨乘勝追擊！'
             )
             continue
 
-        # 5. 進場起漲判定 (現價落入起漲安全區間)
-        if (target['sl_price'] < price <= target['entry_price'] * 1.015) and 'ENTRY' not in events_for_code:
+        # 5. 空單進場判定 (現價在進場區間)
+        if (target['addon_price'] < price <= target['entry_price'] * 1.005) and 'ENTRY' not in events_for_code:
             events_for_code.add('ENTRY')
             send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 起漲安全區 - 進場買點觸發',
-                '現價處於月線正乖離起漲安全區，法人主力籌碼集中背書，可依計畫分批進場建倉！'
+                target, rt, 'ENTRY', '🟢 空單起跌建倉點觸發',
+                '現價跌破月線且法人大賣砸盤，空單進場基準點浮現！可依計畫建立個股期貨空單避險部位！'
             )
             continue
 
@@ -300,7 +305,7 @@ def scan_once(targets, notified_events, force_test=False):
         if force_test and 'TEST' not in events_for_code:
             events_for_code.add('TEST')
             send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 測試推播：法人起漲到價快訊',
+                target, rt, 'ENTRY', '🟢 測試推播：弱勢做空到價快訊',
                 '【盤中雷達連線測試】系統即時監控中，到達四大價位將即時推播！'
             )
             break
@@ -308,7 +313,7 @@ def scan_once(targets, notified_events, force_test=False):
 def run_intraday_scanner(interval=60, once=False, force_test=False):
     """盤中雷達常駐主迴圈"""
     print("=" * 70)
-    print("🚀 啟動【策略02：法人籌碼集中起漲 - 盤中即時雷達與到價推播系統】")
+    print("🚀 啟動【策略03：法人出貨破線做空與個股期貨避險 - 盤中即時雷達與到價推播系統】")
     print("=" * 70)
 
     targets = load_targets()
@@ -344,7 +349,7 @@ def run_intraday_scanner(interval=60, once=False, force_test=False):
         time.sleep(interval)
 
 def main():
-    parser = argparse.ArgumentParser(description="策略 02 法人起漲盤中到價即時雷達推播")
+    parser = argparse.ArgumentParser(description="策略 03 弱勢做空盤中到價即時雷達推播")
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
     parser.add_argument("--once", action="store_true", help="僅執行單次快篩測試")
     parser.add_argument("--test-push", "--force-test", dest="force_test", action="store_true", help="發送一則模擬到價快訊測試 LINE 連線與排版")
