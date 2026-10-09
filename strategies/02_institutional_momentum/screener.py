@@ -447,8 +447,8 @@ def main():
                 msg_lines.append(f"(其餘 {len(df_res)-8} 檔完整名單請查看電腦 CSV 報表)")
             msg_lines.append("💡 交易紀律：起漲安全區進場，跌破停損價無條件執行！")
             
-            print("[*] 正在發送選股清單至 LINE...")
-            send_to_line("\n".join(msg_lines))
+            print("[*] 正在發送選股清單至 LINE (策略 02)...")
+            send_to_line("\n".join(msg_lines), strategy="02")
         except Exception as e:
             print(f"[!] 發送 LINE 選股通知失敗: {e}")
 

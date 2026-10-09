@@ -442,7 +442,7 @@ def main():
             try:
                 from line_sender import send_to_line
                 empty_msg = f"📊【台股選股日報 V2.0】\n📅 日期：{args.date or '今日'} 盤後\n\n今日全市場無符合 V2.0 旗艦濾網（止跌型態+法人純度）之個股，建議耐心空手等待！"
-                send_to_line(empty_msg)
+                send_to_line(empty_msg, strategy="01")
             except Exception as e:
                 print(f"[!] LINE 推播失敗: {e}")
         return
@@ -478,8 +478,8 @@ def main():
             from line_sender import send_to_line
             target_date = args.date or get_latest_trading_date() or "今日"
             line_msg = format_line_message(results, target_date, args)
-            print("[*] 正在發送 V2.0 選股清單至 LINE...")
-            send_to_line(line_msg)
+            print("[*] 正在發送 V2.0 選股清單至 LINE (策略 01)...")
+            send_to_line(line_msg, strategy="01")
         except Exception as e:
             print(f"[!] 發送 LINE 訊息過程發生異常: {e}")
 

@@ -83,6 +83,18 @@ powershell -ExecutionPolicy Bypass -File setup_task_scheduler.ps1
 1. **每日盤後 17:35** 自動執行 `run_all.bat` 彙總全日選股報表並發送 LINE。
 2. **每日開盤 08:55** 自動啟動盤中即時雷達。
 
+### 5. LINE 獨立視窗分流設定 (方案 A：各策略專屬群組)
+為了避免多空策略訊號混淆在同一個聊天視窗，系統支援將三大策略分流至各自的 LINE 群組：
+1. 在 LINE App 內建立 3 個專屬群組（如「01-超跌抄底」、「02-法人起漲」、「03-做空避險」），並邀請您的 Bot 進群。
+2. 執行本機輔助工具 `python get_group_id.py` 獲取各群組的 Group ID (以 C 開頭的 33 字元)。
+3. 在 `.env` 中設定專屬目標：
+   ```env
+   LINE_TARGET_STRATEGY_01=Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # 策略一
+   LINE_TARGET_STRATEGY_02=Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # 策略二
+   LINE_TARGET_STRATEGY_03=Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # 策略三
+   ```
+*(若未設定，系統自動使用預設的 `LINE_USER_ID` 個人聊天室發送)*
+
 ---
 
 ## 架構原則與規範

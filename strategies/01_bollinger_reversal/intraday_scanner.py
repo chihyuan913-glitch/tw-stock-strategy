@@ -236,7 +236,7 @@ def send_intraday_alert_v2(code, meta, rt):
     ]
     message = "\n".join(msg_lines)
     print(f"\n[!] 觸發盤中警報 V2.0: {code} {meta['name']} 現價 {price} (反彈空間 +{upside_pct:.1f}%)")
-    send_to_line(message)
+    send_to_line(message, strategy="01")
 
 def run_intraday_scanner(interval_seconds=180, once=False):
     """盤中雷達 V2.0 主迴圈"""

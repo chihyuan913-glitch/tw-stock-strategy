@@ -43,7 +43,19 @@ if ROOT_DIR not in sys.path:
 
 ---
 
-## 三、量化篩選與資料抓取通用準則
+## 三、LINE 推播獨立視窗分流規範 (Multi-Channel Visual Isolation)
+1. **視窗隔離原則 (防呆防混淆)**：
+   - 為徹底杜絕多空訊號混淆，各策略在 LINE 推播時，**強制支援定向投遞至各自專屬的 LINE 視窗/群組**。
+   - 策略一 (布林超跌抄底)、策略二 (法人起漲動能)、策略三 (股期做空避險) 擁有各自獨立的聊天群組。
+2. **調用標準**：
+   - 各模組調用 `send_to_line` 時，必須傳遞自身策略編號：
+     `send_to_line(message, strategy="01")`
+3. **高可用 Fallback 機制**：
+   - 若 `.env` 未設定該策略之專屬 Group ID（`LINE_TARGET_STRATEGY_XX`），系統自動安全退回使用全域 `LINE_USER_ID`，確保訊息絕對不丟失。
+
+---
+
+## 四、量化篩選與資料抓取通用準則
 1. **數據獲取可靠性**：
    - 優先調用免費公開之證交所/櫃買中心官方 API 與 Yahoo Finance，需具備隨機延遲（Anti-Scraping / Rate Limit 防護）與多層重試機制。
 2. **流動性與防詐濾網**：
@@ -56,6 +68,6 @@ if ROOT_DIR not in sys.path:
 
 ---
 
-## 四、指令執行與維護規範
+## 五、指令執行與維護規範
 - 總指揮下達全域更新或新策略需求時，AI 助手需主動審視並嚴格依照本規範於 `strategies/` 下建置或維護。
 - 重大更動與版本演進需明確記錄於該策略之 `README.md`。

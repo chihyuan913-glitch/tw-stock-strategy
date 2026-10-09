@@ -361,7 +361,7 @@ def send_intraday_momentum_alert(code, meta, rt):
     print(f"🔥 [觸發 LINE 推播] {code} {meta['name']} 現價 {price:.2f} ({chg_sign}{pct_chg:.2f}%)，乖離 +{bias_pct:.2f}%")
     print("=" * 60)
     
-    send_to_line(message)
+    send_to_line(message, strategy="02")
 
 
 def run_intraday_momentum_scanner(interval_seconds=60, once=False):

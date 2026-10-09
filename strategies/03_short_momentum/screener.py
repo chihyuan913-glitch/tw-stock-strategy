@@ -512,8 +512,8 @@ def main():
                 msg_lines.append(f"(其餘 {len(df_res)-8} 檔完整名單請查看 short_result.csv 報表)")
             msg_lines.append("💡 做空紀律：站回月線反壓無條件嚴格停損回補，絕不死抗被軋！")
             
-            print("[*] 正在發送做空選股清單至 LINE...")
-            send_to_line("\n".join(msg_lines))
+            print("[*] 正在發送做空選股清單至 LINE (策略 03)...")
+            send_to_line("\n".join(msg_lines), strategy="03")
         except Exception as e:
             print(f"[!] 發送 LINE 選股通知失敗: {e}")
 
