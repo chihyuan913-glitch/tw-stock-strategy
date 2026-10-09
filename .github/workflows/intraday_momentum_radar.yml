@@ -29,4 +29,4 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
-          python intraday_momentum_scanner.py --interval 60
+          python strategies/02_institutional_momentum/intraday_scanner.py --interval 60

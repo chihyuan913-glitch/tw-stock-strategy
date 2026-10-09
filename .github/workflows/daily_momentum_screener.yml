@@ -28,11 +28,11 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
-          python screener_institutional_momentum.py --line --export momentum_result.csv
+          python strategies/02_institutional_momentum/screener.py --line --export strategies/02_institutional_momentum/result.csv
 
       - name: 存檔最新選股報表 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: momentum-stock-result
-          path: momentum_result.csv
+          path: strategies/02_institutional_momentum/result.csv
           retention-days: 7

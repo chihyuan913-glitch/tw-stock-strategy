@@ -29,4 +29,4 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
-          python intraday_scanner.py
+          python strategies/01_bollinger_reversal/intraday_scanner.py

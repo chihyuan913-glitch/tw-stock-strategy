@@ -1,40 +1,47 @@
 # =====================================================================
-# 一鍵建立 Windows 工作排程器：台股盤中即時雷達自動監控
-# 觸發時段：每週一至週五 早上 08:55 自動啟動，13:35 收盤自動休眠
+# 一鍵建立 Windows 工作排程器：台股選股策略自動排程
+# 1. 每日盤後全策略自動巡邏 (週一至週五 17:30 執行 run_all.bat)
+# 2. 盤中即時雷達自動監控 (週一至週五 08:55 啟動)
 # =====================================================================
 
-$TaskName = "TWStock_Momentum_Intraday_Scanner"
-$ScriptPath = "g:\我的雲端硬碟\台股選股策略\start_momentum_intraday.bat"
+$WorkingDir = "g:\我的雲端硬碟\台股選股策略"
+$DailyRunner = "$WorkingDir\run_all.bat"
+$IntradayScanner = "$WorkingDir\strategies\02_institutional_momentum\start_intraday.bat"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " 正在設定 Windows 工作排程器：台股法人籌碼起漲即時雷達" -ForegroundColor Cyan
+Write-Host " 正在設定 Windows 工作排程器：台股量化選股策略總指揮排程" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 檢查檔案是否存在
-if (-not (Test-Path $ScriptPath)) {
-    Write-Host "[X] 找不到批次檔: $ScriptPath" -ForegroundColor Red
-    exit 1
+# 任務一：每日盤後全策略自動巡邏 (17:35)
+$TaskDaily = "TWStock_Daily_Master_Runner"
+if (Test-Path $DailyRunner) {
+    $ActionDaily = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$DailyRunner`"" -WorkingDirectory $WorkingDir
+    $TriggerDaily = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday -At 05:35PM
+    $SettingsDaily = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+
+    try {
+        Unregister-ScheduledTask -TaskName $TaskDaily -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $TaskDaily -Action $ActionDaily -Trigger $TriggerDaily -Settings $SettingsDaily -Description "台股每日盤後全策略自動選股與 LINE 推播日報" | Out-Null
+        Write-Host "[✓] 成功註冊盤後排程工作：$TaskDaily (每週一至週五 17:35 執行)" -ForegroundColor Green
+    } catch {
+        Write-Host "[!] 註冊 $TaskDaily 失敗: $_" -ForegroundColor Red
+    }
 }
 
-# 動作：啟動批次檔
-$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$ScriptPath`"" -WorkingDirectory "g:\我的雲端硬碟\台股選股策略"
+# 任務二：盤中即時雷達 (08:55)
+$TaskIntraday = "TWStock_Momentum_Intraday_Scanner"
+if (Test-Path $IntradayScanner) {
+    $ActionIntraday = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$IntradayScanner`"" -WorkingDirectory "$WorkingDir\strategies\02_institutional_momentum"
+    $TriggerIntraday = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday -At 08:55AM
+    $SettingsIntraday = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 5)
 
-# 觸發器：週一至週五 08:55
-$Trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday -At 08:55AM
-
-# 設定選項：允許按需執行、錯過補跑、最長執行時間 5 小時 (到 14:00 自動收尾)
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 5)
-
-# 註冊工作排程
-try {
-    # 若已存在先取消註冊
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Description "台股法人籌碼集中起漲盤中即時雷達自動監控 (09:00~13:35 自動推播 LINE)" | Out-Null
-    Write-Host "`n[✓] 成功建立 Windows 排程工作：$TaskName" -ForegroundColor Green
-    Write-Host "    • 執行頻率：週一至週五 早上 08:55 自動啟動" -ForegroundColor Yellow
-    Write-Host "    • 監控邏輯：成交量>1000張、站上20MA且月線上揚、正乖離<8%、無長上影線" -ForegroundColor Yellow
-    Write-Host "    • 訊號推播：觸發即時發送至您的 LINE" -ForegroundColor Yellow
-    Write-Host "    • 結束時間：13:35 盤後自動停止`n" -ForegroundColor Yellow
-} catch {
-    Write-Host "[!] 建立排程失敗，可能需要以系統管理員身分執行: $_" -ForegroundColor Red
+    try {
+        Unregister-ScheduledTask -TaskName $TaskIntraday -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $TaskIntraday -Action $ActionIntraday -Trigger $TriggerIntraday -Settings $SettingsIntraday -Description "台股法人籌碼起漲盤中即時雷達自動監控" | Out-Null
+        Write-Host "[✓] 成功註冊盤中排程工作：$TaskIntraday (每週一至週五 08:55 啟動)" -ForegroundColor Green
+    } catch {
+        Write-Host "[!] 註冊 $TaskIntraday 失敗: $_" -ForegroundColor Red
+    }
 }
+
+Write-Host "`n[完成] 排程設定已更新完畢！" -ForegroundColor Cyan

@@ -32,6 +32,11 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
+# 加入專案根目錄至 sys.path 以便共用模組 (如 line_sender)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 # 匯入 LINE 發送模組
 from line_sender import send_to_line
 

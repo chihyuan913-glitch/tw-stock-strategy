@@ -21,6 +21,11 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 
+# 加入專案根目錄至 sys.path 以便共用模組 (如 line_sender)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -453,17 +458,20 @@ def main():
     print("="*95)
 
     if args.export:
-        if args.export.endswith('.csv'):
-            df_res.to_csv(args.export, index=False, encoding='utf-8-sig')
-            print(f"[✓] 已成功匯出 CSV 報表至: {args.export}")
-        elif args.export.endswith('.md'):
-            with open(args.export, 'w', encoding='utf-8') as f:
+        export_path = args.export
+        if not os.path.isabs(export_path) and os.path.dirname(export_path) == "":
+            export_path = os.path.join(os.path.dirname(__file__), export_path)
+        if export_path.endswith('.csv'):
+            df_res.to_csv(export_path, index=False, encoding='utf-8-sig')
+            print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
+        elif export_path.endswith('.md'):
+            with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(f"# 台股選股清單 V2.0 旗艦版\n\n")
                 f.write(f"- 產生時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"- 核心條件：成交量 > {args.min_vol}張｜下軌區間 [{args.min_dist}% ~ +{args.max_dist}%]｜法人買超佔比 > {args.min_inst_ratio}%｜反彈空間 > {args.min_upside}%\n\n")
                 f.write(df_res.to_markdown(index=False))
                 f.write("\n")
-            print(f"[✓] 已成功匯出 Markdown 報表至: {args.export}")
+            print(f"[✓] 已成功匯出 Markdown 報表至: {export_path}")
 
     if args.line:
         try:

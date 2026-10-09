@@ -36,6 +36,11 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 
+# 加入專案根目錄至 sys.path 以便共用模組 (如 line_sender)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 # 匯入 LINE 發送模組
 from line_sender import send_to_line
 
@@ -458,11 +463,14 @@ def main():
     print("="*115)
 
     if args.export:
-        if args.export.endswith('.csv'):
-            df_res.to_csv(args.export, index=False, encoding='utf-8-sig')
-            print(f"[✓] 已成功匯出 CSV 報表至: {args.export}")
-        elif args.export.endswith('.md'):
-            with open(args.export, 'w', encoding='utf-8') as f:
+        export_path = args.export
+        if not os.path.isabs(export_path) and os.path.dirname(export_path) == "":
+            export_path = os.path.join(os.path.dirname(__file__), export_path)
+        if export_path.endswith('.csv'):
+            df_res.to_csv(export_path, index=False, encoding='utf-8-sig')
+            print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
+        elif export_path.endswith('.md'):
+            with open(export_path, 'w', encoding='utf-8') as f:
                 f.write(f"# 🎯 台股法人出貨破線做空選股日報（⚡ 統一鎖定具備股票期貨標的）\n\n")
                 f.write(f"- 產生時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"- 篩選標準：具備期交所股票期貨、外資/投信3日累計賣超>1000張、法人賣超佔比>10%、跌破月線且斜率向下、5日均量>1000張、負乖離[-8%~0%]、無長下影線\n")
@@ -476,7 +484,7 @@ def main():
                     row_line = "| " + " | ".join(str(row[c]) for c in cols) + " |\n"
                     f.write(row_line)
                 f.write("\n")
-            print(f"[✓] 已成功匯出 Markdown 報表至: {args.export}")
+            print(f"[✓] 已成功匯出 Markdown 報表至: {export_path}")
 
     if args.line:
         try:

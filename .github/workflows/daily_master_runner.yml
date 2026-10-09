@@ -1,13 +1,13 @@
-name: 台股每日選股日報 (布林下軌逆勢法人買超)
+name: 台股全策略總指揮日報 (一鍵全策略自動巡邏)
 
 on:
   schedule:
-    # 台灣時間週一至週五 20:05 (UTC 12:05) 自動執行
-    - cron: '5 12 * * 1-5'
+    # 台灣時間週一至週五 17:35 (UTC 09:35) 證交所結算後執行
+    - cron: '35 9 * * 1-5'
   workflow_dispatch: # 支援在 GitHub 網頁上手動一鍵測試觸發
 
 jobs:
-  run-screener:
+  run-all-strategies:
     runs-on: ubuntu-latest
     steps:
       - name: 簽出專案代碼
@@ -23,16 +23,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 執行選股並發送 LINE 推播
+      - name: 執行全策略選股並發送 LINE 推播
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
-          python strategies/01_bollinger_reversal/screener.py --line --export strategies/01_bollinger_reversal/result.csv
+          python run_all.py --line
 
-      - name: 存檔最新選股報表 Artifact
+      - name: 存檔所有選股報表 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: stock-result-csv
-          path: strategies/01_bollinger_reversal/result.csv
+          name: all-stock-results
+          path: strategies/**/result.*
           retention-days: 7

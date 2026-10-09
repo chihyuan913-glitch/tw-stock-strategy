@@ -1,87 +1,90 @@
-# 台股選股策略 V2.0 旗艦版：布林通道下軌超跌 ＋ 法人逆勢買超 ＋ 止跌型態與盈虧比濾網
+# 台股量化選股策略 最高總指揮中心 (Master Command Center)
 
-本專案提供完整的台股量化選股策略與自動化執行工具，整合**統計學波動通道**、**三大法人籌碼純度**與**K線價格型態**，專注於捕捉「散戶恐慌殺低、籌碼落入法人手中、超跌技術性反轉」的高勝率波段進場點。
-
----
-
-## 策略設計核心理念 (V2.0 升級重點)
-
-### 1. 拒接飛刀：K線止跌型態確認 (Price Action Filter)
-- **實戰痛點**：股價雖然觸及布林下軌，但當天收大長黑K一棒灌破收在最低，隔天通常有強大慣性賣壓。
-- **V2.0 解法**：要求當日必須具有**止跌跡象**——留下影線（下影線長度佔振幅 $\ge 25\%$）代表盤中有強力買盤將價格拉起，或是收紅K（收盤 $\ge$ 開盤）形成多方抵抗，拒絕接下墜的飛刀。
-
-### 2. 防隔日沖：三大法人買超佔比門檻 (Institutional Impact Ratio)
-- **實戰痛點**：三大法人表面上買超 50 張，但其實只佔成交量 0.5%，多為散單避險或隔日沖灌水。
-- **V2.0 解法**：加入「三大法人買超張數 / 當日成交量 $\ge 1.5\%\sim 2.0\%$」的純度門檻，確保法人的買超具備扭轉趨勢的主力實力，並額外標註**「土洋同步同買」**之高勝率標的。
-
-### 3. 盈虧比把關：距 20MA 中軌反彈空間 (Upside Potential)
-- **實戰痛點**：股價在下軌，但 20MA（中軌解套賣壓）就在頭頂 1%~2%，反彈空間太小不符風險報酬比。
-- **V2.0 解法**：要求「距布林中軌潛在利潤空間 $\ge 2.0\%$」，確保反彈空間充分，達成良好的盈虧比（Risk/Reward $\ge 2:1$）。
-
-### 4. 智慧星級評分系統 (0~100 分 & ★★★★★ 標籤)
-- 綜合「籌碼影響力（25分）、主力純度（25分）、止跌型態（25分）、反彈空間（25分）」計算量化總分。
-- **★★★★★ (>= 80分)**：最強首選，土洋同買或超高籌碼佔比＋完美長下影線。
-- **★★★★☆ (>= 65分)**：優質轉折標的。
-- **★★★☆☆ (>= 50分)**：標準觸底反彈標的。
+本專案為台股全方位量化選股與即時雷達監控系統，貫通**「盤後自動選股 ＋ 盤中即時雷達 ＋ LINE 手機戰報 ＋ Excel 報表 ＋ 雲端/本機定時排程」**之完整自動化閉環。
 
 ---
 
-## 專案架構
+## 策略模組矩陣 (Strategies Matrix)
 
-```
+所有策略模組均獨立收納於 `strategies/` 子目錄內，權責解耦、結構標準化：
+
+| 編號 | 策略模組目錄 | 策略名稱與方向 | 核心選股與風控特色 | 快速執行檔 |
+| :---: | :--- | :--- | :--- | :--- |
+| **01** | [`01_bollinger_reversal`](file:///g:/我的雲端硬碟/台股選股策略/strategies/01_bollinger_reversal/) | **布林下軌超跌反轉 (V2.0)**<br>*(抄底多方)* | • 觸及布林下軌 (-5%~+1%)<br>• 止跌K棒 (長下影線 $\ge 25\%$ 或收紅)<br>• 法人逆勢買超佔比 $\ge 1.5\%$<br>• 距 20MA 反彈空間 $\ge 2\%$<br>• 智慧評分與星級標籤 (★★★~★★★★★) | `run_daily.bat`<br>`start_intraday.bat` |
+| **02** | [`02_institutional_momentum`](file:///g:/我的雲端硬碟/台股選股策略/strategies/02_institutional_momentum/) | **法人籌碼集中起漲**<br>*(順勢多方)* | • 外資/投信 3 日買超 $> 1000$ 張<br>• 法人買超佔比 $> 10\%$<br>• 股價站上 20MA 且月線走揚<br>• 正乖離 $< 8\%$ 起漲安全區防追高<br>• 提供操盤四大價位 (進場/加碼/停利/停損) | `run_daily.bat`<br>`start_intraday.bat` |
+| **03** | [`03_short_momentum`](file:///g:/我的雲端硬碟/台股選股策略/strategies/03_short_momentum/) | **法人出貨破線做空與股期避險**<br>*(避險空方)* | • **全面鎖定期交所股票期貨標的** (免借券、無融券限額、期交稅僅 0.002%)<br>• 外資/投信 3 日大賣 $> 1000$ 張<br>• 跌破 20MA 且月線下彎助跌<br>• 負乖離 $[-8\% \sim 0\%]$ 起跌破線區防軋空<br>• 提供放空操盤四價位與保證金試算 | `run_daily.bat` |
+
+---
+
+## 專案目錄結構
+
+```text
 g:\我的雲端硬碟\台股選股策略\
-├── SKILL.md                 # AntiGravity 技能規格定義文件 (V2.0)
-├── README.md                # 專案詳細使用說明與策略手冊 (V2.0)
-├── screener.py              # 盤後自動化選股器 V2.0 (含評分與星級)
-├── intraday_scanner.py      # 盤中即時雷達掃描器 V2.0 (09:00~13:30 每3分鐘即時巡邏推播)
-├── line_sender.py           # LINE Messaging API 推播模組
-├── start_intraday.bat       # 盤中手動一鍵啟動雷達批次檔
-├── run_daily.bat            # 盤後排程執行批次檔
-├── xq_strategy.xs           # XQ 全球贏家 (XS 選股腳本 V2.0)
-├── tradingview_strategy.pine# TradingView Pine Script v5 圖表指標 (V2.0)
-├── .env                     # LINE Token 與 User ID 設定檔
-└── result.csv               # 選股產出結果報表 (可直接用 Excel 開啟)
+├── GEMINI.md                        # 總指揮中心規範 (最高指導原則)
+├── AGENTS.md                        # 代理人規則入口
+├── README.md                        # 總指揮中心戰情手冊 (本文件)
+├── run_all.py                       # 【核心】全策略一鍵依序執行引擎
+├── run_all.bat                      # 【核心】Windows 雙擊一鍵執行所有策略並推播 LINE
+├── line_sender.py                   # 共用 LINE Messaging API 推播模組
+├── setup_task_scheduler.ps1         # Windows 本機工作排程器自動註冊腳本
+├── bookmarks_tw_stock.html          # 台股即時盤勢常用網站書籤
+├── requirements.txt                 # Python 依賴清單
+├── .env                             # LINE Token 與 User ID 金鑰
+├── .github/workflows/               # GitHub Actions 雲端定時排程工作流
+│   ├── daily_master_runner.yml      # 全策略每日盤後總巡邏排程 (17:35)
+│   ├── daily_screener.yml           # 策略一盤後選股排程
+│   ├── intraday_radar.yml           # 策略一盤中即時雷達排程
+│   ├── daily_momentum_screener.yml  # 策略二盤後選股排程
+│   └── intraday_momentum_radar.yml  # 策略二盤中即時雷達排程
+└── strategies/                      # 策略模組庫
+    ├── 01_bollinger_reversal/       # 策略一：布林下軌超跌反轉
+    ├── 02_institutional_momentum/   # 策略二：法人籌碼集中起漲
+    └── 03_short_momentum/           # 策略三：法人出貨破線做空 (股票期貨)
 ```
 
 ---
 
-## 快速使用教學
+## 快速使用指南
 
-### 一、Python 一鍵自動選股（免費、免登入、免 API Key）
-
-直接在終端機執行：
+### 1. 一鍵執行所有策略 (推薦日常使用)
+雙擊根目錄的 **`run_all.bat`** 或在終端機執行：
 ```powershell
-python screener.py --export result.csv
+python run_all.py --line
+```
+系統將依序執行三大策略、產出各自的 Excel CSV 報表，並彙整戰報推播至您的 LINE。
+
+### 2. 單獨執行特定策略
+進入各策略目錄執行對應程式或批次檔：
+```powershell
+# 例如單獨執行策略一 (布林超跌反轉)
+cd strategies/01_bollinger_reversal
+python screener.py --line --export result.csv
+
+# 例如單獨執行策略二 (法人起漲)
+cd strategies/02_institutional_momentum
+python screener.py --line --export result.csv
+
+# 例如單獨執行策略三 (做空避險)
+cd strategies/03_short_momentum
+python screener.py --line --export result.csv
 ```
 
-#### 進階指令參數：
+### 3. 盤中即時巡邏雷達
+- **策略一盤中雷達**：雙擊 `strategies/01_bollinger_reversal/start_intraday.bat`
+- **策略二盤中雷達**：雙擊 `strategies/02_institutional_momentum/start_intraday.bat`
+- 盤中（09:00~13:35）每隔 60~180 秒即時向證交所詢價，符合成交量與進場訊號立即發送 LINE 即時警示。
+
+### 4. 設定 Windows 工作排程器 (無人值守)
+以管理員身分開啟 PowerShell 執行：
 ```powershell
-# 自動推播至 LINE
-python screener.py --line
-
-# 指定歷史日期並匯出 CSV
-python screener.py --date 20261008 --export result.csv
-
-# 自訂最低法人佔比門檻 (例如 3.0%)
-python screener.py --min-inst-ratio 3.0
-
-# 自訂最低反彈空間門檻 (例如 4.0%)
-python screener.py --min-upside 4.0
+powershell -ExecutionPolicy Bypass -File setup_task_scheduler.ps1
 ```
-
-### 二、XQ 全球贏家（XS 語法 V2.0）
-1. 開啟 XQ 全球贏家軟體「策略」→「選股中心」→「新增自訂策略」。
-2. 將 [`xq_strategy.xs`](./xq_strategy.xs) 貼上並設定頻率為「日線」，點擊「執行選股」即可一鍵獲得符合量能、下軌、法人佔比與止跌型態之標的。
-
-### 三、TradingView（Pine Script v5 V2.0）
-將 [`tradingview_strategy.pine`](./tradingview_strategy.pine) 貼入 Pine Editor 即可在 K 線圖直觀標記 V2.0 止跌買訊與反彈空間。
+即可自動註冊：
+1. **每日盤後 17:35** 自動執行 `run_all.bat` 彙總全日選股報表並發送 LINE。
+2. **每日開盤 08:55** 自動啟動盤中即時雷達。
 
 ---
 
-## 實戰交易操作 SOP
-
-| 流程階段 | 操作重點與檢核項目 |
-| :--- | :--- |
-| **進場確認** | 1. 每日盤後查看報表，**優先鎖定 ★★★★★ 與 ★★★★☆ 標的**。<br>2. 優先挑選**「土洋同買 = 是」**且**「法人佔比 > 5%」**之個股。<br>3. 檢查布林通道軌道是否走平（避免向下大開口主跌段）。 |
-| **停損風控（防守）** | 1. **硬性停損**：收盤價跌破進場當日最低價，或跌破下軌超過 5%（無條件出場）。<br>2. **籌碼變節**：次日三大法人反手大幅提款賣超。 |
-| **停利離場（進攻）** | 1. **第一波反彈目標**：股價反彈至**布林通道中軌（20MA）**，出脫 1/2 持股入袋為安。<br>2. **第二波波段目標**：強勢帶量站穩中軌者，續抱至**布林通道上軌**或跌破 5 日線全數獲利了結。 |
+## 架構原則與規範
+- 本架構遵循 [GEMINI.md](file:///g:/我的雲端硬碟/台股選股策略/GEMINI.md) 總指揮中心規範。
+- 全面聚焦於 Python 量化自動化閉環，XQ XS 腳本與 TradingView 指標已封存至各策略之 `legacy/` 目錄，不再要求維護。
