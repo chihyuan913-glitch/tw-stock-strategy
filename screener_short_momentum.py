@@ -27,6 +27,7 @@
 
 import sys
 import os
+import re
 import argparse
 import datetime
 import json
@@ -44,6 +45,49 @@ if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
+
+
+def load_stock_futures_pool():
+    """
+    載入臺灣期貨交易所 (TAIFEX) 股票期貨標的清單
+    優先連線期交所官網動態抓取最新標的，失敗時自動讀取本地 stock_futures_list.json 快取
+    回傳: dict: { stock_code: {'contract': str, 'name': str} }
+    """
+    json_path = os.path.join(os.path.dirname(__file__), 'stock_futures_list.json')
+    futures_map = {}
+    
+    # 嘗試聯網動態抓取最新期交所名單
+    try:
+        url = 'https://www.taifex.com.tw/cht/2/stockLists'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            html = r.read().decode('utf-8', errors='ignore')
+            rows = re.findall(r'<tr>.*?<td[^>]*>([A-Za-z0-9]{2,3})</td>.*?<td[^>]*>([0-9]{4})</td>.*?<td[^>]*>(.*?)</td>.*?</tr>', html, re.DOTALL)
+            for contract, code, name in rows:
+                clean_name = re.sub(r'<.*?>', '', name).strip()
+                futures_map[code] = {
+                    'contract': contract.strip(),
+                    'name': clean_name
+                }
+            if len(futures_map) >= 150:
+                try:
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(futures_map, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+                return futures_map
+    except Exception:
+        pass
+
+    # 聯網失敗時讀取本地快取
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                futures_map = json.load(f)
+        except Exception:
+            pass
+
+    return futures_map
 
 
 def get_recent_trading_dates(n_days=5, max_lookback=20):
@@ -152,10 +196,16 @@ def fetch_daily_quotes(date_str):
 
 def screen_short_stocks(date_str=None, min_vol_lots=1000, 
                         max_neg_bias_pct=-8.0, inst_sell_ratio_pct=10.0,
-                        inst_3d_threshold=1000):
+                        inst_3d_threshold=1000, futures_only=True):
     """
     執行完整做空量化篩選
+    - futures_only: 預設為 True，統一僅推薦臺灣期交所 (TAIFEX) 具備「股票期貨」之個股，徹底解決現貨融券/借券券源不足問題！
     """
+    futures_map = {}
+    if futures_only:
+        futures_map = load_stock_futures_pool()
+        print(f"[*] 【個股期貨優先模式】已載入期交所 {len(futures_map)} 檔股票期貨標的，完全排除無券源小型股！")
+
     if date_str:
         all_dates = get_recent_trading_dates(n_days=10)
         if date_str in all_dates:
@@ -196,6 +246,10 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
     preliminary_meta = {}
 
     for code, q in quotes.items():
+        # 【關鍵過濾】只針對具備股票期貨之標的進行做空推薦
+        if futures_only and code not in futures_map:
+            continue
+
         if code not in chips_history or latest_date not in chips_history[code]:
             continue
             
@@ -328,15 +382,25 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
             high_ref = q['high'] if q['high'] > 0 else curr_close * 1.02
             sl_cover = round(max(ma20_curr * 1.02, high_ref * 1.01), 2)
 
+            # -------------------------------------------------------------
+            # 個股期貨合約資訊與保證金試算 (一口 = 2,000 股現貨 = 2 張)
+            # -------------------------------------------------------------
+            f_info = futures_map.get(code, {'contract': '--', 'name': q['name']})
+            contract_code = f_info.get('contract', '--')
+            # 以標準級距 13.5% 估算一口放空保證金
+            margin_1lot = int(round(curr_close * 2000 * 0.135, -1))
+
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
+                '期貨契約': contract_code,
                 '收盤價': round(curr_close, 2),
                 '空單進場': short_entry,
                 '加空價位': add_short,
                 '停利TP1': tp1_cover,
                 '停利TP2': tp2_cover,
                 '停損回補': sl_cover,
+                '1口保證金(約)': margin_1lot,
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線負乖離%': round(bias_ma20_pct, 2),
                 '當日成交量(張)': q['volume'] // 1000,
@@ -357,12 +421,13 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="台股法人籌碼出貨破線做空選股策略")
+    parser = argparse.ArgumentParser(description="台股法人籌碼出貨破線做空選股策略 (統一鎖定個股期貨標的)")
     parser.add_argument("--date", type=str, default=None, help="指定日期 (格式: YYYYMMDD，預設為最新交易日)")
     parser.add_argument("--min-vol", type=int, default=1000, help="最低5日平均成交量(張)，預設 1000 張")
     parser.add_argument("--max-neg-bias", type=float, default=-8.0, help="20MA 負乖離率下限百分比(%%)，預設 -8.0%% (避免追空過深)")
     parser.add_argument("--sell-ratio", type=float, default=10.0, help="法人賣超佔成交量低標(%%)，預設 10.0%%")
     parser.add_argument("--sell-3d", type=int, default=1000, help="外資或投信近3日累計賣超門檻(張)，預設 1000 張")
+    parser.add_argument("--no-futures-filter", action="store_true", help="關閉個股期貨限制，允許篩選全市場普通股")
     parser.add_argument("--export", type=str, default=None, help="匯出報表檔名 (.csv 或 .md)")
     parser.add_argument("--line", action="store_true", help="發送選股通知至 LINE Notify/Bot")
 
@@ -373,7 +438,8 @@ def main():
         min_vol_lots=args.min_vol,
         max_neg_bias_pct=args.max_neg_bias,
         inst_sell_ratio_pct=args.sell_ratio,
-        inst_3d_threshold=args.sell_3d
+        inst_3d_threshold=args.sell_3d,
+        futures_only=(not args.no_futures_filter)
     )
 
     if not results:
@@ -384,12 +450,12 @@ def main():
     # 依照「法人賣超佔比%」與「當日法人賣超(張)」排序 (砸盤力道最強者排前)
     df_res = df_res.sort_values(by=["法人賣超佔比%", "當日法人賣超(張)"], ascending=[False, True]).reset_index(drop=True)
 
-    print("\n" + "="*105)
-    print(f"🎯【台股法人出貨破線做空】選股結果清單（共 {len(df_res)} 檔）")
-    print("條件符合：外資/投信3日賣超>1000張 | 法人佔比>10% | 跌破20MA且斜率向下 | 5日均量>1000張 | 負乖離[-8%~0%] | 無長下影線")
-    print("="*105)
+    print("\n" + "="*115)
+    print(f"🎯【台股法人出貨破線做空】選股結果清單（共 {len(df_res)} 檔）- ⚡ 全數具備股票期貨，免借券、無券源限制！")
+    print("條件符合：具備股票期貨 | 外資/投信3日賣超>1000張 | 法人佔比>10% | 跌破20MA且斜率向下 | 5日均量>1000張 | 負乖離[-8%~0%]")
+    print("="*115)
     print(df_res.to_string(index=False))
-    print("="*105)
+    print("="*115)
 
     if args.export:
         if args.export.endswith('.csv'):
@@ -397,9 +463,10 @@ def main():
             print(f"[✓] 已成功匯出 CSV 報表至: {args.export}")
         elif args.export.endswith('.md'):
             with open(args.export, 'w', encoding='utf-8') as f:
-                f.write(f"# 🎯 台股法人出貨破線做空選股日報\n\n")
+                f.write(f"# 🎯 台股法人出貨破線做空選股日報（⚡ 統一鎖定具備股票期貨標的）\n\n")
                 f.write(f"- 產生時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"- 篩選標準：外資/投信3日累計賣超>1000張、法人賣超佔比>10%、跌破月線且斜率向下、5日均量>1000張、負乖離[-8%~0%]、無長下影線\n\n")
+                f.write(f"- 篩選標準：具備期交所股票期貨、外資/投信3日累計賣超>1000張、法人賣超佔比>10%、跌破月線且斜率向下、5日均量>1000張、負乖離[-8%~0%]、無長下影線\n")
+                f.write(f"- 交易優勢：**免借券、無融券額度限制、無股東會/除權息強制回補、期交稅僅十萬分之二 (0.002%)**\n\n")
                 cols = list(df_res.columns)
                 header_line = "| " + " | ".join(cols) + " |\n"
                 separator_line = "| " + " | ".join(["---"] * len(cols)) + " |\n"
@@ -418,21 +485,23 @@ def main():
             msg_lines = [
                 "📉【台股做空選股日報】法人出貨破線轉弱標的",
                 f"📅 基準日期：{target_date}",
+                "⚡【全面鎖定個股期貨標的】做空免借券、無回補限制、期交稅僅0.002%！",
                 f"🎯 空方濾網：外資投信3日大賣>1000張｜法人賣超佔比>10%｜跌破月線且下彎｜負乖離[-8%~0%]起跌區｜無長下影線",
-                f"🔥 今日篩選出 {len(df_res)} 檔空方發動焦點標的（附操盤四價位）：",
+                f"🔥 今日篩選出 {len(df_res)} 檔具備股票期貨之做空焦點股（附操盤四價位與保證金）：",
                 "─────────────────────"
             ]
             for i, r in enumerate(df_res.head(8).to_dict(orient='records'), 1):
                 msg_lines.append(
-                    f"{i}. 📍 {r['證券代號']} {r['證券名稱']} (現價 {r['收盤價']}元)\n"
-                    f"   🟢 空單進場：{r['收盤價']} 元 (月線 {r['月線(20MA)']}，負乖離 {r['月線負乖離%']}%)\n"
+                    f"{i}. 📍 {r['證券代號']} {r['證券名稱']} ｜ 期貨: {r['期貨契約']}\n"
+                    f"   🟢 空單進場：{r['收盤價']} 元 (負乖離 {r['月線負乖離%']}%, 月線 {r['月線(20MA)']})\n"
                     f"   🔵 加空價位：{r['加空價位']} 元 ｜ 🛑 停損回補：{r['停損回補']} 元\n"
                     f"   🔴 停利補回：TP1 {r['停利TP1']} 元 ｜ TP2 {r['停利TP2']} 元\n"
+                    f"   💰 放空1口保證金：約 {r['1口保證金(約)']:,} 元 (相當於放空2張現貨)\n"
                     f"   🏦 籌碼：賣超佔比 {r['法人賣超佔比%']}% (外資3日{r['外資3日賣超(張)']:,}張, 投信3日{r['投信3日賣超(張)']:,}張)\n"
                     "─────────────────────"
                 )
             if len(df_res) > 8:
-                msg_lines.append(f"(其餘 {len(df_res)-8} 檔請查看 short_result.csv 報表)")
+                msg_lines.append(f"(其餘 {len(df_res)-8} 檔完整名單請查看 short_result.csv 報表)")
             msg_lines.append("💡 做空紀律：站回月線反壓無條件嚴格停損回補，絕不死抗被軋！")
             
             print("[*] 正在發送做空選股清單至 LINE...")
