@@ -338,13 +338,27 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
                     upside_pct=upside_pct
                 )
 
+                ma20_val = round(float(ma20), 2)
+                ub_val = round(float(upper_band), 2)
+                lb_val = round(float(lower_band), 2)
+                close_val = round(curr_close, 2)
+                addon_val = round(max(c_feat['high'], curr_close * 1.025), 2)
+                sl_val = round(float(lower_band * 0.95), 2)
+
                 results.append({
                     '證券代號': code,
                     '證券名稱': meta['name'],
                     '星級推薦': stars,
                     '評分': score,
-                    '收盤價': round(curr_close, 2),
-                    '布林下軌': round(float(lower_band), 2),
+                    '收盤價': close_val,
+                    '進場價位': close_val,
+                    '加碼價位': addon_val,
+                    '停利TP1': ma20_val,
+                    '停利TP2': ub_val,
+                    '停損價位': sl_val,
+                    '布林下軌': lb_val,
+                    '布林中軌': ma20_val,
+                    '布林上軌': ub_val,
                     '反彈空間%': round(float(upside_pct), 2),
                     '距下軌%': round(float(dist_pct), 2),
                     '日成交量(張)': vol_lots,
@@ -361,26 +375,24 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
     return results
 
 def format_line_message(results, date_str, args):
-    """將 V2.0 選股清單格式化為手機 LINE 排版"""
+    """將 V2.0 選股清單格式化為手機 LINE 排版 (一律包含實戰四大操盤價位)"""
     sorted_res = sorted(results, key=lambda x: x['評分'], reverse=True)
     msg_lines = [
         "📊【台股選股日報 V2.0 旗艦版】",
         f"📅 日期：{date_str} 盤後",
         f"🎯 策略：布林下軌超跌 ＋ 法人逆勢買超 ＋ 止跌型態",
-        f"🔥 今日精選轉折標的（共 {len(sorted_res)} 檔，依評分排序）：",
+        f"🔥 今日精選轉折標的（共 {len(sorted_res)} 檔，附操盤四大價位）：",
         "─────────────────"
     ]
     
-    for i, r in enumerate(sorted_res[:10], 1):
+    for i, r in enumerate(sorted_res[:8], 1):
         name = r['證券名稱']
         code = r['證券代號']
         stars = r['星級推薦']
         score = r['評分']
-        close = r['收盤價']
         dist = r['距下軌%']
         dist_sign = "+" if dist > 0 else ""
         upside = r['反彈空間%']
-        vol = r['日成交量(張)']
         tot_inst = r['法人買超(張)']
         ratio = r['法人佔比%']
         f_inst = r['外資買超']
@@ -396,18 +408,20 @@ def format_line_message(results, date_str, args):
         chip_detail = f" ({', '.join(detail_items)})" if detail_items else ""
 
         msg_lines.append(
-            f"{i}. {code} {name} {stars} (評分:{score})\n"
-            f"   • 收盤: {close} 元 (距下軌 {dist_sign}{dist}%)\n"
-            f"   • 潛在反彈空間: +{upside}% (看中軌)\n"
-            f"   • K線: {pattern}{dual_str}\n"
-            f"   • 籌碼: 買超 +{tot_inst:,} 張 (佔比 {ratio}%){chip_detail}"
+            f"{i}. 📍 {code} {name} {stars} (評分:{score})\n"
+            f"   🟢 進場價位：{r['進場價位']} 元 (距下軌 {dist_sign}{dist}%, 反彈空間 +{upside}%)\n"
+            f"   🔵 加碼價位：{r['加碼價位']} 元 (突破今日高點續彈)\n"
+            f"   🔴 停利價位：TP1 {r['停利TP1']} 元 (中軌) ｜ TP2 {r['停利TP2']} 元 (上軌)\n"
+            f"   🛑 停損價位：{r['停損價位']} 元 (跌破下軌-5%嚴格停損)\n"
+            f"   🏦 籌碼：買超 +{tot_inst:,} 張 (佔比 {ratio}%){chip_detail}{dual_str}\n"
+            f"   🕯️ K線：{pattern}\n"
+            "─────────────────"
         )
         
-    if len(sorted_res) > 10:
-        msg_lines.append(f"...\n(其餘 {len(sorted_res)-10} 檔請查看電腦 result.csv 報表)")
+    if len(sorted_res) > 8:
+        msg_lines.append(f"(其餘 {len(sorted_res)-8} 檔請查看電腦 result.csv 報表)")
         
-    msg_lines.append("─────────────────")
-    msg_lines.append("💡 交易紀律：優先鎖定 ★★★★☆ 以上標的；跌破下軌逾 5% 嚴格停損！")
+    msg_lines.append("💡 交易紀律：優先鎖定 ★★★★☆ 以上標的，嚴守四大價位防守紀律！")
     return "\n".join(msg_lines)
 
 def main():
