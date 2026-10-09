@@ -227,24 +227,26 @@ def send_intraday_alert_v2(code, meta, rt):
     tp2_p = round(ub, 2)
 
     msg_lines = [
-        f"⚡【台股盤中雷達 V2.0】觸底轉折點 {stars}",
-        "─────────────────",
-        f"📍 標的：{code} {meta['name']}{dual_tag}",
-        f"💰 即時現價：{price:.2f} 元 (距下軌 {dist_sign}{dist_pct:.2f}%)",
-        "─────────────────",
-        "🎯【實戰操盤四大價位】",
-        f"  🟢 進場價位：{price:.2f} 元 (觸底轉折區建倉)",
-        f"  🔵 加碼價位：{addon_p:.2f} 元 (突破日高續彈確認)",
-        f"  🔴 停利價位：TP1 {tp1_p:.2f} 元 (中軌) ｜ TP2 {tp2_p:.2f} 元 (上軌)",
-        f"  🛑 停損價位：{sl_p:.2f} 元 (跌破下軌-5%嚴格停損)",
-        "─────────────────",
-        f"🎯 潛在反彈空間：+{upside_pct:.1f}% (看中軌 {mb:.2f} 元)",
-        f"📊 盤中量能：{rt['volume']:,} 張 (已大於千張門檻)",
-        f"🕯️ 即時型態：{candle_status}",
-        f"🏦 法人背景：昨日買超 +{meta['total_lots']:,} 張 (外資+{meta['foreign_lots']:,}, 投信+{meta['trust_lots']:,})",
+        "╔═══════════════════════╗",
+        "║  🚨【盤中雷達】布林超跌觸底轉折  ║",
+        "╚═══════════════════════╝",
+        f"📍 監控標的：{code} {meta['name']} ｜ {stars}{dual_tag}",
+        f"💵 即時現價：{price:.2f} 元 (距下軌 {dist_sign}{dist_pct:.2f}%)",
+        "━━━━━━━━━━━━━━━━━━━━",
+        "🎯 實戰操盤四大防線：",
+        f"├ 🟢 進場價位：{price:.2f} 元 (觸底轉折區建倉)",
+        f"├ 🔵 加碼價位：{addon_p:.2f} 元 (突破日高續彈確認)",
+        f"├ 🔴 停利目標：TP1 {tp1_p:.2f} (中軌) ｜ TP2 {tp2_p:.2f} (上軌)",
+        f"└ 🛑 停損防守：{sl_p:.2f} 元 (跌破下軌-5%無條件離場)",
+        "────────────────────",
+        "📊 即時量能與型態：",
+        f"• 盤中量能：{rt['volume']:,} 張 (千張量能確認)",
+        f"• 潛在空間：+{upside_pct:.1f}% (目標看中軌 {mb:.2f} 元)",
+        f"• 即時型態：{candle_status}",
+        f"• 昨日籌碼：法人 +{meta['total_lots']:,} 張 (外資+{meta['foreign_lots']:,}, 投信+{meta['trust_lots']:,})",
         f"⏰ 偵測時間：{rt.get('time', datetime.datetime.now().strftime('%H:%M:%S'))}",
-        "─────────────────",
-        "💡 實戰提醒：嚴守四大價位紀律，破下軌5%嚴格停損！"
+        "━━━━━━━━━━━━━━━━━━━━",
+        "💡【實戰提醒】具備反彈空間與法人背書，破停損無條件離場！"
     ]
     message = "\n".join(msg_lines)
     print(f"\n[!] 觸發盤中警報 V2.0: {code} {meta['name']} 現價 {price} (反彈空間 +{upside_pct:.1f}%)")

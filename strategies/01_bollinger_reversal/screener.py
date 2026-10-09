@@ -375,17 +375,19 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
     return results
 
 def format_line_message(results, date_str, args):
-    """將 V2.0 選股清單格式化為手機 LINE 排版 (一律包含實戰四大操盤價位)"""
+    """將 V2.0 選股清單格式化為手機 LINE 專業視覺化戰報"""
     sorted_res = sorted(results, key=lambda x: x['評分'], reverse=True)
     msg_lines = [
-        "📊【台股選股日報 V2.0 旗艦版】",
-        f"📅 日期：{date_str} 盤後",
-        f"🎯 策略：布林下軌超跌 ＋ 法人逆勢買超 ＋ 止跌型態",
-        f"🔥 今日精選轉折標的（共 {len(sorted_res)} 檔，附操盤四大價位）：",
-        "─────────────────"
+        "╔═══════════════════════╗",
+        "║  📊【台股盤後】布林超跌旗艦日報  ║",
+        "╚═══════════════════════╝",
+        f"📅 交易日期：{date_str} 盤後結算",
+        "🎯 核心邏輯：超跌轉折 ＋ 法人逆勢 ＋ 止跌型態",
+        f"🔥 今日精選：共 {len(sorted_res)} 檔（嚴選前 {min(len(sorted_res), 6)} 檔精華）",
+        "━━━━━━━━━━━━━━━━━━━━"
     ]
     
-    for i, r in enumerate(sorted_res[:8], 1):
+    for i, r in enumerate(sorted_res[:6], 1):
         name = r['證券名稱']
         code = r['證券代號']
         stars = r['星級推薦']
@@ -405,23 +407,30 @@ def format_line_message(results, date_str, args):
             detail_items.append(f"外資{'+' if f_inst>0 else ''}{f_inst}")
         if t_inst != 0:
             detail_items.append(f"投信{'+' if t_inst>0 else ''}{t_inst}")
-        chip_detail = f" ({', '.join(detail_items)})" if detail_items else ""
 
         msg_lines.append(
-            f"{i}. 📍 {code} {name} {stars} (評分:{score})\n"
-            f"   🟢 進場價位：{r['進場價位']} 元 (距下軌 {dist_sign}{dist}%, 反彈空間 +{upside}%)\n"
-            f"   🔵 加碼價位：{r['加碼價位']} 元 (突破今日高點續彈)\n"
-            f"   🔴 停利價位：TP1 {r['停利TP1']} 元 (中軌) ｜ TP2 {r['停利TP2']} 元 (上軌)\n"
-            f"   🛑 停損價位：{r['停損價位']} 元 (跌破下軌-5%嚴格停損)\n"
-            f"   🏦 籌碼：買超 +{tot_inst:,} 張 (佔比 {ratio}%){chip_detail}{dual_str}\n"
-            f"   🕯️ K線：{pattern}\n"
-            "─────────────────"
+            f"【{i:02d}】📍 {code} {name} ｜ {stars} (評分:{score})\n"
+            f"💵 現價收盤：{r['收盤價']} 元 (距下軌 {dist_sign}{dist}%)\n"
+            f"────────────────────\n"
+            f"🎯 操盤四大防線：\n"
+            f"├ 🟢 進場價位：{r['進場價位']} 元 (轉折支撐區建倉)\n"
+            f"├ 🔵 加碼價位：{r['加碼價位']} 元 (突破今日高點續彈)\n"
+            f"├ 🔴 停利目標：TP1 {r['停利TP1']} (中軌) ｜ TP2 {r['停利TP2']} (上軌)\n"
+            f"└ 🛑 停損防守：{r['停損價位']} 元 (跌破下軌-5%無條件離場)\n"
+            f"────────────────────\n"
+            f"📈 空間與籌碼純度：\n"
+            f"• 潛在空間：+{upside}% (目標看中軌 20MA)\n"
+            f"• 法人籌碼：買超 +{tot_inst:,} 張 (佔比 {ratio}%){dual_str}\n"
+            f"• 細項分佈：{', '.join(detail_items) if detail_items else '主力買盤支撐'}\n"
+            f"• K線型態：{pattern}\n"
+            "━━━━━━━━━━━━━━━━━━━━"
         )
         
-    if len(sorted_res) > 8:
-        msg_lines.append(f"(其餘 {len(sorted_res)-8} 檔請查看電腦 result.csv 報表)")
+    if len(sorted_res) > 6:
+        msg_lines.append(f"📋 其餘 {len(sorted_res)-6} 檔標的完整數據請查閱 result.csv")
+        msg_lines.append("━━━━━━━━━━━━━━━━━━━━")
         
-    msg_lines.append("💡 交易紀律：優先鎖定 ★★★★☆ 以上標的，嚴守四大價位防守紀律！")
+    msg_lines.append("💡【總指揮風控紀律】優先鎖定 ★★★★☆ 以上標的，嚴守四大防線紀律！")
     return "\n".join(msg_lines)
 
 def main():
