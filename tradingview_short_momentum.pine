@@ -1,0 +1,89 @@
+//@version=5
+indicator("台股法人出貨破線做空指標 (Institutional Dumping & Downtrend Breakdown)", shorttitle="法人做空訊號", overlay=true)
+
+// =============================================================================
+// 參數設定 (Inputs)
+// =============================================================================
+grp_ma = "均線與趨勢參數"
+ma_len       = input.int(20, title="月線天期 (MA20)", group=grp_ma)
+max_neg_bias = input.float(-8.0, title="月線負乖離率下限 (%)", minval=-20.0, maxval=-1.0, step=0.5, group=grp_ma)
+
+grp_vol = "量能濾網"
+min_vol_lots = input.int(1000, title="5日平均成交量低標 (張)", minval=100, step=100, group=grp_vol)
+
+grp_k = "K棒形態濾網"
+shadow_ratio = input.float(0.5, title="下影線佔實體比例上限", minval=0.1, maxval=1.0, step=0.1, group=grp_k)
+
+// =============================================================================
+// 1. 技術面計算 (MA20、斜率、負乖離率)
+// =============================================================================
+ma20 = ta.sma(close, ma_len)
+ma20_slope_down = ma20 < ma20[1] // 月線向下助跌反壓
+
+// 月線 -8% 負乖離起跌安全邊界
+ma20_bias_floor = ma20 * (1.0 + max_neg_bias / 100.0)
+
+// 乖離率計算 (%)
+bias_pct = ((close - ma20) / ma20) * 100.0
+in_short_zone = (close <= ma20) and (bias_pct >= max_neg_bias)
+
+// =============================================================================
+// 2. 流動性濾網 (5日均量 >= 1000 張)
+// =============================================================================
+vol_lots = volume >= 100000 ? volume / 1000.0 : volume
+vol_ma5  = ta.sma(vol_lots, 5)
+vol_ok   = vol_ma5 >= min_vol_lots
+
+// =============================================================================
+// 3. K棒形態濾網 (排除長下影線低檔強撐)
+// =============================================================================
+body = math.abs(close - open)
+lower_shadow = math.min(open, close) - low
+
+// 判定是否有長下影線干擾
+is_long_lower_shadow = body > (close * 0.001) ? (lower_shadow >= shadow_ratio * body) : (lower_shadow > (close * 0.005))
+candle_bearish_clean = not is_long_lower_shadow
+
+// =============================================================================
+// 4. 綜合空方破線放空訊號判定
+// =============================================================================
+short_signal = (close <= ma20) and ma20_slope_down and in_short_zone and vol_ok and candle_bearish_clean
+short_trigger = short_signal and not short_signal[1]
+
+// =============================================================================
+// 5. 圖表繪製與視覺化呈現
+// =============================================================================
+// 月線顏色：向下呈現鮮紅色(蓋頭反壓)，走平或上揚呈現灰綠色
+ma_color = ma20_slope_down ? color.new(#FF1744, 0) : color.new(#78909C, 0)
+p_ma20 = plot(ma20, title="月線反壓 (MA20)", color=ma_color, linewidth=2)
+p_floor = plot(ma20_bias_floor, title="月線 -8% 起跌做空邊界", color=color.new(#FF9100, 30), style=plot.style_circles)
+
+// 填充做空最佳甜蜜區間 (0% ~ -8%)
+fill(p_ma20, p_floor, color=color.new(#FF5252, 92), title="起跌做空甜蜜區 (0% ~ -8%)")
+
+// 標記長下影線低檔承接警示
+plotshape(is_long_lower_shadow and low == ta.lowest(low, 5), 
+          title="低檔長下影線支撐警示", 
+          style=shape.triangleup, 
+          location=location.belowbar, 
+          color=color.new(#00E676, 0), 
+          size=size.tiny, 
+          text="下影線")
+
+// 標記做空破線發動點
+plotshape(short_trigger, 
+          title="法人破線做空點", 
+          style=shape.triangledown, 
+          location=location.abovebar, 
+          color=color.new(#FF1744, 0), 
+          size=size.small, 
+          text="做空點")
+
+// K 棒著色：在做空甜蜜區且殺盤紮實的 K 棒
+barcolor(short_signal ? color.new(#FF1744, 20) : na, title="空頭破線K棒著色")
+
+// =============================================================================
+// 6. 警報設定 (Alerts)
+// =============================================================================
+alertcondition(short_trigger, title="【法人出貨破線】放空進場訊號", message="[台股空方警報] {{ticker}} 跌破20MA月線且均線下彎、負乖離在甜蜜區[-8%~0%]、無長下影線！建議建立空單防守。")
+alertcondition(is_long_lower_shadow, title="【警示】當日出現長下影線低檔承接", message="[台股警示] {{ticker}} 低檔爆出長下影線，可能有主力低接，注意空單停利保護！")
