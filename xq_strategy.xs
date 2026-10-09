@@ -7,12 +7,11 @@
 // 【核心選股邏輯】
 // 1. 日成交量 >= 1000 張 (排除無量小型股與流動性陷阱)
 // 2. 股價位於布林下軌 1% 之內或是跌破 5% 之內 (-5.0% <= 偏離率 <= +1.0%)
-// 3. 籌碼純度：三大法人合計買超 > 0，且佔成交量比重 >= 1.5%，投信無大量拋售
+// 3. 籌碼純度：外資+投信+自營商合計買超 > 0，且佔比 >= 1.5%，投信無大量拋售
 // 4. K線止跌型態：留長下影線(>=25%) 或 收紅K落底，拒絕長黑接刀
 // 5. 盈虧比空間：距布林中軌 (20MA) 潛在反彈利潤空間 >= 2.0%
 // =====================================================================
 
-[Input]
 input: Length(20, "布林天期(MA20)");
 input: BandRange(2, "標準差倍數(預設2倍)");
 input: MinVolLots(1000, "日成交量門檻(張)");
@@ -23,12 +22,12 @@ input: MinUpsidePct(2.0, "距20MA最低反彈空間%(盈虧比)");
 input: TrustSellLimit(500, "投信最大賣超上限(張，超過視為拋售)");
 
 // ---------------------------------------------------------------------
-// 1. 量能與布林通道計算 (採用原生相容演算法)
+// 1. 量能與布林通道計算
 // ---------------------------------------------------------------------
 variable: VolLots(0), MidBand(0), StdDevVal(0), UpBand(0), DownBand(0);
 variable: BiasLB(0), UpsidePotential(0);
 
-VolLots = Volume; // 日線下 Volume 單位即為張
+VolLots = Volume; // 日線頻率下 Volume 單位即為張數
 MidBand = Average(Close, Length);
 StdDevVal = StandardDev(Close, Length, 1);
 UpBand = MidBand + (BandRange * StdDevVal);
@@ -47,15 +46,17 @@ else
     UpsidePotential = 0;
 
 // ---------------------------------------------------------------------
-// 2. 讀取三大法人籌碼數據與純度計算
+// 2. 讀取三大法人籌碼數據與純度計算 (修正為 XQ 標準欄位語法)
 // ---------------------------------------------------------------------
 variable: TotalInst(0), ForeignNet(0), TrustNet(0), DealerNet(0);
 variable: InstRatio(0), IsDualBuy(false);
 
-TotalInst  = GetField("三大法人買賣超", "D");
 ForeignNet = GetField("外資買賣超", "D");
 TrustNet   = GetField("投信買賣超", "D");
 DealerNet  = GetField("自營商買賣超", "D");
+
+// 三大法人合計買賣超 (相加避免不同券商版 XQ 欄位名稱衝突)
+TotalInst = ForeignNet + TrustNet + DealerNet;
 
 // 法人買超佔比 = 三大法人買超張數 / 當日成交量 * 100%
 if VolLots > 0 then
