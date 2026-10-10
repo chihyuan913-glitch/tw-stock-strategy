@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-台股自選個股盤中到價雷達核心管理模組 (Intraday Custom Radar Manager)
-功能：
-1. 管理盤中自選個股監控名單 (watchlist.json)。
-2. 支援動態指令：
-   - ➕ 加入監控：鎖定四大操盤防線價位 (🟢進場、🔵加碼、🔴停利、🛑停損)。
-   - ➖ 取消監控：自雷達清單移除。
-   - 📋 查詢監控：檢視目前所有盯盤標的與即時防線。
-3. 盤中即時到價掃描與事件觸發：
-   - 🛑 停損警戒 (STOP_LOSS)：現價摜破停損防線 (最高優先級)。
-   - 🔴 停利滿足 (TP1 / TP2)：現價抵達第一反壓或波段目標。
-   - 🔵 突破加碼 (ADDON)：帶量突破關鍵續強加碼點。
-   - 🟢 建倉進場 (ENTRY)：現價回測進入黃金建倉區間。
-4. 嚴格防洗版機制 (Deduplication)：同一標的同事件類型，當日僅推播一次。
+台股自選個股盤中到價雷達核心管理模組 V2.0 (Intraday Multi-Channel Radar Manager)
+支援四大進階匯入方案：
+1. 【方案一：多檔批次貼上】：一鍵貼上多檔代碼（例如 "監控 2330 2476 3221 5328 2603"），整批掛入。
+2. 【方案二：自動連動每日選股戰報】：輸入 "同步選股"，自動讀取四大策略最新 result.csv 精華標的。
+3. 【方案三：券商自選清單匯入】：支援貼上任意雜亂券商看盤清單文字或本地檔案 (my_stocks.txt) 一鍵擷取。
+4. 【方案四：熱門題材一鍵打包】：輸入 "監控 矽光子"、"監控 機器人"、"監控 散熱" 等，整組核心概念股整包掛入。
 """
 
 import os
 import sys
+import re
 import json
+import glob
 import datetime
 import urllib.request
 from pathlib import Path
@@ -30,8 +25,25 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-WATCHLIST_FILE = Path(__file__).resolve().parent / "watchlist.json"
+ROOT_DIR = Path(__file__).resolve().parent
+WATCHLIST_FILE = ROOT_DIR / "watchlist.json"
 TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
+# 方案四：熱門題材核心概念股字典
+THEMES = {
+    "矽光子": ["3450", "6442", "3163", "3081", "3363", "6451"],
+    "CPO": ["3450", "6442", "3163", "3081", "3363", "6451"],
+    "機器人": ["2359", "6188", "4562", "8374", "6215"],
+    "散熱": ["3017", "3324", "8996", "2421", "3653"],
+    "COWOS": ["3583", "3131", "6187", "2467", "6640"],
+    "先進封裝": ["3583", "3131", "6187", "2467", "6640"],
+    "AI伺服器": ["3231", "2382", "2376", "6669", "2356"],
+    "AI": ["3231", "2382", "2376", "6669", "2356"],
+    "低軌衛星": ["3491", "6285", "3138", "3221"],
+    "衛星": ["3491", "6285", "3138", "3221"],
+    "重電": ["1519", "1503", "1513", "1514"],
+    "綠能": ["6806", "1519", "1503", "1513", "1514"],
+}
 
 def load_watchlist() -> dict:
     """載入自選監控清單"""
@@ -48,19 +60,17 @@ def save_watchlist(data: dict):
     with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def add_stock_to_radar(user_input: str, target_id: str = "") -> str:
-    """將個股加入盤中監控雷達，鎖定四大價位"""
-    from stock_analyzer import resolve_stock_input, fetch_realtime_mis, fetch_history_and_technicals
-
-    code, stock_name_cached = resolve_stock_input(user_input)
-    if not code:
-        return "⚠️ 請輸入正確的台股 4 碼股票代碼或股票名稱（例如：監控 2476、監控 鉅祥、+3221）。"
-
+def calculate_stock_defense(code: str) -> dict:
+    """為單一股票計算四大操盤防線"""
+    from stock_analyzer import fetch_realtime_mis, fetch_history_and_technicals, load_stock_dict
+    
+    stock_dict = load_stock_dict()
     realtime = fetch_realtime_mis(code)
-    stock_name = realtime['name'] or stock_name_cached or f"台股_{code}"
+    stock_name = realtime['name'] or stock_dict.get(code, f"台股_{code}")
+    
     tech = fetch_history_and_technicals(code)
     if not tech:
-        return f"⚠️ 查無股票 【{code} {stock_name}】 之市場數據，無法掛入監控。"
+        return None
 
     if realtime['price'] and realtime['price'] > 0:
         current_price = realtime['price']
@@ -74,8 +84,7 @@ def add_stock_to_radar(user_input: str, target_id: str = "") -> str:
     bias20 = ((current_price - ma20) / ma20 * 100) if ma20 else 0.0
     is_above_ma20 = (current_price >= ma20)
 
-    # 精算四大操盤防線價位
-    # A. 停損
+    # 停損
     if is_above_ma20 and tech['low_5d'] >= ma20:
         sl_base = min(tech['low_5d'] * 0.995, current_price * 0.955)
     elif is_above_ma20:
@@ -84,7 +93,7 @@ def add_stock_to_radar(user_input: str, target_id: str = "") -> str:
         sl_base = min(tech['low_5d'] * 0.985, current_price * 0.95)
     stop_loss = round(sl_base, 2)
 
-    # B. 進場
+    # 進場
     if bias20 > 8.0:
         entry_low = round(min(ma10, current_price * 0.965), 2)
         entry_high = round(current_price * 0.985, 2)
@@ -99,18 +108,15 @@ def add_stock_to_radar(user_input: str, target_id: str = "") -> str:
     if entry_low > entry_high:
         entry_low, entry_high = entry_high, entry_low
 
-    # C. 加碼
+    # 加碼
     high_ref = max(tech['last_high'], current_price)
     addon_price = round(max(high_ref * 1.01, current_price * 1.025), 2)
 
-    # D. 停利
+    # 停利
     tp1_price = round(max(tech['high_5d'], current_price * 1.07), 2)
     tp2_price = round(max(tech['high_20d'] * 1.05, current_price * 1.15), 2)
 
-    watchlist = load_watchlist()
-    now_str = datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d %H:%M:%S')
-
-    watchlist[code] = {
+    return {
         'code': code,
         'name': stock_name,
         'base_price': current_price,
@@ -119,45 +125,208 @@ def add_stock_to_radar(user_input: str, target_id: str = "") -> str:
         'addon_price': addon_price,
         'tp1_price': tp1_price,
         'tp2_price': tp2_price,
-        'sl_price': stop_loss,
-        'target_id': target_id or watchlist.get(code, {}).get('target_id', ''),
-        'added_at': now_str,
-        'alerted_today': {}
+        'sl_price': stop_loss
     }
+
+def batch_add_to_radar(user_text: str, target_id: str = "") -> str:
+    """
+    通用進階掛入入口：
+    支援：
+    1. 題材概念股一鍵打包 (例如 "監控 矽光子", "監控 機器人")
+    2. 多檔代碼批次貼上 (例如 "監控 2330 2476 3221 5328 2603")
+    3. 單檔代碼 (例如 "監控 2476")
+    """
+    clean_text = user_text.upper().strip()
+    
+    # 檢查是否命中題材庫 (方案四)
+    theme_hit = None
+    for theme_name, theme_codes in THEMES.items():
+        if theme_name in clean_text:
+            theme_hit = (theme_name, theme_codes)
+            break
+
+    codes_to_add = []
+    header_title = ""
+
+    if theme_hit:
+        t_name, t_codes = theme_hit
+        codes_to_add = t_codes
+        header_title = f"🏷️【已成功打包【{t_name}】概念股群組進雷達！】"
+    else:
+        # 從文字中擷取所有 4 碼數字 (方案一 & 方案三)
+        codes_to_add = list(set(re.findall(r'\b\d{4}\b', user_text)))
+        
+        # 若沒找到數字，檢查是否有中文股名
+        if not codes_to_add:
+            from stock_analyzer import resolve_stock_input
+            c, n = resolve_stock_input(user_text)
+            if c:
+                codes_to_add = [c]
+
+    if not codes_to_add:
+        return """⚠️ 未識別出有效的股票代碼或題材名稱！
+
+💡 您可以這樣輸入：
+• 批次掛入：監控 2330 2476 3221 5328
+• 題材打包：監控 矽光子 / 監控 機器人 / 監控 散熱
+• 單檔掛入：監控 2476"""
+
+    watchlist = load_watchlist()
+    now_str = datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d %H:%M:%S')
+    added_list = []
+
+    for code in codes_to_add:
+        res = calculate_stock_defense(code)
+        if not res:
+            continue
+
+        res['target_id'] = target_id or watchlist.get(code, {}).get('target_id', '')
+        res['added_at'] = now_str
+        res['alerted_today'] = {}
+        watchlist[code] = res
+        added_list.append(res)
+
+    if not added_list:
+        return f"⚠️ 嘗試掛入 {len(codes_to_add)} 檔標的，但皆無市場交易數據，請檢查代碼。"
+
     save_watchlist(watchlist)
 
-    msg = f"""✅【已成功掛入盤中自動到價雷達！】
+    # 若只有 1 檔，回傳詳細單檔卡片
+    if len(added_list) == 1:
+        it = added_list[0]
+        return f"""✅【已成功掛入盤中自動到價雷達！】
 ━━━━━━━━━━━━━━━
-標的：{code} {stock_name}
-基準價：{current_price:.2f} 元
+標的：{it['code']} {it['name']}
+基準價：{it['base_price']:.2f} 元
 
 🎯 鎖定四大操盤防線：
-🟢 建議進場：{entry_low:.2f} ~ {entry_high:.2f} 元
-🔵 動能加碼：{addon_price:.2f} 元
-🔴 第一停利(TP1)：{tp1_price:.2f} 元
-🔴 波段滿足(TP2)：{tp2_price:.2f} 元
-🛑 嚴格停損：{stop_loss:.2f} 元
+🟢 建議進場：{it['entry_low']:.2f} ~ {it['entry_high']:.2f} 元
+🔵 動能加碼：{it['addon_price']:.2f} 元
+🔴 第一停利(TP1)：{it['tp1_price']:.2f} 元
+🔴 波段滿足(TP2)：{it['tp2_price']:.2f} 元
+🛑 嚴格停損：{it['sl_price']:.2f} 元
 ────────────────
 🕒 盤中交易時段 (09:00 ~ 13:35) 每 60 秒自動雷達巡邏！
 ⚡ 盤中價格一旦觸及四大防線，將立即在此視窗自動發送到價推播！"""
 
-    return msg.strip()
+    # 若為多檔或題材打包，回傳結構化整批清單
+    if not header_title:
+        header_title = f"✅【已成功整批掛入 {len(added_list)} 檔標的進雷達！】"
 
-def remove_stock_from_radar(user_input: str) -> str:
-    """自盤中監控雷達移除個股"""
-    from stock_analyzer import resolve_stock_input
-    code, stock_name = resolve_stock_input(user_input)
-    if not code:
-        return "⚠️ 請輸入要移除的 4 碼股票代碼或股名（例如：刪除 2476、-3221）。"
+    msg_lines = [
+        header_title,
+        "━━━━━━━━━━━━━━━"
+    ]
+    for idx, it in enumerate(added_list, 1):
+        msg_lines.append(f"{idx}. 【{it['code']} {it['name']}】現價 {it['base_price']:.1f}")
+        msg_lines.append(f"   🟢進: {it['entry_low']:.1f}~{it['entry_high']:.1f} | 🔵加: {it['addon_price']:.1f}")
+        msg_lines.append(f"   🔴利: {it['tp1_price']:.1f} | 🛑損: {it['sl_price']:.1f}")
+
+    msg_lines.append("────────────────")
+    msg_lines.append(f"🕒 盤中交易時段 (09:00 ~ 13:35) 每 60 秒自動盯盤！")
+    msg_lines.append("⚡ 任何一檔觸及進場、加碼、停利或停損，將即時在此視窗推播！")
+    return "\n".join(msg_lines)
+
+def sync_screener_to_radar(target_id: str = "") -> str:
+    """
+    方案二：全自動連動「每日量化選股戰報」
+    讀取四大策略目錄下的最新 result.csv，將精選黑馬股自動同步至雷達清單
+    """
+    import pandas as pd
+    strategies_pattern = str(ROOT_DIR / "strategies" / "*" / "result.csv")
+    csv_files = glob.glob(strategies_pattern)
+
+    if not csv_files:
+        return "ℹ️ 目前策略目錄下尚未產出 result.csv 選股報表，請確認日報篩選是否已執行。"
 
     watchlist = load_watchlist()
-    if code in watchlist:
-        name = watchlist[code].get('name', stock_name or code)
-        del watchlist[code]
+    now_str = datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d %H:%M:%S')
+    synced_stocks = []
+
+    strat_names = {
+        "01_bollinger_reversal": "布林超跌",
+        "02_institutional_momentum": "法人起漲",
+        "03_short_momentum": "弱勢破線",
+        "04_cb_pricing_ambush": "可轉債伏擊"
+    }
+
+    for path in csv_files:
+        folder_name = Path(path).parent.name
+        tag = strat_names.get(folder_name, folder_name)
+        try:
+            df = pd.read_csv(path, encoding='utf-8-sig')
+            if df.empty:
+                continue
+
+            # 取各策略前 3 檔精選標的
+            top_df = df.head(3)
+            for _, row in top_df.iterrows():
+                # 代碼欄位辨識
+                code = str(row.get('證券代號', row.get('代號', ''))).strip()
+                if not code or not code.isdigit() or len(code) != 4:
+                    continue
+                name = str(row.get('證券名稱', row.get('名稱', code))).strip()
+                close_p = float(row.get('收盤價', row.get('現價', 0)))
+                
+                # 計算或提取價位
+                res = calculate_stock_defense(code)
+                if not res:
+                    continue
+
+                res['name'] = f"{res['name']}[{tag}]"
+                res['target_id'] = target_id or watchlist.get(code, {}).get('target_id', '')
+                res['added_at'] = now_str
+                res['alerted_today'] = {}
+                watchlist[code] = res
+                synced_stocks.append(res)
+        except Exception as e:
+            print(f"[!] 讀取 {path} 失敗: {e}")
+
+    if not synced_stocks:
+        return "⚠️ 查無可同步之精選標的。"
+
+    save_watchlist(watchlist)
+
+    msg_lines = [
+        f"🤖【已全自動同步 {len(synced_stocks)} 檔量化選股標的至雷達！】",
+        "━━━━━━━━━━━━━━━",
+        "已自各策略最新選股日報中提取精選標的："
+    ]
+    for idx, it in enumerate(synced_stocks, 1):
+        msg_lines.append(f"{idx}. 【{it['code']} {it['name']}】現價 {it['base_price']:.1f}")
+        msg_lines.append(f"   🟢進: {it['entry_low']:.1f}~{it['entry_high']:.1f} | 🛑損: {it['sl_price']:.1f}")
+
+    msg_lines.append("────────────────")
+    msg_lines.append("🕒 盤中開盤即自動啟動到價雷達巡邏，到價即推播！")
+    return "\n".join(msg_lines)
+
+def remove_stock_from_radar(user_input: str) -> str:
+    """自盤中監控雷達移除個股 (支援代碼或中文名稱)"""
+    from stock_analyzer import resolve_stock_input
+    
+    # 支援一次移除多檔
+    codes = re.findall(r'\b\d{4}\b', user_input)
+    if not codes:
+        c, n = resolve_stock_input(user_input)
+        if c:
+            codes = [c]
+
+    if not codes:
+        return "⚠️ 請輸入要移除的 4 碼股票代碼或股名（例如：刪除 2476、-3221 5328）。"
+
+    watchlist = load_watchlist()
+    removed = []
+    for c in codes:
+        if c in watchlist:
+            name = watchlist[c].get('name', c)
+            del watchlist[c]
+            removed.append(f"{c} {name}")
+
+    if removed:
         save_watchlist(watchlist)
-        return f"🗑️ 已成功自盤中監控雷達移除【{code} {name}】！"
+        return f"🗑️ 已成功自盤中監控雷達移除：\n" + "\n".join([f"• {x}" for x in removed])
     else:
-        return f"ℹ️ 監控清單中查無標的 【{code} {stock_name or ''}】。"
+        return "ℹ️ 監控清單中查無指定的標的。"
 
 def get_radar_summary() -> str:
     """查詢目前掛在雷達上的自選股清單"""
@@ -165,11 +334,11 @@ def get_radar_summary() -> str:
     if not watchlist:
         return """📋【盤中到價監控雷達・目前無監控標的】
 ────────────────
-💡 如何加入標的？
+💡 如何批次加入標的？
 在 LINE 聊天室直接輸入：
-• 監控 2476
-• 監控 華容
-• +3221
+• 批次掛入：監控 2330 2476 3221 5328 2603
+• 自動連動：同步選股
+• 題材打包：監控 矽光子 / 監控 機器人 / 監控 散熱
 
 系統即刻自動鎖定四大價位並開始即時盯盤！"""
 
@@ -187,14 +356,36 @@ def get_radar_summary() -> str:
         ad = item.get('addon_price', 0)
         tp1 = item.get('tp1_price', 0)
         sl = item.get('sl_price', 0)
-        msg_lines.append(f"\n{idx}. 【{code} {name}】基準: {bp:.2f}元")
-        msg_lines.append(f"   🟢進場: {el:.2f}~{eh:.2f} | 🔵加碼: {ad:.2f}")
-        msg_lines.append(f"   🔴停利: {tp1:.2f} | 🛑停損: {sl:.2f}")
+        msg_lines.append(f"\n{idx}. 【{code} {name}】基準: {bp:.1f}元")
+        msg_lines.append(f"   🟢進: {el:.1f}~{eh:.1f} | 🔵加: {ad:.1f}")
+        msg_lines.append(f"   🔴利: {tp1:.1f} | 🛑損: {sl:.1f}")
 
     msg_lines.append("────────────────")
     msg_lines.append("🕒 盤中交易時段 (09:00 ~ 13:35) 自動輪詢到價推播")
-    msg_lines.append("💡 輸入「刪除 2476」可取消單檔監控")
+    msg_lines.append("💡 輸入「刪除 2476」可取消單檔，輸入「清空監控」可全部移除")
     return "\n".join(msg_lines)
+
+def clear_all_radar() -> str:
+    """清空所有監控標的"""
+    save_watchlist({})
+    return "🗑️ 已清空盤中監控雷達的所有標的！"
+
+def get_themes_summary() -> str:
+    """取得支援的一鍵題材概念股清單"""
+    lines = [
+        "🏷️【支援之一鍵打包題材概念股清單】",
+        "━━━━━━━━━━━━━━━"
+    ]
+    seen = set()
+    for t_name, t_codes in THEMES.items():
+        key = tuple(t_codes)
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"•「監控 {t_name}」➜ 包含代碼: {', '.join(t_codes)}")
+    lines.append("────────────────")
+    lines.append("💡 在 LINE 輸入「監控 矽光子」即可將整組族群一次掛入雷達！")
+    return "\n".join(lines)
 
 def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
     """
@@ -210,29 +401,31 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
     time_str = now_tw.strftime('%H:%M:%S')
 
     codes = list(watchlist.keys())
-    # 批次向 mis.twse 查詢現價
-    channel_str = "|".join([f"tse_{c}.tw|otc_{c}.tw" for c in codes])
-    url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={channel_str}&json=1&delay=0"
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    # 批次向 mis.twse 查詢現價 (每 50 檔一包)
     quotes = {}
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            for item in data.get('msgArray', []):
-                c = item.get('c', '')
-                if c in watchlist:
-                    z = item.get('z', '-')
-                    y = item.get('y', '-')
-                    p = float(z) if (z and z != '-') else (float(y) if (y and y != '-') else None)
-                    if p:
-                        quotes[c] = {
-                            'price': p,
-                            'name': item.get('n', watchlist[c].get('name', c)),
-                            'time': item.get('t', time_str)
-                        }
-    except Exception as e:
-        print(f"[!] 批次查詢現價失敗: {e}")
-        return []
+    chunk_size = 50
+    for i in range(0, len(codes), chunk_size):
+        chunk = codes[i:i + chunk_size]
+        channel_str = "|".join([f"tse_{c}.tw|otc_{c}.tw" for c in chunk])
+        url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={channel_str}&json=1&delay=0"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                for item in data.get('msgArray', []):
+                    c = item.get('c', '')
+                    if c in watchlist:
+                        z = item.get('z', '-')
+                        y = item.get('y', '-')
+                        p = float(z) if (z and z != '-') else (float(y) if (y and y != '-') else None)
+                        if p:
+                            quotes[c] = {
+                                'price': p,
+                                'name': item.get('n', watchlist[c].get('name', c)),
+                                'time': item.get('t', time_str)
+                            }
+        except Exception as e:
+            print(f"[!] 批次查詢現價失敗: {e}")
 
     triggered_alerts = []
     watchlist_updated = False
@@ -311,7 +504,6 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 ⏰ 觸發時間：{time_str}
 （盤中智慧防洗版：同一事件當日僅推播一次）"""
 
-            # 發送 LINE Push 訊息
             push_url = "https://api.line.me/v2/bot/message/push"
             headers = {
                 "Content-Type": "application/json",
@@ -339,13 +531,13 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
     return triggered_alerts
 
 if __name__ == '__main__':
-    # 測試
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'list'
     if cmd == 'add':
-        t = sys.argv[2] if len(sys.argv) > 2 else '2476'
-        print(add_stock_to_radar(t, "test_target"))
+        t = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else '2476 3221'
+        print(batch_add_to_radar(t, "test"))
+    elif cmd == 'sync':
+        print(sync_screener_to_radar("test"))
+    elif cmd == 'themes':
+        print(get_themes_summary())
     elif cmd == 'list':
         print(get_radar_summary())
-    elif cmd == 'remove':
-        t = sys.argv[2] if len(sys.argv) > 2 else '2476'
-        print(remove_stock_from_radar(t))

@@ -123,31 +123,56 @@ def process_event_task(event: dict):
     from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
     print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
 
-    # 導入雷達管理模組
-    from radar_manager import add_stock_to_radar, remove_stock_from_radar, get_radar_summary
+    # 導入雷達管理模組 (支援四大進階匯入方案)
+    from radar_manager import (
+        batch_add_to_radar,
+        remove_stock_from_radar,
+        get_radar_summary,
+        sync_screener_to_radar,
+        clear_all_radar,
+        get_themes_summary
+    )
     target_dest = group_id or user_id
 
-    # 1. 監控指令：例如 "監控 2476", "+2476", "加入 2476", "監控 鉅祥"
-    if user_text.startswith(('監控 ', '加入 ', '追蹤 ', '盯盤 ', '+')) or '加入監控' in user_text:
-        clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|\+)\s*', '', user_text)
-        res = add_stock_to_radar(clean_target, target_id=target_dest)
+    # 方案二：全自動連動每日選股戰報
+    if user_text in ('同步選股', '同步策略', '同步日報', '同步戰報', 'sync'):
+        res = sync_screener_to_radar(target_id=target_dest)
         reply_line_message(reply_token, res)
         return
 
-    # 2. 查詢監控清單：例如 "監控清單", "清單", "查監控", "雷達清單"
+    # 方案四：查詢熱門題材清單
+    if user_text in ('族群清單', '題材清單', '概念股清單', '熱門題材', 'themes'):
+        res = get_themes_summary()
+        reply_line_message(reply_token, res)
+        return
+
+    # 清空所有監控
+    if user_text in ('清空監控', '全部清空', '全部刪除', 'clear'):
+        res = clear_all_radar()
+        reply_line_message(reply_token, res)
+        return
+
+    # 查詢監控清單
     if user_text in ('監控清單', '清單', '查監控', '雷達清單', 'watchlist'):
         res = get_radar_summary()
         reply_line_message(reply_token, res)
         return
 
-    # 3. 移除監控指令：例如 "刪除 2476", "取消 2476", "-2476", "移除 2476"
+    # 方案一、三、四：掛入監控 (支援多檔批次貼上、題材打包、單檔)
+    if user_text.startswith(('監控 ', '加入 ', '追蹤 ', '盯盤 ', '+')) or '加入監控' in user_text:
+        clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|\+)\s*', '', user_text)
+        res = batch_add_to_radar(clean_target, target_id=target_dest)
+        reply_line_message(reply_token, res)
+        return
+
+    # 移除監控指令
     if user_text.startswith(('刪除 ', '取消 ', '移除 ', '-')) or '取消監控' in user_text:
         clean_target = re.sub(r'^(刪除|取消|移除|\-)\s*', '', user_text)
         res = remove_stock_from_radar(clean_target)
         reply_line_message(reply_token, res)
         return
 
-    # 4. 一般即時查詢：支援代碼或中文股名辨識 (例如 "2476", "分析 2330", "華容", "台積電")
+    # 一般即時個股查詢 (支援代碼或中文名稱)
     from stock_analyzer import resolve_stock_input
     stock_code, stock_name = resolve_stock_input(user_text)
     if stock_code:
@@ -160,16 +185,17 @@ def process_event_task(event: dict):
     # 若非指令或股名，回覆友善使用說明
     help_text = """👋 歡迎使用【台股即時量化操盤小助手】！
 
-📱 功能一：盤中即時操盤指引
+📱 功能一：個股即時操盤指引
 傳送台股 4 碼代碼或中文名稱（例如：5328、華容、2330），秒回四大防線價位與勝率評等！
 
-⚡ 功能二：盤中自動到價推播雷達
-• 輸入「監控 2476」或「+2476」：掛入自動盯盤雷達
-• 輸入「監控清單」：查看目前盯盤標的與防線
-• 輸入「刪除 2476」：移除監控
+⚡ 功能二：盤中自動到價雷達 (四大免逐檔匯入方案)
+1️⃣【多檔批次貼上】：輸入「監控 2330 2476 3221 5328 2603」整批鎖定
+2️⃣【連動選股日報】：輸入「同步選股」一鍵載入策略最新黑馬股
+3️⃣【熱門題材打包】：輸入「監控 矽光子」或「監控 散熱」整組概念股打包
+4️⃣【查看現有盯盤】：輸入「監控清單」或「族群清單」
 
-🕒 盤中交易時段 (09:00 ~ 13:35) 雲端全自動監控！
-價格一旦觸及「🟢進場、🔵加碼、🔴停利、🛑停損」，立即在此視窗推播提醒！"""
+🕒 盤中交易時段 (09:00 ~ 13:35) 雲端全自動盯盤！
+價格觸及「🟢進場、🔵加碼、🔴停利、🛑停損」立即在此視窗推播！"""
 
     reply_line_message(reply_token, help_text)
 
