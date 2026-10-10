@@ -95,6 +95,20 @@ def process_event_task(event: dict):
     event_type = event.get('type')
     reply_token = event.get('replyToken')
 
+    # 1. 處理機器人被加入新群組 (獨立視窗建立)
+    if event_type == 'join':
+        source = event.get('source', {})
+        group_id = source.get('groupId', '')
+        print(f"[+] 機器人已成功加入新群組！群組 ID: {group_id}", flush=True)
+        welcome_msg = f"""🎉 成功建立【台股即時量化操盤指引】獨立專屬視窗！
+
+📱 本視窗已連線雲端量化引擎，盤中請隨時在此輸入任一台股 4 碼代碼（例如：3221、2330、2603），機器人將在此專屬視窗為您即時秒回四大防線價位操盤指引！
+
+💡 本群組專屬 Group ID：
+{group_id}"""
+        reply_line_message(reply_token, welcome_msg)
+        return
+
     if event_type != 'message':
         return
 
@@ -103,8 +117,11 @@ def process_event_task(event: dict):
         return
 
     user_text = msg.get('text', '').strip()
-    user_id = event.get('source', {}).get('userId', '未知用戶')
-    print(f"[*] 收到來自 [{user_id[:8]}...] 的訊息: \"{user_text}\"", flush=True)
+    source = event.get('source', {})
+    group_id = source.get('groupId', '')
+    user_id = source.get('userId', '未知用戶')
+    from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
+    print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
 
     # 檢查是否為台股 4 碼股票代碼 (例如 "3221", "分析 2330", "2603 可以買嗎")
     match = re.search(r'\b(\d{4})\b', user_text)
