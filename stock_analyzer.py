@@ -267,9 +267,13 @@ def analyze_stock(user_input: str) -> str:
         entry_high = round(current_price, 2)
         entry_strat = "跌深進入布林下軌超跌區，支撐浮現，可於區間內分批小量試單"
     else:
-        entry_low = round(max(ma10, current_price * 0.975), 2)
+        entry_cand1 = min(ma10, current_price * 0.975) if current_price < ma10 else max(ma10, current_price * 0.975)
+        entry_low = round(min(entry_cand1, current_price * 0.985), 2)
         entry_high = round(current_price, 2)
         entry_strat = "黃金回測支撐區，守穩 5MA/10MA 均線分批佈局"
+
+    if entry_low > entry_high:
+        entry_low, entry_high = entry_high, entry_low
 
     entry_target_mid = (entry_low + entry_high) / 2.0
 
