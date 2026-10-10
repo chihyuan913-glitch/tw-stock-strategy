@@ -123,43 +123,90 @@ def process_event_task(event: dict):
     from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
     print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
 
-    # 支援代碼或中文股名辨識 (例如 "3221", "分析 2330", "華容", "台積電")
+    # 導入雷達管理模組
+    from radar_manager import add_stock_to_radar, remove_stock_from_radar, get_radar_summary
+    target_dest = group_id or user_id
+
+    # 1. 監控指令：例如 "監控 2476", "+2476", "加入 2476", "監控 鉅祥"
+    if user_text.startswith(('監控 ', '加入 ', '追蹤 ', '盯盤 ', '+')) or '加入監控' in user_text:
+        clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|\+)\s*', '', user_text)
+        res = add_stock_to_radar(clean_target, target_id=target_dest)
+        reply_line_message(reply_token, res)
+        return
+
+    # 2. 查詢監控清單：例如 "監控清單", "清單", "查監控", "雷達清單"
+    if user_text in ('監控清單', '清單', '查監控', '雷達清單', 'watchlist'):
+        res = get_radar_summary()
+        reply_line_message(reply_token, res)
+        return
+
+    # 3. 移除監控指令：例如 "刪除 2476", "取消 2476", "-2476", "移除 2476"
+    if user_text.startswith(('刪除 ', '取消 ', '移除 ', '-')) or '取消監控' in user_text:
+        clean_target = re.sub(r'^(刪除|取消|移除|\-)\s*', '', user_text)
+        res = remove_stock_from_radar(clean_target)
+        reply_line_message(reply_token, res)
+        return
+
+    # 4. 一般即時查詢：支援代碼或中文股名辨識 (例如 "2476", "分析 2330", "華容", "台積電")
     from stock_analyzer import resolve_stock_input
     stock_code, stock_name = resolve_stock_input(user_text)
     if stock_code:
         print(f"[*] 正在分析標的 【{stock_code} {stock_name}】...", flush=True)
         analysis_result = analyze_stock(user_text)
+        analysis_result += f"\n💡 盤中盯盤：輸入「監控 {stock_code}」即刻掛入雷達，到價自動推播！"
         reply_line_message(reply_token, analysis_result)
         return
 
-    # 若非 4 碼代碼或股名，回覆友善使用說明
+    # 若非指令或股名，回覆友善使用說明
     help_text = """👋 歡迎使用【台股即時量化操盤小助手】！
 
-📱 盤中隨時傳送任一台股 4 碼代碼或中文名稱，系統將在 3 秒內為您精算【操盤四大防線價位】：
+📱 功能一：盤中即時操盤指引
+傳送台股 4 碼代碼或中文名稱（例如：5328、華容、2330），秒回四大防線價位與勝率評等！
 
-💡 範例輸入：
-• 5328 或 華容
-• 2330 或 台積電
-• 3221 或 台嘉碩
+⚡ 功能二：盤中自動到價推播雷達
+• 輸入「監控 2476」或「+2476」：掛入自動盯盤雷達
+• 輸入「監控清單」：查看目前盯盤標的與防線
+• 輸入「刪除 2476」：移除監控
 
-🎯 回傳完整量化戰報：
-📊 量能分析（當日成交量 vs 5MA 均量比）
-⭐ 4+1 量化星級評分（1~5 星評等與多空徽章）
-🟢 建議進場價位（黃金回測低接區）
-🔵 動能加碼價位（右側突破追擊點）
-🔴 雙階停利目標（TP1 前高反壓 / TP2 波段滿足）
-🛑 嚴格停損防守（風控紀律撤退線）
-⚖️ 即時盈虧比試算（Risk / Reward）
-💡 雙向操盤錦囊（空手者買點 vs 持股者防守指引）！"""
+🕒 盤中交易時段 (09:00 ~ 13:35) 雲端全自動監控！
+價格一旦觸及「🟢進場、🔵加碼、🔴停利、🛑停損」，立即在此視窗推播提醒！"""
 
     reply_line_message(reply_token, help_text)
+
+@app.on_event("startup")
+async def startup_event():
+    """啟動盤中到價雷達背景巡邏任務 (09:00 ~ 13:35)"""
+    import asyncio
+    import datetime
+    from radar_manager import scan_and_generate_alerts
+
+    async def intraday_radar_worker():
+        print("[✓] 盤中到價雷達背景巡邏引擎已啟動 (09:00 ~ 13:35 自動盯盤)", flush=True)
+        while True:
+            try:
+                tz_tw = datetime.timezone(datetime.timedelta(hours=8))
+                now_tw = datetime.datetime.now(tz_tw)
+                # 週一至週五且時段在 08:58 ~ 13:35
+                if now_tw.weekday() < 5:
+                    t_int = now_tw.hour * 100 + now_tw.minute
+                    if 858 <= t_int <= 1335:
+                        default_uid = os.environ.get("LINE_USER_ID", "")
+                        alerts = scan_and_generate_alerts(CHANNEL_ACCESS_TOKEN, default_uid)
+                        if alerts:
+                            print(f"[⚡] 盤中到價雷達觸發事件: {alerts}", flush=True)
+            except Exception as e:
+                print(f"[!] 盤中雷達輪詢例外: {e}", flush=True)
+            await asyncio.sleep(60)
+
+    asyncio.create_task(intraday_radar_worker())
 
 @app.get("/")
 async def root():
     return {
         "status": "online",
         "service": "台股盤中隨傳隨回即時 LINE Bot 伺服器",
-        "line_token_configured": bool(CHANNEL_ACCESS_TOKEN)
+        "line_token_configured": bool(CHANNEL_ACCESS_TOKEN),
+        "intraday_radar_active": True
     }
 
 @app.post("/callback")
