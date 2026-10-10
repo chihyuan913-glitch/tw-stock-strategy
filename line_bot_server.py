@@ -53,12 +53,27 @@ CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or ENV.get("L
 
 app = FastAPI(title="台股盤中即時隨傳隨回 LINE Bot")
 
+import collections
+import datetime
+
+# 雲端即時記憶體日誌隊列 (供在線除錯診斷)
+SERVER_LOGS = collections.deque(maxlen=200)
+
+def log_debug(msg: str):
+    """帶時間戳的除錯日誌，同時輸出至 stdout 與記憶體日誌隊列"""
+    tz_tw = datetime.timezone(datetime.timedelta(hours=8))
+    ts = datetime.datetime.now(tz_tw).strftime("%H:%M:%S")
+    formatted = f"[{ts}] {msg}"
+    print(formatted, flush=True)
+    SERVER_LOGS.append(formatted)
+
 def reply_line_message(reply_token: str, text: str):
     """呼叫 LINE Messaging API Reply Token 回覆訊息 (免費無上限)"""
     if not CHANNEL_ACCESS_TOKEN:
-        print("[!] 錯誤：未設定 LINE_CHANNEL_ACCESS_TOKEN 環境變數", flush=True)
+        log_debug("[!] 錯誤：未設定 LINE_CHANNEL_ACCESS_TOKEN 環境變數")
         return
     if not reply_token:
+        log_debug("[!] 警告：reply_token 為空，無法回覆")
         return
 
     url = "https://api.line.me/v2/bot/message/reply"
@@ -82,13 +97,13 @@ def reply_line_message(reply_token: str, text: str):
             headers=headers,
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            print(f"[✓] 成功回覆 LINE 訊息 (狀態碼: {resp.status})", flush=True)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            log_debug(f"[✓] 成功回覆 LINE 訊息 (狀態碼: {resp.status})")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='ignore')
-        print(f"[!] LINE Reply 失敗 (HTTP {e.code}): {err_body}", flush=True)
+        log_debug(f"[!] LINE Reply 失敗 (HTTP {e.code}): {err_body}")
     except Exception as e:
-        print(f"[!] 回覆 LINE 訊息例外: {e}", flush=True)
+        log_debug(f"[!] 回覆 LINE 訊息例外: {e}")
 
 def process_event_task(event: dict):
     """背景處理 LINE 訊息事件並進行即時個股分析"""
@@ -122,7 +137,7 @@ def process_event_task(event: dict):
     group_id = source.get('groupId', '')
     user_id = source.get('userId', '未知用戶')
     from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
-    print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
+    log_debug(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"")
 
     # 導入雷達管理模組 (支援四大進階匯入方案與獨立視窗分流)
     from radar_manager import (
@@ -138,8 +153,18 @@ def process_event_task(event: dict):
     )
     target_dest = group_id or user_id
 
-    # 0. 設定獨立雷達視窗指令
-    if user_text in ('設定雷達視窗', '設為雷達視窗', '綁定雷達', '雷達視窗'):
+    # 統一文字去空白並轉小寫做意圖比對
+    u_norm = user_text.replace(" ", "").lower()
+
+    # 0. 設定獨立雷達視窗指令 (繁簡體與意圖全面涵蓋)
+    is_bind_cmd = (
+        u_norm in {'設定雷達視窗', '設為雷達視窗', '綁定雷達', '雷達視窗', 
+                   '设定雷达视窗', '设为雷达视窗', '绑定雷达', '雷达视窗', 'bindradar'} or
+        ('雷達' in user_text and any(k in user_text for k in ('綁定', '設定', '視窗', '群組'))) or
+        ('雷达' in user_text and any(k in user_text for k in ('绑定', '设定', '视窗', '群组')))
+    )
+
+    if is_bind_cmd:
         if group_id:
             set_radar_channel(group_id, "盤中自動監控雷達專屬視窗")
             msg = f"""🎯【成功綁定：盤中到價自動監控雷達 獨立專屬視窗！】
@@ -170,45 +195,46 @@ def process_event_task(event: dict):
             reply_line_message(reply_token, msg)
             return
 
-    if user_text in ('解除雷達視窗', '解綁雷達'):
+    # 解除綁定指令 (繁簡相容)
+    if u_norm in ('解除雷達視窗', '解綁雷達', '解除雷达视窗', '解绑雷达', 'unbind'):
         clear_radar_channel()
         reply_line_message(reply_token, "🗑️ 已解除雷達專屬視窗綁定，到價警報將恢復預設發送。")
         return
 
-    # 方案二：全自動連動每日選股戰報
-    if user_text in ('同步選股', '同步策略', '同步日報', '同步戰報', 'sync'):
+    # 方案二：全自動連動每日選股戰報 (繁簡相容)
+    if u_norm in ('同步選股', '同步策略', '同步日報', '同步戰報', '同步选股', '同步策略', '同步日报', '同步战报', 'sync'):
         res = sync_screener_to_radar(target_id=target_dest)
         reply_line_message(reply_token, res)
         return
 
-    # 方案四：查詢熱門題材清單
-    if user_text in ('族群清單', '題材清單', '概念股清單', '熱門題材', 'themes'):
+    # 方案四：查詢熱門題材清單 (繁簡相容)
+    if u_norm in ('族群清單', '題材清單', '概念股清單', '熱門題材', '族群清单', '题材清单', '概念股清单', '热门题材', 'themes'):
         res = get_themes_summary()
         reply_line_message(reply_token, res)
         return
 
-    # 清空所有監控
-    if user_text in ('清空監控', '全部清空', '全部刪除', 'clear'):
+    # 清空所有監控 (繁簡相容)
+    if u_norm in ('清空監控', '全部清空', '全部刪除', '清空监控', '全部删除', 'clear'):
         res = clear_all_radar()
         reply_line_message(reply_token, res)
         return
 
-    # 查詢監控清單
-    if user_text in ('監控清單', '清單', '查監控', '雷達清單', 'watchlist'):
+    # 查詢監控清單 (繁簡相容)
+    if u_norm in ('監控清單', '清單', '查監控', '雷達清單', '监控清单', '清单', '查监控', '雷达清单', 'watchlist'):
         res = get_radar_summary()
         reply_line_message(reply_token, res)
         return
 
-    # 方案一、三、四：掛入監控 (支援多檔批次貼上、題材打包、單檔)
-    if user_text.startswith(('監控 ', '加入 ', '追蹤 ', '盯盤 ', '+')) or '加入監控' in user_text:
-        clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|\+)\s*', '', user_text)
+    # 方案一、三、四：掛入監控 (支援多檔批次貼上、題材打包、單檔，繁簡體與 + 號)
+    if re.match(r'^(監控|加入|追蹤|盯盤|监控|追踪|盯盘|\+)\s*', user_text) or any(k in user_text for k in ('加入監控', '加入监控', '掛入雷達', '挂入雷达')):
+        clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|监控|追踪|盯盘|\+)\s*', '', user_text)
         res = batch_add_to_radar(clean_target, target_id=target_dest)
         reply_line_message(reply_token, res)
         return
 
-    # 移除監控指令
-    if user_text.startswith(('刪除 ', '取消 ', '移除 ', '-')) or '取消監控' in user_text:
-        clean_target = re.sub(r'^(刪除|取消|移除|\-)\s*', '', user_text)
+    # 移除監控指令 (繁簡相容)
+    if re.match(r'^(刪除|取消|移除|删除|\-)\s*', user_text) or any(k in user_text for k in ('取消監控', '取消监控', '移除監控', '移除监控')):
+        clean_target = re.sub(r'^(刪除|取消|移除|删除|\-)\s*', '', user_text)
         res = remove_stock_from_radar(clean_target)
         reply_line_message(reply_token, res)
         return
@@ -217,7 +243,7 @@ def process_event_task(event: dict):
     from stock_analyzer import resolve_stock_input
     stock_code, stock_name = resolve_stock_input(user_text)
     if stock_code:
-        print(f"[*] 正在分析標的 【{stock_code} {stock_name}】...", flush=True)
+        log_debug(f"[*] 正在分析標的 【{stock_code} {stock_name}】...")
         analysis_result = analyze_stock(user_text)
         analysis_result += f"\n💡 盤中盯盤：輸入「監控 {stock_code}」即刻掛入雷達，到價自動推播！"
         reply_line_message(reply_token, analysis_result)
@@ -311,15 +337,28 @@ async def health():
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
+@app.get("/logs")
+async def get_logs():
+    """查看雲端伺服器最近 200 筆即時日誌 (除錯專用)"""
+    return {
+        "count": len(SERVER_LOGS),
+        "token_set": bool(CHANNEL_ACCESS_TOKEN),
+        "token_prefix": CHANNEL_ACCESS_TOKEN[:10] + "..." if CHANNEL_ACCESS_TOKEN else "None",
+        "logs": list(SERVER_LOGS)
+    }
+
 @app.post("/callback")
 async def callback(request: Request, background_tasks: BackgroundTasks):
     """LINE Webhook 接收端點"""
     try:
-        body = await request.json()
-    except Exception:
+        raw_body = await request.body()
+        body = json.loads(raw_body.decode('utf-8'))
+    except Exception as e:
+        log_debug(f"[!] /callback 收到無效 JSON: {e}")
         return {"status": "invalid_json"}
 
     events = body.get('events', [])
+    log_debug(f"[/callback] 收到 Webhook 請求，包含 {len(events)} 個事件")
     for event in events:
         background_tasks.add_task(process_event_task, event)
 
