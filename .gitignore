@@ -8,3 +8,5 @@ __pycache__/
 
 # 暫存結果
 *.tmp
+tools/*.exe
+tools/
