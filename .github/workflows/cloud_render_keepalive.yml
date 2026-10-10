@@ -1,0 +1,36 @@
+name: Render Web Service 盤中防休眠心跳 (Keep-Alive)
+
+on:
+  schedule:
+    # 台灣時間週一至週五 08:00 ~ 13:50 (UTC 00:00 ~ 05:50) 每 10 分鐘喚醒一次
+    # 防止 Render 免費版 15 分鐘無流量自動休眠 (Cold Start)，確保盤中隨傳隨回秒級回應
+    - cron: '*/10 0-5 * * 1-5'
+  workflow_dispatch: # 支援在 GitHub 網頁上手動按鍵測試
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render 伺服器保活端點
+        env:
+          RENDER_URL: ${{ secrets.RENDER_WEB_URL }}
+        run: |
+          if [ -z "$RENDER_URL" ]; then
+            echo "[i] 尚未設定 Repository Secret: RENDER_WEB_URL"
+            echo "    若您已部署至 Render，請至 GitHub 倉庫 Settings -> Secrets -> Actions"
+            echo "    新增 RENDER_WEB_URL (例如: https://tw-stock-line-bot.onrender.com)"
+            exit 0
+          fi
+          
+          # 確保 URL 格式正確
+          TARGET_URL="${RENDER_URL%/}/health"
+          echo "[*] 正在向 Render 發送心跳保活請求: $TARGET_URL"
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "$TARGET_URL" || echo "FAIL")
+          echo "[✓] 回應狀態碼: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "🎉 Render 伺服器成功保活，狀態清醒！"
+          else
+            echo "⚠️ 心跳回應代碼: $HTTP_STATUS，伺服器可能正在喚醒中或網址需檢查。"
+          fi

@@ -196,9 +196,33 @@ async def startup_event():
                             print(f"[⚡] 盤中到價雷達觸發事件: {alerts}", flush=True)
             except Exception as e:
                 print(f"[!] 盤中雷達輪詢例外: {e}", flush=True)
-            await asyncio.sleep(60)
+    async def render_keep_alive_worker():
+        """Render 免費版防休眠背景心跳任務 (每 10 分鐘自動保活，防止 15 分鐘無流量休眠)"""
+        external_url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("SERVER_PUBLIC_URL", "")
+        if not external_url:
+            print("[i] 未設定 RENDER_EXTERNAL_URL，跳過內部自動保活心跳 (建議搭配外部 Ping 或開盤 GitHub 工作流)。", flush=True)
+            return
 
-    asyncio.create_task(intraday_radar_worker())
+        if not external_url.startswith("http"):
+            external_url = f"https://{external_url}"
+        ping_url = f"{external_url.rstrip('/')}/health"
+
+        print(f"[✓] Render 防休眠心跳任務啟動，目標: {ping_url} (每 10 分鐘自動保活)", flush=True)
+        await asyncio.sleep(60)  # 伺服器啟動後先等待 1 分鐘穩定
+
+        while True:
+            try:
+                def _do_ping():
+                    req = urllib.request.Request(ping_url, headers={'User-Agent': 'RenderKeepAlive/1.0'})
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        return resp.status
+                status = await asyncio.to_thread(_do_ping)
+                print(f"[💓] Render 防休眠心跳觸發成功 (HTTP {status})", flush=True)
+            except Exception as e:
+                print(f"[!] Render 防休眠心跳例外: {e}", flush=True)
+            await asyncio.sleep(600)  # 每 10 分鐘 ping 一次 (Render 休眠門檻為 15 分鐘)
+
+    asyncio.create_task(render_keep_alive_worker())
 
 @app.get("/")
 async def root():
@@ -207,6 +231,17 @@ async def root():
         "service": "台股盤中隨傳隨回即時 LINE Bot 伺服器",
         "line_token_configured": bool(CHANNEL_ACCESS_TOKEN),
         "intraday_radar_active": True
+    }
+
+@app.get("/health")
+@app.get("/ping")
+async def health():
+    """專供 Render 防休眠檢測之輕量端點"""
+    import datetime
+    return {
+        "status": "ok",
+        "service": "tw-stock-line-bot",
+        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 @app.post("/callback")
