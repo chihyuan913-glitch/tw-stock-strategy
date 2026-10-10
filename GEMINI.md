@@ -118,6 +118,19 @@ if ROOT_DIR not in sys.path:
 
 ---
 
-## 七、指令執行與維護規範
+## 七、每週日 20:00 全策略動態優化與再升級規範 (Weekly Sunday Optimization Standard)
+1. **雲端定時觸發機制**：
+   - GitHub Actions 工作流 [`cloud_weekly_optimizer.yml`](file:///.github/workflows/cloud_weekly_optimizer.yml) 於**每週日晚上 8 點 (20:00 台灣時間 / 12:00 UTC)** 自動喚醒。
+   - 支援 `workflow_dispatch` 手動一鍵觸發，亦可於本機雙擊 [`run_weekly_optimizer.bat`](file:///run_weekly_optimizer.bat)。
+2. **五大核心升級作業**：
+   - ① **全台股官方字典同步 (`stock_dict.json`)**：自動爬取證交所 (TWSE) 與櫃買中心 (TPEx) 官方名冊，即時同步上市、上櫃新掛牌或更名標的。
+   - ② **大盤環境與波動率動態校準 (Market Regime)**：分析加權指數 (^TWII) 20MA/60MA 趨勢與月線乖離率，動態判定多頭主攻、高檔震盪或空頭防禦情境。
+   - ③ **可轉債 (CB) 事件池動態審查**：審查 Strategy 04 之 `cb_pool.json`，核對最後退場死線（3個月閉鎖期解禁日），過期強制清倉除帳。
+   - ④ **全策略盤前全域選股重算**：自動執行 `run_all.py`，提早為週一開盤備妥最新清單與四大防線價位。
+   - ⑤ **生成戰略週報與 LINE 戰報推播**：產出 [`weekly_report.md`](file:///weekly_report.md)，並將總體操盤指引與各策略前 3 檔精選標的推播至 LINE。
+
+---
+
+## 八、指令執行與維護規範
 - 總指揮下達全域更新或新策略需求時，AI 助手需主動審視並嚴格依照本規範於 `strategies/` 下建置或維護。
 - 重大更動與版本演進需明確記錄於該策略之 `README.md`。
