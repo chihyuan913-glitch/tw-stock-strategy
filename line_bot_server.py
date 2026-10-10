@@ -123,31 +123,34 @@ def process_event_task(event: dict):
     from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
     print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
 
-    # 檢查是否為台股 4 碼股票代碼 (例如 "3221", "分析 2330", "2603 可以買嗎")
-    match = re.search(r'\b(\d{4})\b', user_text)
-    if match:
-        stock_code = match.group(1)
-        print(f"[*] 正在分析股票代碼 【{stock_code}】...", flush=True)
-        analysis_result = analyze_stock(stock_code)
+    # 支援代碼或中文股名辨識 (例如 "3221", "分析 2330", "華容", "台積電")
+    from stock_analyzer import resolve_stock_input
+    stock_code, stock_name = resolve_stock_input(user_text)
+    if stock_code:
+        print(f"[*] 正在分析標的 【{stock_code} {stock_name}】...", flush=True)
+        analysis_result = analyze_stock(user_text)
         reply_line_message(reply_token, analysis_result)
         return
 
-    # 若非 4 碼代碼，回覆友善使用說明
+    # 若非 4 碼代碼或股名，回覆友善使用說明
     help_text = """👋 歡迎使用【台股即時量化操盤小助手】！
 
-📱 盤中隨時傳送任一台股 4 碼代碼，系統將立即在 3 秒內為您精算【操盤四大防線價位】：
+📱 盤中隨時傳送任一台股 4 碼代碼或中文名稱，系統將在 3 秒內為您精算【操盤四大防線價位】：
 
-範例輸入：
-• 3221
-• 2330
-• 分析 2603
+💡 範例輸入：
+• 5328 或 華容
+• 2330 或 台積電
+• 3221 或 台嘉碩
 
-🎯 回傳包含：
+🎯 回傳完整量化戰報：
+📊 量能分析（當日成交量 vs 5MA 均量比）
+⭐ 4+1 量化星級評分（1~5 星評等與多空徽章）
 🟢 建議進場價位（黃金回測低接區）
-🔵 動能加碼價位（突破確認追擊點）
-🔴 停利目標（TP1 前高反壓 / TP2 波段滿足）
-🛑 嚴格停損價位（風控撤退防線）
-⚖️ 即時盈虧比（Risk / Reward）與盤面建議！"""
+🔵 動能加碼價位（右側突破追擊點）
+🔴 雙階停利目標（TP1 前高反壓 / TP2 波段滿足）
+🛑 嚴格停損防守（風控紀律撤退線）
+⚖️ 即時盈虧比試算（Risk / Reward）
+💡 雙向操盤錦囊（空手者買點 vs 持股者防守指引）！"""
 
     reply_line_message(reply_token, help_text)
 
