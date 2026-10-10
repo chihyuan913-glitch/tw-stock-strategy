@@ -65,6 +65,98 @@ def clear_radar_channel() -> bool:
             pass
     return False
 
+def reset_today_alerts() -> str:
+    """重置當日所有標的的到價觸發紀錄 (盤中可再次接收所有到價推播)"""
+    watchlist = load_watchlist()
+    if not watchlist:
+        return "ℹ️ 目前監控清單為空，無須重置。"
+    now_tw = datetime.datetime.now(TZ_TW)
+    today_str = now_tw.strftime('%Y-%m-%d')
+    for code, item in watchlist.items():
+        if 'alerted_today' in item and today_str in item['alerted_today']:
+            item['alerted_today'][today_str] = []
+    save_watchlist(watchlist)
+    return f"🔄【已重置今日 ({today_str}) 全部標的之到價警報狀態！】\n所有標的今日若再次觸及四大防線，將會重新發送推播。"
+
+def get_radar_status() -> str:
+    """查詢當前雷達引擎健康度、監控數量與目標視窗狀態"""
+    watchlist = load_watchlist()
+    channel_id = get_radar_channel()
+    now_tw = datetime.datetime.now(TZ_TW)
+    now_str = now_tw.strftime('%Y-%m-%d %H:%M:%S')
+    weekday = now_tw.weekday()
+    t_int = now_tw.hour * 100 + now_tw.minute
+    is_trading_hour = (weekday < 5 and 900 <= t_int <= 1335)
+
+    trading_status = "🟢 盤中交易時段 (即時輪詢盯盤中)" if is_trading_hour else "🟡 非交易時段 (待開盤 09:00 自動啟動)"
+    target_desc = f"專屬群組 [{channel_id[:10]}...]" if channel_id else "預設全域視窗 (未鎖定專屬群組)"
+
+    lines = [
+        "📡【台股盤中到價自動監控雷達・系統運作狀態】",
+        "━━━━━━━━━━━━━━━",
+        f"⏱️ 當前台灣時間：{now_str}",
+        f"⚡ 盯盤引擎狀態：{trading_status}",
+        f"🎯 推播目標視窗：{target_desc}",
+        f"📊 監控標的數量：共 {len(watchlist)} 檔",
+        f"🕒 輪詢掃描頻率：每 60 秒即時全自動比對四大防線",
+        f"🛡️ 防休眠心跳：每 10 分鐘保活任務已掛載",
+        "────────────────",
+        "💡 快捷指令：",
+        "•「監控清單」查看詳細股票與防線價位",
+        "•「雷達測試」發送一則模擬到價警報卡片",
+        "•「重置警報」重置今日已觸發之標籤",
+        "•「同步選股」一鍵載入今日策略黑馬"
+    ]
+    return "\n".join(lines)
+
+def generate_test_alert(token: str, target_id: str = "") -> str:
+    """發送一則全擬真的到價雷達測試卡片至專屬視窗"""
+    dest = target_id or get_radar_channel()
+    if not dest:
+        return "⚠️ 尚未設定雷達專屬視窗！請先在群組輸入「設定雷達視窗」進行綁定。"
+    if not token:
+        return "⚠️ 未設定 LINE_CHANNEL_ACCESS_TOKEN，無法發送測試訊息。"
+
+    now_tw = datetime.datetime.now(TZ_TW)
+    time_str = now_tw.strftime('%H:%M:%S')
+
+    test_card = f"""⚡【盤中到價即時雷達警報 (功能測試)】
+━━━━━━━━━━━━━━━
+標的：2330 台積電
+現價：1,085.00 元 (▲+2.36%)
+觸發：🔵【動能追擊通知・突破加碼防線觸發】
+
+🎯 操盤四大防線現況：
+🟢 建議進場：1,045.00 ~ 1,060.00 元
+🔵 動能加碼：1,080.00 元 (已突破！)
+🔴 第一停利：1,120.00 元 (波段空間 +3.2%)
+🛑 嚴格停損：1,020.00 元 (風控底線 -5.9%)
+────────────────
+💡 操盤錦囊與行動方針：
+現價 1,085.00 元 放量實體K棒突破關鍵加碼點 1,080.00 元！短線多頭主升段動能確立，右側交易者可順勢加碼 1/3 倉位，並同步將防守停損線拉高至 1,050 元保本防守！
+━━━━━━━━━━━━━━━
+⏰ 觸發時間：{time_str}
+🤖 系統狀態：盤中到價雷達連線 100% 正常！到價自動推播已就緒。"""
+
+    push_url = "https://api.line.me/v2/bot/message/push"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+    body = {
+        "to": dest,
+        "messages": [{"type": "text", "text": test_card}]
+    }
+    try:
+        post_data = json.dumps(body, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(push_url, data=post_data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            if resp.status == 200:
+                return "✅【測試推播成功發送！】\n已向您的【盤中自動監控雷達專屬視窗】發送一則全擬真到價警報卡片，請查看群組訊息！"
+    except Exception as e:
+        return f"❌ 測試推播失敗: {e}"
+    return "⚠️ 測試推播未完成。"
+
 # 方案四：熱門題材核心概念股字典 (繁簡雙向支援)
 THEMES = {
     "矽光子": ["3450", "6442", "3163", "3081", "3363", "6451"],
@@ -481,6 +573,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 
         q = quotes[code]
         curr_p = q['price']
+        prev_p = q.get('prev_close', curr_p)
         name = item.get('name', q['name'])
         entry_low = item.get('entry_low', 0)
         entry_high = item.get('entry_high', 0)
@@ -489,54 +582,67 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
         tp2_p = item.get('tp2_price', 0)
         sl_p = item.get('sl_price', 0)
 
+        # 計算即時漲跌幅
+        diff_p = curr_p - prev_p
+        diff_pct = (diff_p / prev_p * 100) if prev_p else 0.0
+        sign = "▲+" if diff_p > 0 else ("▼" if diff_p < 0 else " ")
+        price_display = f"{curr_p:.2f} 元 ({sign}{diff_pct:.2f}%)"
+
         alerted = item.setdefault('alerted_today', {}).setdefault(today_str, [])
         radar_channel_id = get_radar_channel()
         target_dest = radar_channel_id or item.get('target_id') or default_user_id
 
-        # 事件判定 (優先級：停損 > 停利 > 加碼 > 進場)
+        # 事件判定 (優先級：停損 > 停利TP2 > 停利TP1 > 加碼 > 進場)
         event_info = None
 
-        # 1. 停損警戒 (現價 <= 停損線)
+        # 1. 停損警戒 (現價 <= 停損線) - 優先級第一！
         if sl_p > 0 and curr_p <= sl_p and 'STOP_LOSS' not in alerted:
+            sl_drop = ((curr_p - sl_p) / sl_p * 100)
             event_info = {
                 'type': 'STOP_LOSS',
                 'badge': '🛑【最高風控警報・破線停損警戒觸發】',
-                'detail': f'現價 {curr_p:.2f} 元 已跌破停損防線 {sl_p:.2f} 元！多頭結構破壞，請無條件依紀律嚴格停損撤退，鎖定風險。'
+                'guide': f'現價已跌破嚴格防守停損線 {sl_p:.2f} 元 (破線幅度 {sl_drop:.1f}%)！\n多頭結構已遭破壞，請無條件依紀律嚴格執行停損退場，保留實力鎖定最大風險！'
             }
-        # 2. 停利滿足 (TP2 或 TP1)
+        # 2. 波段滿足 (現價 >= TP2)
         elif tp2_p > 0 and curr_p >= tp2_p and 'TP2' not in alerted:
+            gain_pct = ((curr_p - entry_high) / entry_high * 100) if entry_high else 0.0
             event_info = {
                 'type': 'TP2',
-                'badge': '🔴【波段滿足警示・TP2 目標強勢攻抵】',
-                'detail': f'現價 {curr_p:.2f} 元 已攻抵波段等幅滿足點 {tp2_p:.2f} 元！波段獲利豐碩，建議獲利全數入袋或緊縮移動防守。'
+                'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
+                'guide': f'現價強勢衝抵第二波段等幅滿足點 {tp2_p:.2f} 元 (累積獲利估 +{gain_pct:.1f}%)！\n主升段利潤豐碩，建議獲利全數落袋為安，或緊縮移動停利線至今日低點保本！'
             }
+        # 3. 前高停利 (現價 >= TP1)
         elif tp1_p > 0 and curr_p >= tp1_p and 'TP1' not in alerted:
             event_info = {
                 'type': 'TP1',
-                'badge': '🔴【獲利了結通知・TP1 前高反壓觸發】',
-                'detail': f'現價 {curr_p:.2f} 元 已衝抵第一目標反壓區 {tp1_p:.2f} 元！前方逢解套賣壓，建議分批獲利減碼 1/2。'
+                'badge': '🔴【獲利了結通知・TP1 第一目標觸發】',
+                'guide': f'現價已攻抵第一反壓目標區 {tp1_p:.2f} 元！前方逢前波密集解套區，建議先獲利了結 1/2 倉位落袋，其餘半數拉高成本線續抱讓利潤奔馳！'
             }
-        # 3. 突破加碼 (現價 >= 加碼價)
+        # 4. 突破加碼 (現價 >= 加碼價)
         elif addon_p > 0 and curr_p >= addon_p and 'ADDON' not in alerted:
             event_info = {
                 'type': 'ADDON',
-                'badge': '🔵【動能追擊通知・突破加碼防線觸發】',
-                'detail': f'現價 {curr_p:.2f} 元 放量突破關鍵續強點 {addon_p:.2f} 元！主升段動能確立，右側可順勢加碼 1/3。'
+                'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
+                'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
             }
-        # 4. 建倉進場 (現價回測進入進場區間)
+        # 5. 建倉進場 (現價回測進入黃金進場區間)
         elif entry_low <= curr_p <= entry_high and 'ENTRY' not in alerted:
+            # 計算即時盈虧比
+            risk = max(curr_p - sl_p, 0.1)
+            reward = max(tp1_p - curr_p, 0.1)
+            rr_ratio = reward / risk if risk > 0 else 1.0
             event_info = {
                 'type': 'ENTRY',
-                'badge': '🟢【黃金買點通知・拉回進場區間觸發】',
-                'detail': f'現價 {curr_p:.2f} 元 已回測落入黃金建倉區間 ({entry_low:.2f} ~ {entry_high:.2f} 元)！守穩短均線，可分批佈局。'
+                'badge': '🟢【黃金買點通知・拉回建倉區間觸發】',
+                'guide': f'現價回測穩守短均線，已落入黃金建倉區 ({entry_low:.2f} ~ {entry_high:.2f} 元)！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，風險有限、向上空間開闊，可依規劃分批佈局。'
             }
 
         if event_info and target_dest and token:
             card = f"""⚡【盤中到價即時雷達警報】
 ━━━━━━━━━━━━━━━
 標的：{code} {name}
-現價：{curr_p:.2f} 元
-觸發：{event_info['badge']}
+現價：{price_display}
+狀態：{event_info['badge']}
 
 🎯 操盤四大防線現況：
 🟢 建議進場：{entry_low:.2f} ~ {entry_high:.2f} 元
@@ -544,11 +650,11 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 🔴 第一停利：{tp1_p:.2f} 元
 🛑 嚴格停損：{sl_p:.2f} 元
 ────────────────
-💡 行動方針：
-{event_info['detail']}
+💡 操盤錦囊與即時行動方針：
+{event_info['guide']}
 ━━━━━━━━━━━━━━━
 ⏰ 觸發時間：{time_str}
-（盤中智慧防洗版：同一事件當日僅推播一次）"""
+🤖 盤中智慧防洗版：同一標的同事件當日僅推播一次"""
 
             push_url = "https://api.line.me/v2/bot/message/push"
             headers = {
@@ -562,7 +668,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
             try:
                 post_data = json.dumps(body, ensure_ascii=False).encode('utf-8')
                 p_req = urllib.request.Request(push_url, data=post_data, headers=headers, method="POST")
-                with urllib.request.urlopen(p_req, timeout=5) as p_resp:
+                with urllib.request.urlopen(p_req, timeout=6) as p_resp:
                     if p_resp.status == 200:
                         print(f"[✓] 成功推送到價警訊至 [{target_dest[:8]}...]: {code} {event_info['type']}", flush=True)
                         alerted.append(event_info['type'])

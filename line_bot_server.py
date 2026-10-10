@@ -149,7 +149,10 @@ def process_event_task(event: dict):
         get_themes_summary,
         set_radar_channel,
         get_radar_channel,
-        clear_radar_channel
+        clear_radar_channel,
+        get_radar_status,
+        generate_test_alert,
+        reset_today_alerts
     )
     target_dest = group_id or user_id
 
@@ -179,7 +182,8 @@ def process_event_task(event: dict):
 •「同步選股」一鍵掛入今日策略黑馬股
 •「監控 2476 3221」批次掛入自選股
 •「監控 矽光子」熱門概念股一鍵打包
-•「監控清單」查看目前盯盤標的與防線"""
+•「監控清單」查看目前盯盤標的與防線
+•「雷達測試」發送模擬到價警報卡片驗證"""
             reply_line_message(reply_token, msg)
             return
         else:
@@ -194,6 +198,24 @@ def process_event_task(event: dict):
 系統即會將該新群組綁定為專屬雷達視窗！所有盤中到價推播只會在該群組發出，絕不干擾個人聊天室！"""
             reply_line_message(reply_token, msg)
             return
+
+    # 測試推播 (繁簡相容)
+    if u_norm in ('雷達測試', '測試推播', '雷达测试', '测试推送', '測試雷達', '测试雷达', 'testpush', 'test'):
+        res = generate_test_alert(CHANNEL_ACCESS_TOKEN, target_dest)
+        reply_line_message(reply_token, res)
+        return
+
+    # 查詢雷達狀態 (繁簡相容)
+    if u_norm in ('雷達狀態', '監控狀態', '雷达状态', '监控状态', '系統狀態', '系统状态', 'status'):
+        res = get_radar_status()
+        reply_line_message(reply_token, res)
+        return
+
+    # 重置今日警報 (繁簡相容)
+    if u_norm in ('重置警報', '重置警报', '重設警報', '重设警报', 'resetalerts', 'reset'):
+        res = reset_today_alerts()
+        reply_line_message(reply_token, res)
+        return
 
     # 解除綁定指令 (繁簡相容)
     if u_norm in ('解除雷達視窗', '解綁雷達', '解除雷达视窗', '解绑雷达', 'unbind'):
@@ -274,21 +296,75 @@ async def startup_event():
     from radar_manager import scan_and_generate_alerts
 
     async def intraday_radar_worker():
-        print("[✓] 盤中到價雷達背景巡邏引擎已啟動 (09:00 ~ 13:35 自動盯盤)", flush=True)
+        log_debug("[✓] 盤中到價雷達背景巡邏引擎已啟動 (09:00 ~ 13:35 自動盯盤)")
+        notified_morning = ""
+        notified_closing = ""
+
         while True:
             try:
                 tz_tw = datetime.timezone(datetime.timedelta(hours=8))
                 now_tw = datetime.datetime.now(tz_tw)
-                # 週一至週五且時段在 08:58 ~ 13:35
-                if now_tw.weekday() < 5:
+                today_str = now_tw.strftime('%Y-%m-%d')
+                weekday = now_tw.weekday()
+
+                # 週一至週五且時段在 08:55 ~ 13:35
+                if weekday < 5:
                     t_int = now_tw.hour * 100 + now_tw.minute
+                    
+                    # 1. 開盤晨報 (08:58 提醒今日監控標的)
+                    if 858 <= t_int <= 900 and notified_morning != today_str:
+                        from radar_manager import load_watchlist, get_radar_channel
+                        w = load_watchlist()
+                        target_ch = get_radar_channel()
+                        if w and target_ch and CHANNEL_ACCESS_TOKEN:
+                            m_card = f"""🔔【台股開盤前夕・盤中到價雷達全自動啟動】
+━━━━━━━━━━━━━━━
+今日共鎖定 {len(w)} 檔焦點標的！
+雲端即時盯盤引擎已就緒，盤中將每 60 秒比對四大防線價位。
+一旦觸及「🟢進場、🔵加碼、🔴停利、🛑停損」，將立即在此視窗為您即時推播！
+祝福今日操盤順利，嚴守紀律！"""
+                            push_url = "https://api.line.me/v2/bot/message/push"
+                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
+                            body = json.dumps({"to": target_ch, "messages": [{"type": "text", "text": m_card}]}, ensure_ascii=False).encode('utf-8')
+                            try:
+                                urllib.request.urlopen(urllib.request.Request(push_url, data=body, headers=headers, method="POST"), timeout=6)
+                                log_debug(f"[✓] 成功發送開盤晨報至雷達視窗")
+                            except Exception as e:
+                                log_debug(f"[!] 開盤晨報推播失敗: {e}")
+                        notified_morning = today_str
+
+                    # 2. 盤中即時盯盤比對 (09:00 ~ 13:35)
                     if 858 <= t_int <= 1335:
                         default_uid = os.environ.get("LINE_USER_ID", "")
                         alerts = scan_and_generate_alerts(CHANNEL_ACCESS_TOKEN, default_uid)
                         if alerts:
-                            print(f"[⚡] 盤中到價雷達觸發事件: {alerts}", flush=True)
+                            log_debug(f"[⚡] 盤中到價雷達觸發事件: {', '.join(alerts)}")
+
+                    # 3. 收盤總結 (13:31)
+                    if 1331 <= t_int <= 1335 and notified_closing != today_str:
+                        from radar_manager import get_radar_channel
+                        target_ch = get_radar_channel()
+                        if target_ch and CHANNEL_ACCESS_TOKEN:
+                            c_card = f"""🏁【今日台股盤中到價雷達監控圓滿結束】
+━━━━━━━━━━━━━━━
+盤中交易已於 13:30 順利收盤！
+今日到價事件推播完畢，雲端雷達轉入盤後待機模式。
+💡 傍晚可輸入「同步選股」一鍵更新今日三大策略最新黑馬名單！"""
+                            push_url = "https://api.line.me/v2/bot/message/push"
+                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
+                            body = json.dumps({"to": target_ch, "messages": [{"type": "text", "text": c_card}]}, ensure_ascii=False).encode('utf-8')
+                            try:
+                                urllib.request.urlopen(urllib.request.Request(push_url, data=body, headers=headers, method="POST"), timeout=6)
+                                log_debug(f"[✓] 成功發送收盤總結至雷達視窗")
+                            except Exception as e:
+                                log_debug(f"[!] 收盤總結推播失敗: {e}")
+                        notified_closing = today_str
+
             except Exception as e:
-                print(f"[!] 盤中雷達輪詢例外: {e}", flush=True)
+                log_debug(f"[!] 盤中雷達輪詢例外: {e}")
+
+            await asyncio.sleep(60)
+
     async def render_keep_alive_worker():
         """Render 免費版防休眠背景心跳任務 (每 10 分鐘自動保活，防止 15 分鐘無流量休眠)"""
         external_url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("SERVER_PUBLIC_URL", "")
@@ -315,6 +391,7 @@ async def startup_event():
                 print(f"[!] Render 防休眠心跳例外: {e}", flush=True)
             await asyncio.sleep(600)  # 每 10 分鐘 ping 一次 (Render 休眠門檻為 15 分鐘)
 
+    asyncio.create_task(intraday_radar_worker())
     asyncio.create_task(render_keep_alive_worker())
 
 @app.get("/")
