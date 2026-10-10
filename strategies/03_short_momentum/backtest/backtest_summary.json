@@ -1,0 +1,279 @@
+{
+  "backtest_period": "20250101 ~ 20260930",
+  "total_trading_days": 422,
+  "all_trades_stats": {
+    "total_trades": 5140,
+    "win_trades": 1992,
+    "loss_trades": 3148,
+    "win_rate_pct": 38.75,
+    "total_return_pct": -2770.52,
+    "avg_return_pct": -0.54,
+    "median_return_pct": -2.3,
+    "profit_factor": 0.81,
+    "payoff_ratio": 1.28,
+    "avg_win_pct": 5.97,
+    "avg_loss_pct": -4.66,
+    "max_win_pct": 18.88,
+    "max_loss_pct": -17.47,
+    "max_drawdown_pct": -5231.65,
+    "sharpe_ratio": -0.42,
+    "avg_holding_days": 11.5,
+    "avg_hold_win": 13.3,
+    "avg_hold_loss": 10.4,
+    "tp1_count": 1138,
+    "tp1_pct": 22.1,
+    "tp2_count": 5,
+    "tp2_pct": 0.1,
+    "sl_count": 2412,
+    "sl_pct": 46.9,
+    "time_count": 1457,
+    "time_pct": 28.3
+  },
+  "hedge_regime_stats": {
+    "total_trades": 1959,
+    "win_trades": 806,
+    "loss_trades": 1153,
+    "win_rate_pct": 41.14,
+    "total_return_pct": 410.77,
+    "avg_return_pct": 0.21,
+    "median_return_pct": -2.05,
+    "profit_factor": 1.07,
+    "payoff_ratio": 1.54,
+    "avg_win_pct": 7.37,
+    "avg_loss_pct": -4.79,
+    "max_win_pct": 18.88,
+    "max_loss_pct": -15.45,
+    "max_drawdown_pct": -2448.06,
+    "sharpe_ratio": 0.15,
+    "avg_holding_days": 10.7,
+    "avg_hold_win": 11.7,
+    "avg_hold_loss": 10.0,
+    "tp1_count": 597,
+    "tp1_pct": 30.5,
+    "tp2_count": 4,
+    "tp2_pct": 0.2,
+    "sl_count": 897,
+    "sl_pct": 45.8,
+    "time_count": 451,
+    "time_pct": 23.0
+  },
+  "bull_regime_stats": {
+    "total_trades": 3181,
+    "win_trades": 1186,
+    "loss_trades": 1995,
+    "win_rate_pct": 37.28,
+    "total_return_pct": -3181.29,
+    "avg_return_pct": -1.0,
+    "median_return_pct": -2.42,
+    "profit_factor": 0.65,
+    "payoff_ratio": 1.1,
+    "avg_win_pct": 5.02,
+    "avg_loss_pct": -4.58,
+    "max_win_pct": 17.65,
+    "max_loss_pct": -17.47,
+    "max_drawdown_pct": -3205.74,
+    "sharpe_ratio": -0.84,
+    "avg_holding_days": 12.0,
+    "avg_hold_win": 14.3,
+    "avg_hold_loss": 10.6,
+    "tp1_count": 541,
+    "tp1_pct": 17.0,
+    "tp2_count": 1,
+    "tp2_pct": 0.0,
+    "sl_count": 1515,
+    "sl_pct": 47.6,
+    "time_count": 1006,
+    "time_pct": 31.6
+  },
+  "yearly_stats": {
+    "2025": {
+      "total_trades": 3291,
+      "win_trades": 1329,
+      "loss_trades": 1962,
+      "win_rate_pct": 40.38,
+      "total_return_pct": -387.35,
+      "avg_return_pct": -0.12,
+      "median_return_pct": -2.13,
+      "profit_factor": 0.96,
+      "payoff_ratio": 1.41,
+      "avg_win_pct": 6.43,
+      "avg_loss_pct": -4.55,
+      "max_win_pct": 18.63,
+      "max_loss_pct": -14.93,
+      "max_drawdown_pct": -2845.2,
+      "sharpe_ratio": -0.09,
+      "avg_holding_days": 12.3,
+      "avg_hold_win": 13.6,
+      "avg_hold_loss": 11.4,
+      "tp1_count": 798,
+      "tp1_pct": 24.2,
+      "tp2_count": 3,
+      "tp2_pct": 0.1,
+      "sl_count": 1478,
+      "sl_pct": 44.9,
+      "time_count": 1012,
+      "time_pct": 30.8
+    },
+    "2026": {
+      "total_trades": 1849,
+      "win_trades": 663,
+      "loss_trades": 1186,
+      "win_rate_pct": 35.86,
+      "total_return_pct": -2383.17,
+      "avg_return_pct": -1.29,
+      "median_return_pct": -2.62,
+      "profit_factor": 0.58,
+      "payoff_ratio": 1.04,
+      "avg_win_pct": 5.05,
+      "avg_loss_pct": -4.83,
+      "max_win_pct": 18.88,
+      "max_loss_pct": -17.47,
+      "max_drawdown_pct": -2388.03,
+      "sharpe_ratio": -1.14,
+      "avg_holding_days": 10.2,
+      "avg_hold_win": 12.6,
+      "avg_hold_loss": 8.9,
+      "tp1_count": 340,
+      "tp1_pct": 18.4,
+      "tp2_count": 2,
+      "tp2_pct": 0.1,
+      "sl_count": 934,
+      "sl_pct": 50.5,
+      "time_count": 445,
+      "time_pct": 24.1
+    }
+  },
+  "monthly_stats": {
+    "202501": {
+      "trades": 263,
+      "win_rate": 24.3,
+      "total_return": -482.24,
+      "avg_return": -1.83
+    },
+    "202502": {
+      "trades": 178,
+      "win_rate": 21.3,
+      "total_return": -373.74,
+      "avg_return": -2.1
+    },
+    "202503": {
+      "trades": 396,
+      "win_rate": 86.9,
+      "total_return": 2987.31,
+      "avg_return": 7.54
+    },
+    "202504": {
+      "trades": 166,
+      "win_rate": 25.3,
+      "total_return": -311.28,
+      "avg_return": -1.88
+    },
+    "202505": {
+      "trades": 98,
+      "win_rate": 50.0,
+      "total_return": 137.88,
+      "avg_return": 1.41
+    },
+    "202506": {
+      "trades": 291,
+      "win_rate": 39.9,
+      "total_return": -149.77,
+      "avg_return": -0.51
+    },
+    "202507": {
+      "trades": 220,
+      "win_rate": 29.1,
+      "total_return": -415.09,
+      "avg_return": -1.89
+    },
+    "202508": {
+      "trades": 281,
+      "win_rate": 35.6,
+      "total_return": -413.46,
+      "avg_return": -1.47
+    },
+    "202509": {
+      "trades": 334,
+      "win_rate": 35.3,
+      "total_return": -391.02,
+      "avg_return": -1.17
+    },
+    "202510": {
+      "trades": 305,
+      "win_rate": 53.1,
+      "total_return": 220.34,
+      "avg_return": 0.72
+    },
+    "202511": {
+      "trades": 356,
+      "win_rate": 41.6,
+      "total_return": -117.53,
+      "avg_return": -0.33
+    },
+    "202512": {
+      "trades": 403,
+      "win_rate": 20.8,
+      "total_return": -1078.75,
+      "avg_return": -2.68
+    },
+    "202601": {
+      "trades": 254,
+      "win_rate": 40.6,
+      "total_return": -216.73,
+      "avg_return": -0.85
+    },
+    "202602": {
+      "trades": 105,
+      "win_rate": 38.1,
+      "total_return": -162.13,
+      "avg_return": -1.54
+    },
+    "202603": {
+      "trades": 337,
+      "win_rate": 39.2,
+      "total_return": -280.91,
+      "avg_return": -0.83
+    },
+    "202604": {
+      "trades": 217,
+      "win_rate": 35.5,
+      "total_return": -321.04,
+      "avg_return": -1.48
+    },
+    "202605": {
+      "trades": 298,
+      "win_rate": 12.4,
+      "total_return": -1190.63,
+      "avg_return": -4.0
+    },
+    "202606": {
+      "trades": 122,
+      "win_rate": 46.7,
+      "total_return": -37.37,
+      "avg_return": -0.31
+    },
+    "202607": {
+      "trades": 164,
+      "win_rate": 58.5,
+      "total_return": 325.41,
+      "avg_return": 1.98
+    },
+    "202608": {
+      "trades": 154,
+      "win_rate": 31.8,
+      "total_return": -268.02,
+      "avg_return": -1.74
+    },
+    "202609": {
+      "trades": 198,
+      "win_rate": 36.4,
+      "total_return": -231.75,
+      "avg_return": -1.17
+    }
+  },
+  "cost_advantage": {
+    "futures_total_return": -2770.52,
+    "stock_total_return": -5083.52,
+    "saved_cost_pct": 2313.0
+  }
+}

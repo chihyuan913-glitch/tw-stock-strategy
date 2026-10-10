@@ -1,0 +1,109 @@
+{
+  "backtest_period": "2025/01/01 ~ 2026/09/30 (民國 114 年 1 月 1 日 ~ 115 年 9 月底)",
+  "trading_days": 422,
+  "total_signals": 2410,
+  "total_trades": 2410,
+  "win_trades_count": 1056,
+  "loss_trades_count": 1221,
+  "flat_trades_count": 132,
+  "win_rate_pct": 43.82,
+  "tp_vs_sl_win_rate_pct": 42.28,
+  "exit_reasons": {
+    "TP1_hit": 923,
+    "TP1_pct": 38.3,
+    "STOP_LOSS_hit": 1260,
+    "STOP_LOSS_pct": 52.28,
+    "TIME_EXIT": 210,
+    "TIME_EXIT_pct": 8.71,
+    "HOLDING_END": 17
+  },
+  "cumulative_touch_counts": {
+    "ever_hit_tp1": 923,
+    "ever_hit_tp2": 56,
+    "ever_hit_sl": 1260
+  },
+  "returns": {
+    "avg_return_pct": 0.41,
+    "avg_win_pct": 6.73,
+    "avg_loss_pct": -5.01,
+    "profit_loss_ratio": 1.34,
+    "profit_factor": 1.16,
+    "max_win_pct": 69.58,
+    "max_loss_pct": -14.84
+  },
+  "avg_holding_days": 6.9,
+  "stars_summary": {
+    "★★★★★": {
+      "count": 1310,
+      "win_rate": 39.24,
+      "tp1_hits": 428,
+      "sl_hits": 752,
+      "avg_return": 0.22
+    },
+    "★★★★☆": {
+      "count": 991,
+      "win_rate": 49.14,
+      "tp1_hits": 441,
+      "sl_hits": 466,
+      "avg_return": 0.75
+    },
+    "★★★☆☆": {
+      "count": 103,
+      "win_rate": 48.54,
+      "tp1_hits": 49,
+      "sl_hits": 41,
+      "avg_return": -0.44
+    }
+  },
+  "quarterly_summary": {
+    "2025Q1": {
+      "count": 497,
+      "win_rate": 40.85,
+      "tp1_count": 189,
+      "sl_count": 294,
+      "avg_return": -0.39
+    },
+    "2025Q2": {
+      "count": 364,
+      "win_rate": 32.14,
+      "tp1_count": 93,
+      "sl_count": 235,
+      "avg_return": -0.4
+    },
+    "2025Q3": {
+      "count": 209,
+      "win_rate": 55.98,
+      "tp1_count": 97,
+      "sl_count": 69,
+      "avg_return": 0.66
+    },
+    "2025Q4": {
+      "count": 305,
+      "win_rate": 54.43,
+      "tp1_count": 151,
+      "sl_count": 125,
+      "avg_return": 0.86
+    },
+    "2026Q1": {
+      "count": 262,
+      "win_rate": 51.15,
+      "tp1_count": 123,
+      "sl_count": 115,
+      "avg_return": 0.96
+    },
+    "2026Q2": {
+      "count": 267,
+      "win_rate": 45.32,
+      "tp1_count": 115,
+      "sl_count": 133,
+      "avg_return": 0.61
+    },
+    "2026Q3": {
+      "count": 506,
+      "win_rate": 39.13,
+      "tp1_count": 155,
+      "sl_count": 289,
+      "avg_return": 1.01
+    }
+  }
+}

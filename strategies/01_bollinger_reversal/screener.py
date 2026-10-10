@@ -231,10 +231,14 @@ def calculate_score(inst_ratio, foreign_lots, trust_lots, candle_feat, upside_pc
 
 def screen_stocks(date_str=None, min_volume_lots=1000, 
                   lower_dist_max=1.0, lower_dist_min=-5.0, 
-                  min_inst_ratio=1.5, min_upside=2.0,
-                  trust_max_sell_lots=500, require_reversal_candle=True):
+                  min_inst_ratio=1.5, min_upside=0.0,
+                  trust_max_sell_lots=500, require_reversal_candle=False):
     """
-    V2.0 旗艦選股流程
+    V2.0 旗艦選股流程 (優化版：4大黃金維度 ＋ 100分星級評分矩陣)
+    維度 1：流動性防守 (日成交量 >= 1,000 張)
+    維度 2：籌碼主力逆勢承接 (三大法人買超佔比 >= 1.5% 且 投信無恐慌棄守)
+    維度 3：超跌技術位階 (位於布林下軌 [-5.0% ~ +1.0%])
+    維度 4：型態與反彈空間 (軟評分矩陣打分，長下影/紅K/土洋同買獲 ★★★★★ 推薦)
     """
     if not date_str:
         date_str = get_latest_trading_date()
@@ -261,21 +265,22 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
             total_lots = c['total'] // 1000
             inst_ratio = (total_lots / vol_lots * 100.0) if vol_lots > 0 else 0.0
 
-            # 條件 1: 日成交量 >= 1000 張
-            # 條件 3: 三大主力法人合計買超 > 0 且佔比達標
-            # 條件 3 (副條件): 投信未大量拋售
+            # 維度 1 (流動性) ＋ 維度 2 (籌碼純度與投信防踩雷)
             if total_lots > 0 and inst_ratio >= min_inst_ratio and c['trust'] >= -(trust_max_sell_lots * 1000):
-                # 型態止跌濾網
                 candle_feat = calculate_candlestick_features(q)
+                # 排除跌停無量鎖死 (收在最低且單日重挫 >= 9.5%)
+                if q['close'] <= q['low'] and q.get('change_pct', 0) <= -9.5:
+                    continue
+                # 若明確要求嚴格型態濾網才淘汰
                 if require_reversal_candle and not candle_feat['is_reversal']:
                     continue
 
                 candidate_codes.append(code)
                 candidate_meta[code] = {**q, **c, 'inst_ratio': inst_ratio, 'candle_feat': candle_feat}
 
-    print(f"[*] 通過量能、籌碼佔比與K線止跌初篩個股共 {len(candidate_codes)} 檔。")
+    print(f"[*] 通過量能與籌碼初篩個股共 {len(candidate_codes)} 檔。")
     if not candidate_codes:
-        print("[-] 今日無個股符合量能、籌碼佔比與型態門檻。")
+        print("[-] 今日無個股符合量能與籌碼門檻。")
         return []
 
     print(f"[*] 第二階段計算：批次計算 20 日布林通道與反彈空間...")
@@ -315,11 +320,11 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
             curr_close = meta['close']
             dist_pct = (curr_close - lower_band) / lower_band * 100.0
 
-            # 條件 2: 位於布林下軌 1% 之內或是跌破 5% 之內
+            # 維度 3: 位於布林下軌 1% 之內或是跌破 5% 之內 (超跌轉折位階)
             if lower_dist_min <= dist_pct <= lower_dist_max:
-                # 反彈空間 (距 20MA 中軌潛在利潤)
+                # 反彈空間 (距 20MA 中軌潛在利潤，納入軟評分評分項，不硬殺)
                 upside_pct = (ma20 - curr_close) / curr_close * 100.0
-                if upside_pct < min_upside:
+                if min_upside > 0 and upside_pct < min_upside:
                     continue
 
                 vol_lots = meta['volume'] // 1000
@@ -440,9 +445,10 @@ def main():
     parser.add_argument("--max-dist", type=float, default=1.0, help="位於布林下軌上方容許百分比(%%)，預設 1.0%%")
     parser.add_argument("--min-dist", type=float, default=-5.0, help="跌破布林下軌容許百分比(%%)，預設 -5.0%%")
     parser.add_argument("--min-inst-ratio", type=float, default=1.5, help="法人買超佔成交量最低比重(%%)，預設 1.5%%")
-    parser.add_argument("--min-upside", type=float, default=2.0, help="距布林中軌最低反彈空間(%%)，預設 2.0%%")
+    parser.add_argument("--min-upside", type=float, default=0.0, help="距布林中軌最低反彈空間(%%)，預設 0.0%% (納入評分，不硬篩)")
     parser.add_argument("--trust-dump-limit", type=int, default=500, help="投信最大容許賣超張數，預設 500 張")
-    parser.add_argument("--no-candle-filter", action="store_true", help="關閉 K 線止跌型態濾網")
+    parser.add_argument("--strict-candle", action="store_true", help="開啟嚴格 K 線止跌型態硬濾網 (預設以軟評分加權)")
+    parser.add_argument("--no-candle-filter", action="store_true", help="相容舊版旗標")
     parser.add_argument("--export", type=str, default=None, help="匯出檔名 (如 result.csv 或 result.md)")
     parser.add_argument("--line", action="store_true", help="自動發送選股結果至 LINE 推播")
 
@@ -456,7 +462,7 @@ def main():
         min_inst_ratio=args.min_inst_ratio,
         min_upside=args.min_upside,
         trust_max_sell_lots=args.trust_dump_limit,
-        require_reversal_candle=not args.no_candle_filter
+        require_reversal_candle=args.strict_candle
     )
 
     if not results:

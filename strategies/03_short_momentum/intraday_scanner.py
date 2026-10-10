@@ -208,8 +208,8 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
     # 動態指引標籤
     entry_tag = " ◄◄ 【空單進場基準！】" if event_type == "ENTRY" else ""
     addon_tag = " ◄◄ 【破低加空追擊！】" if event_type == "ADDON" else ""
-    tp1_tag = " ◄◄ 【TP1達標(-12%)！】" if event_type == "TP1" else ""
-    tp2_tag = " ◄◄ 【TP2達標(-20%)！】" if event_type == "TP2" else ""
+    tp1_tag = " ◄◄ 【TP1達標(-10%)！】" if event_type == "TP1" else ""
+    tp2_tag = " ◄◄ 【TP2達標(-16%)！】" if event_type == "TP2" else ""
     sl_tag = " ◄◄ 【站上月線停損！】" if event_type == "STOP_LOSS" else ""
 
     msg_lines = [
@@ -223,7 +223,7 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
         "🎯 實戰操盤四大防線：",
         f"├ 🟢 進場價位：{target['entry_price']:.2f} 元 (空單進場基準){entry_tag}",
         f"├ 🔵 加碼價位：{target['addon_price']:.2f} 元 (破低加空追擊){addon_tag}",
-        f"├ 🔴 停利目標：TP1 {target['tp1_price']:.2f} (-12%){tp1_tag} ｜ TP2 {target['tp2_price']:.2f} (-20%){tp2_tag}",
+        f"├ 🔴 停利目標：TP1 {target['tp1_price']:.2f} (-10%){tp1_tag} ｜ TP2 {target['tp2_price']:.2f} (-16%){tp2_tag}",
         f"└ 🛑 停損防守：{target['sl_price']:.2f} 元 (站上月線反壓){sl_tag}",
         "────────────────────",
         "💰 股期保證金與籌碼：",
@@ -269,8 +269,8 @@ def scan_once(targets, notified_events, force_test=False):
         if price <= target['tp2_price'] and 'TP2' not in events_for_code:
             events_for_code.add('TP2')
             send_intraday_price_alert(
-                target, rt, 'TP2', '🔴 空單達成第二停利目標 TP2 (-20%)',
-                '股價重挫達標波段回補目標 TP2 (-20%)！利潤豐厚，建議大幅獲利了結回補空單部位！'
+                target, rt, 'TP2', '🔴 空單達成第二停利目標 TP2 (-16%)',
+                '股價重挫達標波段回補目標 TP2 (-16%)！利潤豐厚，建議大幅獲利了結回補空單部位！'
             )
             continue
 
@@ -278,8 +278,8 @@ def scan_once(targets, notified_events, force_test=False):
         if price <= target['tp1_price'] and 'TP1' not in events_for_code:
             events_for_code.add('TP1')
             send_intraday_price_alert(
-                target, rt, 'TP1', '🔴 空單達成第一停利目標 TP1 (-12%)',
-                '股價下殺達標第一停利目標 TP1 (-12%)！短線跌勢滿足，建議分批回補 1/3 至 1/2 空單！'
+                target, rt, 'TP1', '🔴 空單達成第一停利目標 TP1 (-10%)',
+                '股價下殺達標第一停利目標 TP1 (-10%)！短線跌勢滿足，建議分批回補 1/3 至 1/2 空單！'
             )
             continue
 

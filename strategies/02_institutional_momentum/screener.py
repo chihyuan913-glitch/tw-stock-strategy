@@ -317,25 +317,22 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
             if v5_avg_lots < min_vol_lots:
                 continue
 
-            # 條件 6 (風險進場濾網): 收盤價與 20 日均線正乖離率小於 8%
+            # 維度 5 (風險進場濾網): 收盤價與 20 日均線正乖離率小於 8% (起漲安全區，保證盈虧比)
             bias_ma20_pct = ((curr_close - ma20_curr) / ma20_curr) * 100.0
             # 站上月線且在 +8% 乖離之內 (0% <= Bias < 8%)
             if not (0.0 <= bias_ma20_pct < max_bias_pct):
                 continue
 
-            # 條件 3 (籌碼集中度): 近 5 日法人累計大於 0
-            if meta['total_5d_lots'] <= 0:
-                continue
-
             # -------------------------------------------------------------
-            # 策略實戰操盤四大價位試算 (進場、加碼、停利、停損)
+            # 策略實戰操盤四大價位試算 (依 114~115 年回測優化旗艦版)
             # -------------------------------------------------------------
             entry_p = round(curr_close, 2)
             addon_raw = max(q['high'] * 1.005, curr_close * 1.03)
             addon_p = round(min(addon_raw, ma20_curr * 1.10), 2)
-            tp1_p = round(ma20_curr * 1.12, 2)
-            tp2_p = round(ma20_curr * 1.20, 2)
-            sl_p = round(max(ma20_curr * 0.98, q['low'] * 0.99), 2)
+            tp1_p = round(curr_close * 1.15, 2)  # TP1 (+15% 獲利減半 50% 並上移成本保本)
+            tp2_p = round(curr_close * 1.20, 2)  # TP2 (+20% 達標全數落袋，或 10MA 移動停利)
+            sl_hard = round(curr_close * 0.95, 2)  # 盤中硬停損 -5.0%
+            sl_p = round(ma20_curr * 0.98, 2)    # 收盤波段停損 (跌破月線 2%)
 
             results.append({
                 '證券代號': code,
