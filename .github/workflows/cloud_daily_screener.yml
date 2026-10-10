@@ -1,0 +1,64 @@
+name: ☁️ 雲端全策略盤後選股與 LINE 推播
+
+on:
+  schedule:
+    # 台灣時間週一至週五 17:35 (UTC 09:35) 證交所結算後自動執行
+    - cron: '35 9 * * 1-5'
+  workflow_dispatch: # 支援在 GitHub 網頁上隨時手動一鍵執行
+
+# 允許 Actions 提交更新後的選股報表回 Git 倉庫
+permissions:
+  contents: write
+
+jobs:
+  run-daily-screener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: 簽出專案代碼
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 設定 Python 環境 (3.11)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安裝相依套件
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 執行全策略盤後選股並定向推播至專屬 LINE 視窗
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          LINE_TARGET_STRATEGY_01: ${{ secrets.LINE_TARGET_STRATEGY_01 }}
+          LINE_TARGET_STRATEGY_02: ${{ secrets.LINE_TARGET_STRATEGY_02 }}
+          LINE_TARGET_STRATEGY_03: ${{ secrets.LINE_TARGET_STRATEGY_03 }}
+          LINE_TARGET_STRATEGY_04: ${{ secrets.LINE_TARGET_STRATEGY_04 }}
+        run: |
+          python run_all.py --line
+
+      - name: 自動同步最新選股報表回 Git 倉庫
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add strategies/**/result.csv strategies/**/result.md || true
+          if git diff --staged --quiet; then
+            echo "[*] 選股報表無變更，無需提交。"
+          else
+            git commit -m "chore(cloud): 自動更新全策略盤後選股報表 [skip ci]"
+            git push
+            echo "[✓] 已成功同步最新選股報表至 GitHub 倉庫！"
+          fi
+
+      - name: 封存選股報表 Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-screener-results
+          path: strategies/**/result.*
+          retention-days: 14

@@ -100,6 +100,24 @@ if ROOT_DIR not in sys.path:
 
 ---
 
-## 六、指令執行與維護規範
+## 六、100% 零開電腦純雲端自動監控規範 (Zero-PC Pure Cloud Standard)
+1. **GitHub Actions 雲端原生運算**：
+   - 全策略與所有未來新增策略，一律全面支援 **100% 零開電腦純雲端自動執行**。
+   - 本地電腦無需開機或維持聯網，所有盤後選股與盤中即時雷達由 GitHub Actions 雲端虛擬機全權託管。
+2. **兩大雲端標準工作流**：
+   - 📅 **雲端盤後選股 (`cloud_daily_screener.yml`)**：
+     * 每週一至週五台灣時間 17:35 自動喚醒執行 `run_all.py --line`。
+     * 自動推播最新戰報至各策略獨立 LINE 視窗，並自動將更新後的 `result.csv` / `result.md` 提交回 Git 倉庫備份。
+   - 🚨 **雲端盤中到價雷達 (`cloud_intraday_radar.yml`)**：
+     * 每週一至週五台灣時間 08:58 自動喚醒執行 `run_all_intraday.py --interval 60`。
+     * 常駐監控全策略標的之四大防線（🟢進場、🔵加碼、🔴停利、🛑停損），到價即刻推播，至 13:35 收盤自動安全結束。
+3. **雲端金鑰安全管理**：
+   - 包含 LINE Token 與策略分流群組 ID（`LINE_TARGET_STRATEGY_01~04`）一律由 GitHub Repository Secrets 加密保護，不外洩。
+4. **未來新增策略繼承機制**：
+   - 新增策略只需依標準於 `strategies/` 建置好 `screener.py` 與 `intraday_scanner.py`，並於根目錄之 `run_all.py` 與 `run_all_intraday.py` 登記清單，**即自動全面納入雲端盤後選股與盤中雷達託管，完全不需額外編寫雲端工作流**。
+
+---
+
+## 七、指令執行與維護規範
 - 總指揮下達全域更新或新策略需求時，AI 助手需主動審視並嚴格依照本規範於 `strategies/` 下建置或維護。
 - 重大更動與版本演進需明確記錄於該策略之 `README.md`。

@@ -1,0 +1,56 @@
+name: 🚨 雲端全策略盤中到價即時雷達與推播
+
+on:
+  schedule:
+    # 台灣時間週一至週五 08:58 (UTC 00:58) 盤前啟動，常駐監控至 13:35 收盤
+    - cron: '58 0 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '執行模式'
+        required: true
+        default: 'monitor'
+        type: choice
+        options:
+          - 'monitor'    # 常駐即時監控至收盤 (每 60 秒巡邏)
+          - 'test_push'  # 發送全策略模擬到價快訊至 LINE 測試連線
+          - 'once'       # 執行單次全市場到價快篩
+
+jobs:
+  run-intraday-radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 320 # 最長執行至收盤後自動退出
+    steps:
+      - name: 簽出專案代碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 環境 (3.11)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安裝相依套件
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 啟動雲端盤中到價雷達
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          LINE_TARGET_STRATEGY_01: ${{ secrets.LINE_TARGET_STRATEGY_01 }}
+          LINE_TARGET_STRATEGY_02: ${{ secrets.LINE_TARGET_STRATEGY_02 }}
+          LINE_TARGET_STRATEGY_03: ${{ secrets.LINE_TARGET_STRATEGY_03 }}
+          LINE_TARGET_STRATEGY_04: ${{ secrets.LINE_TARGET_STRATEGY_04 }}
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "test_push" ]; then
+            echo "[+] 執行模擬到價推播測試..."
+            python run_all_intraday.py --test-push
+          elif [ "${{ github.event.inputs.mode }}" = "once" ]; then
+            echo "[+] 執行單次快篩巡邏..."
+            python run_all_intraday.py --once
+          else
+            echo "[+] 啟動全策略即時雷達輪詢 (每 60 秒巡邏，至 13:35 自動收工)..."
+            python run_all_intraday.py --interval 60
+          fi
