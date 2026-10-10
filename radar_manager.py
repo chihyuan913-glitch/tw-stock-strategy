@@ -27,7 +27,43 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 ROOT_DIR = Path(__file__).resolve().parent
 WATCHLIST_FILE = ROOT_DIR / "watchlist.json"
+RADAR_CHANNEL_FILE = ROOT_DIR / "radar_channel.json"
 TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
+def get_radar_channel() -> str:
+    """取得獨立雷達專屬推播目標 ID (Group ID)"""
+    env_target = os.environ.get("LINE_TARGET_RADAR", "")
+    if env_target:
+        return env_target
+    if RADAR_CHANNEL_FILE.exists():
+        try:
+            with open(RADAR_CHANNEL_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                return d.get("target_id", "")
+        except Exception:
+            pass
+    return ""
+
+def set_radar_channel(target_id: str, group_name: str = "") -> str:
+    """設定獨立雷達專屬推播視窗"""
+    d = {
+        "target_id": target_id,
+        "group_name": group_name or "台股盤中自動監控雷達專屬視窗",
+        "updated_at": datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d %H:%M:%S')
+    }
+    with open(RADAR_CHANNEL_FILE, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+    return target_id
+
+def clear_radar_channel() -> bool:
+    """解除雷達專屬視窗綁定"""
+    if RADAR_CHANNEL_FILE.exists():
+        try:
+            os.remove(RADAR_CHANNEL_FILE)
+            return True
+        except Exception:
+            pass
+    return False
 
 # 方案四：熱門題材核心概念股字典
 THEMES = {
@@ -445,7 +481,8 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
         sl_p = item.get('sl_price', 0)
 
         alerted = item.setdefault('alerted_today', {}).setdefault(today_str, [])
-        target_dest = item.get('target_id') or default_user_id
+        radar_channel_id = get_radar_channel()
+        target_dest = radar_channel_id or item.get('target_id') or default_user_id
 
         # 事件判定 (優先級：停損 > 停利 > 加碼 > 進場)
         event_info = None

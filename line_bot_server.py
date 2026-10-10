@@ -100,12 +100,13 @@ def process_event_task(event: dict):
         source = event.get('source', {})
         group_id = source.get('groupId', '')
         print(f"[+] 機器人已成功加入新群組！群組 ID: {group_id}", flush=True)
-        welcome_msg = f"""🎉 成功建立【台股即時量化操盤指引】獨立專屬視窗！
+        welcome_msg = f"""🎉 成功加入新群組！
 
-📱 本視窗已連線雲端量化引擎，盤中請隨時在此輸入任一台股 4 碼代碼（例如：3221、2330、2603），機器人將在此專屬視窗為您即時秒回四大防線價位操盤指引！
+💡 若要將本群組設定為【盤中自動監控雷達・獨立專屬視窗】：
+請在此群組內直接輸入：
+👉「設定雷達視窗」
 
-💡 本群組專屬 Group ID：
-{group_id}"""
+綁定後，所有盤中到價警報（進場、加碼、停利、停損）將全數定點發送至此群組，與個人隨問隨答視窗徹底分流！"""
         reply_line_message(reply_token, welcome_msg)
         return
 
@@ -123,16 +124,56 @@ def process_event_task(event: dict):
     from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
     print(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"", flush=True)
 
-    # 導入雷達管理模組 (支援四大進階匯入方案)
+    # 導入雷達管理模組 (支援四大進階匯入方案與獨立視窗分流)
     from radar_manager import (
         batch_add_to_radar,
         remove_stock_from_radar,
         get_radar_summary,
         sync_screener_to_radar,
         clear_all_radar,
-        get_themes_summary
+        get_themes_summary,
+        set_radar_channel,
+        get_radar_channel,
+        clear_radar_channel
     )
     target_dest = group_id or user_id
+
+    # 0. 設定獨立雷達視窗指令
+    if user_text in ('設定雷達視窗', '設為雷達視窗', '綁定雷達', '雷達視窗'):
+        if group_id:
+            set_radar_channel(group_id, "盤中自動監控雷達專屬視窗")
+            msg = f"""🎯【成功綁定：盤中到價自動監控雷達 獨立專屬視窗！】
+━━━━━━━━━━━━━━━
+本群組已正式設定為「到價警報獨立專屬視窗」！
+
+✅ 雙視窗徹底隔離生效：
+1. 📱 個人隨問隨答視窗：維持安靜純淨，僅在您主動輸入代碼時秒回分析，絕無任何自動推播干擾。
+2. ⚡ 本雷達專屬視窗：所有盤中自動到價推播（🟢進場、🔵加碼、🔴停利、🛑停損）全數在此獨立發布！
+
+💡 在此視窗您可直接使用四大免逐檔指令：
+•「同步選股」一鍵掛入今日策略黑馬股
+•「監控 2476 3221」批次掛入自選股
+•「監控 矽光子」熱門概念股一鍵打包
+•「監控清單」查看目前盯盤標的與防線"""
+            reply_line_message(reply_token, msg)
+            return
+        else:
+            msg = """💡【如何新設雷達獨立專屬視窗？】
+────────────────
+若要將「盤中自動到價雷達」與「隨問隨答助手」分開：
+
+1. 在 LINE App 建立一個新群組（例如命名為：【台股盤中自動監控雷達】）。
+2. 把本官方帳號（機器人）邀請進入該新群組。
+3. 在該群組內發送一句「設定雷達視窗」或「綁定雷達」。
+
+系統即會將該新群組綁定為專屬雷達視窗！所有盤中到價推播只會在該群組發出，絕不干擾個人聊天室！"""
+            reply_line_message(reply_token, msg)
+            return
+
+    if user_text in ('解除雷達視窗', '解綁雷達'):
+        clear_radar_channel()
+        reply_line_message(reply_token, "🗑️ 已解除雷達專屬視窗綁定，到價警報將恢復預設發送。")
+        return
 
     # 方案二：全自動連動每日選股戰報
     if user_text in ('同步選股', '同步策略', '同步日報', '同步戰報', 'sync'):
