@@ -583,7 +583,7 @@ async def callback(request: Request, background_tasks: BackgroundTasks):
     return {"status": "ok", "events_queued": len(events)}
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8989))
     print(f"=====================================================")
     print(f"  台股即時隨傳隨回 LINE 操盤機器人伺服器啟動中...")
     print(f"  本機端點: http://127.0.0.1:{port}/callback")

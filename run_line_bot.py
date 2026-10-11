@@ -42,7 +42,7 @@ def main():
         print("    請確認 tools/cloudflared.exe 是否存在。", flush=True)
         sys.exit(1)
 
-    port = 8000
+    port = 8989
     python_exe = sys.executable
 
     # 1. 啟動 FastAPI / Uvicorn 伺服器
