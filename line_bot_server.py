@@ -18,6 +18,7 @@ import os
 import sys
 import re
 import json
+import time
 import urllib.request
 from pathlib import Path
 import threading
@@ -397,15 +398,15 @@ async def startup_event():
     if os.environ.get("LOCAL_WEB_MODE") == "1":
         server_start_time = time.time()
         def lifecycle_watchdog():
-            time.sleep(15)
+            time.sleep(20)
             while True:
                 time.sleep(1.0)
                 with shutdown_lock:
                     now = time.time()
-                    if not has_ever_connected and (now - server_start_time) > 30:
-                        print("\n[系統提醒] 啟動後 30 秒內未偵測到任何瀏覽器開啟連線，已自動結束伺服器釋放資源。", flush=True)
+                    if not has_ever_connected and (now - server_start_time) > 45:
+                        print("\n[系統提醒] 啟動後 45 秒內未偵測到任何瀏覽器開啟連線，已自動結束伺服器釋放資源。", flush=True)
                         os._exit(0)
-                    if has_ever_connected and (now - last_heartbeat_time) > 5.0 and len(active_websockets) == 0:
+                    if has_ever_connected and (now - last_heartbeat_time) > 8.0 and len(active_websockets) == 0:
                         try:
                             print("\n" + "=" * 70, flush=True)
                             print(" [STOP] 偵測到所有瀏覽器視窗/分頁已關閉！", flush=True)
@@ -428,7 +429,7 @@ active_websockets: Set[WebSocket] = set()
 shutdown_timer: Optional[threading.Timer] = None
 shutdown_lock = threading.RLock()
 has_ever_connected = False
-last_heartbeat_time: float = 0.0
+last_heartbeat_time: float = time.time()
 
 def schedule_server_shutdown(delay: float = 4.0):
     """排程關閉伺服器。若在 delay 秒內無新連線/心跳，則終止 Python 行程並釋放資源"""
@@ -441,7 +442,7 @@ def schedule_server_shutdown(delay: float = 4.0):
         
         def _terminate():
             with shutdown_lock:
-                if len(active_websockets) == 0:
+                if len(active_websockets) == 0 and (time.time() - last_heartbeat_time) >= 3.5:
                     try:
                         print("\n" + "=" * 70, flush=True)
                         print(" [STOP] 偵測到所有台股戰情儀表板視窗/分頁已關閉！", flush=True)
@@ -466,16 +467,19 @@ def cancel_server_shutdown():
 @app.websocket("/ws/session")
 async def websocket_session(websocket: WebSocket):
     """WebSocket 即時心跳監控 (維持生命週期)"""
-    global has_ever_connected
+    global has_ever_connected, last_heartbeat_time
     await websocket.accept()
     with shutdown_lock:
         active_websockets.add(websocket)
         has_ever_connected = True
+        last_heartbeat_time = time.time()
         cancel_server_shutdown()
     try:
         while True:
             msg = await websocket.receive_text()
-            cancel_server_shutdown()
+            with shutdown_lock:
+                last_heartbeat_time = time.time()
+                cancel_server_shutdown()
     except WebSocketDisconnect:
         pass
     except Exception:
