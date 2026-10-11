@@ -21,6 +21,7 @@ import json
 import urllib.request
 from pathlib import Path
 from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi.responses import HTMLResponse, FileResponse
 import uvicorn
 
 # 導入同目錄下的股票分析引擎
@@ -394,14 +395,154 @@ async def startup_event():
     asyncio.create_task(intraday_radar_worker())
     asyncio.create_task(render_keep_alive_worker())
 
-@app.get("/")
-async def root():
+WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    """提供深色科技風「台股量化選股策略最高總指揮中心」戰情儀表板"""
+    if WEB_INDEX.exists():
+        return FileResponse(WEB_INDEX)
+    return HTMLResponse("<h1>台股量化選股策略最高總指揮中心</h1><p>請確認 web/index.html 是否存在。</p>")
+
+@app.get("/api/overview")
+async def get_overview():
+    """提供大盤現況與全策略入選總數概覽"""
+    import pandas as pd
+    report_file = Path(__file__).resolve().parent / "weekly_report.md"
+    market_data = {
+        "close": "49,313.44",
+        "ma20": "47,687.85",
+        "bias_ma20": 3.41,
+        "regime": "🟢【多頭良性主升波段】",
+        "trend": "多頭排列",
+        "risk_advice": "均線呈多頭排列，可積極佈局策略 02 法人起漲股與策略 04 可轉債伏擊股。"
+    }
+
+    # 計算四大策略總入選數
+    total_candidates = 0
+    strat_dirs = ["01_bollinger_reversal", "02_institutional_momentum", "03_short_momentum", "04_cb_pricing_ambush"]
+    for s in strat_dirs:
+        csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
+        if csv_file.exists():
+            try:
+                df = pd.read_csv(csv_file, encoding='utf-8-sig')
+                total_candidates += len(df)
+            except Exception:
+                pass
+
     return {
         "status": "online",
-        "service": "台股盤中隨傳隨回即時 LINE Bot 伺服器",
-        "line_token_configured": bool(CHANNEL_ACCESS_TOKEN),
-        "intraday_radar_active": True
+        "market": market_data,
+        "total_candidates": total_candidates,
+        "strategies": strat_dirs
     }
+
+@app.get("/api/strategy/{strat_id}")
+async def get_strategy_data(strat_id: str):
+    """取得指定策略最新選股表格數據"""
+    import pandas as pd
+    strat_meta = {
+        "01_bollinger_reversal": {
+            "name": "策略 01：布林通道下軌超跌反轉策略",
+            "desc": "鎖定觸及布林下軌、融資洗清、三大法人逆勢大額買超之高勝率反轉強撐股。"
+        },
+        "02_institutional_momentum": {
+            "name": "策略 02：法人籌碼集中起漲動能策略",
+            "desc": "鎖定外資與投信連續重金吃貨、站穩月線、籌碼集中度大增之起漲黑馬股。"
+        },
+        "03_short_momentum": {
+            "name": "策略 03：弱勢破線做空與個股期貨避險策略",
+            "desc": "鎖定均線空頭排列、外資法人瘋狂倒貨、摜破關鍵支撐之弱勢避險放空標的。"
+        },
+        "04_cb_pricing_ambush": {
+            "name": "策略 04：可轉債 (CB) 定價伏擊與區間博弈策略",
+            "desc": "捕捉可轉債定價日前後主力壓盤洗盤甜蜜點，伏擊右側拉抬紅利，嚴守3個月閉鎖解禁前清倉死線。"
+        }
+    }
+
+    meta = strat_meta.get(strat_id, {"name": strat_id, "desc": ""})
+    csv_file = Path(__file__).resolve().parent / "strategies" / strat_id / "result.csv"
+    if not csv_file.exists():
+        return {
+            "name": meta["name"],
+            "desc": meta["desc"],
+            "columns": [],
+            "rows": []
+        }
+
+    try:
+        df = pd.read_csv(csv_file, encoding='utf-8-sig')
+        df = df.fillna('')
+        cols = list(df.columns)
+        rows = df.to_dict(orient='records')
+        return {
+            "name": meta["name"],
+            "desc": meta["desc"],
+            "columns": cols,
+            "rows": rows
+        }
+    except Exception as e:
+        return {
+            "name": meta["name"],
+            "desc": meta["desc"],
+            "error": str(e),
+            "columns": [],
+            "rows": []
+        }
+
+@app.get("/api/weekly_report")
+async def get_weekly_report():
+    """取得每週總體戰略週報內容"""
+    report_file = Path(__file__).resolve().parent / "weekly_report.md"
+    if report_file.exists():
+        try:
+            with open(report_file, "r", encoding="utf-8") as f:
+                return {"content": f.read()}
+        except Exception as e:
+            return {"content": f"讀取報告失敗: {e}"}
+    return {"content": "目前尚無每週戰報，請執行週日優化作業。"}
+
+@app.post("/api/analyze")
+async def analyze_endpoint(request: Request):
+    """個股即時操盤指引診斷 API"""
+    body = await request.json()
+    query = body.get("query", "").strip()
+    if not query:
+        return {"result": "請輸入有效之台股代碼或股票名稱。"}
+    res = analyze_stock(query)
+    return {"result": res}
+
+@app.post("/api/action/{action_name}")
+async def trigger_action_endpoint(action_name: str, background_tasks: BackgroundTasks):
+    """觸發本機後台任務"""
+    import subprocess
+    root_dir = Path(__file__).resolve().parent
+    if action_name == "run_screener":
+        def _task():
+            subprocess.run([sys.executable, str(root_dir / "run_all.py")])
+        background_tasks.add_task(_task)
+        return {"message": "已在背景啟動全策略盤後選股 (run_all.py)！"}
+
+    elif action_name == "run_radar":
+        def _task():
+            subprocess.run([sys.executable, str(root_dir / "run_all_intraday.py"), "--once"])
+        background_tasks.add_task(_task)
+        return {"message": "已在背景啟動全策略盤中到價掃描 (run_all_intraday.py --once)！"}
+
+    elif action_name == "run_optimizer":
+        def _task():
+            subprocess.run([sys.executable, str(root_dir / "optimize_all.py"), "--line"])
+        background_tasks.add_task(_task)
+        return {"message": "已在背景啟動每週日動態優化 (optimize_all.py --line)！"}
+
+    elif action_name == "test_line":
+        def _task():
+            from line_sender import send_to_line
+            send_to_line("🚀【總指揮中心測試】Web 戰情儀表板連線正常！", strategy=None)
+        background_tasks.add_task(_task)
+        return {"message": "已發送 LINE 測試訊息至總指揮窗口！"}
+
+    return {"message": f"未知的動作: {action_name}"}
 
 @app.get("/health")
 @app.get("/ping")

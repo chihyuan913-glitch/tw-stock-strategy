@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股量化選股策略 - 最高總指揮中心戰情儀表板</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    .glow-border {
+      box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#090d16] text-slate-100">
+
+  <!-- 頂部主導航列 -->
+  <header class="sticky top-0 z-50 bg-[#0f172a]/95 backdrop-blur border-b border-slate-800 px-6 py-3.5 shadow-lg">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-black text-xl">
+          📈
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-extrabold text-white tracking-wide">台股量化選股最高總指揮中心</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              雲端原生連線
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">100% 零開電腦純雲端自動監控 ｜ 4+1維度量化 ｜ 四大防線價位體系</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4 text-xs">
+        <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
+          <i data-lucide="clock" class="w-4 h-4 text-slate-400"></i>
+          <span id="currentTime" class="font-mono text-slate-300">2026-10-11 12:00:00</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <a href="https://github.com/chihyuan913-glitch/tw-stock-strategy/actions" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center gap-1.5 transition">
+            <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+            <span>GitHub Actions</span>
+          </a>
+          <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center gap-1.5 shadow transition">
+            <i data-lucide="refresh-cw" id="refreshIcon" class="w-4 h-4"></i>
+            <span>即時刷新</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 大盤位階與總體指標橫幅 -->
+  <section class="max-w-7xl mx-auto w-full px-6 pt-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <!-- 大盤指數卡 -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span class="flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> 加權指數 (^TWII)</span>
+          <span id="marketTrendTag" class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">多頭排列</span>
+        </div>
+        <div class="text-2xl font-black font-mono text-white" id="twiiPrice">49,313.44</div>
+        <div class="text-xs text-slate-400 mt-1 flex items-center gap-2">
+          <span>20MA: <strong id="twiiMa20" class="text-slate-300">47,687.85</strong></span>
+          <span class="text-emerald-400 font-semibold" id="twiiBias">月線乖離 +3.41%</span>
+        </div>
+      </div>
+
+      <!-- 市場位階判定 -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
+        <div class="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
+          <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
+          <span>市場位階情境 (Market Regime)</span>
+        </div>
+        <div class="text-base font-bold text-emerald-400 mt-1" id="marketRegime">🟢【多頭良性主升波段】</div>
+        <div class="text-xs text-slate-400 mt-1 truncate" id="marketAdvice">
+          均線呈多頭排列，可積極佈局策略 02 起漲股與策略 04 可轉債。
+        </div>
+      </div>
+
+      <!-- 監控標的統計 -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
+        <div class="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
+          <i data-lucide="crosshair" class="w-4 h-4 text-amber-400"></i>
+          <span>四大策略精選入選總檔數</span>
+        </div>
+        <div class="flex items-baseline space-x-2">
+          <span class="text-2xl font-black font-mono text-amber-400" id="totalCandidatesCount">17</span>
+          <span class="text-xs text-slate-400">檔嚴選標的 (已就緒)</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-1">
+          包含布林超跌、法人起動、弱勢空頭、CB伏擊
+        </div>
+      </div>
+
+      <!-- 雲端排程狀態 -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
+        <div class="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
+          <i data-lucide="cloud" class="w-4 h-4 text-indigo-400"></i>
+          <span>雲端雙軌自動化狀態</span>
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+          <span class="text-sm font-bold text-white">GitHub 雲端排程託管中</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-1 flex justify-between">
+          <span>盤後 17:35 選股</span>
+          <span>盤中 08:58 雷達</span>
+          <span>週日 20:00 優化</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 主功能標籤切換 -->
+  <main class="max-w-7xl mx-auto w-full px-6 py-6 flex-1 flex flex-col">
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-6">
+      <div class="flex space-x-2" id="tabButtons">
+        <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
+          📊 四大選股策略戰報
+        </button>
+        <button onclick="switchTab('analyzer')" id="btn-tab-analyzer" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+          🔍 個股即時量化診斷
+        </button>
+        <button onclick="switchTab('weekly')" id="btn-tab-weekly" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+          🧭 每週總體戰略週報
+        </button>
+        <button onclick="switchTab('hub')" id="btn-tab-hub" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
+          🚀 雲端與本機控制中心
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-400 flex items-center gap-1.5">
+        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+        <span>四大防線標準：進場 ‧ 加碼 ‧ 停利 ‧ 停損</span>
+      </div>
+    </div>
+
+    <!-- 視圖 1：四大選股策略戰報 -->
+    <div id="view-strategies" class="space-y-6">
+      <!-- 策略子標籤 -->
+      <div class="flex space-x-2 border-b border-slate-800/60 pb-2">
+        <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700">
+          策略 01：布林下軌超跌反轉
+        </button>
+        <button onclick="loadStrategyData('02_institutional_momentum')" id="subbtn-02" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 02：法人籌碼集中起漲
+        </button>
+        <button onclick="loadStrategyData('03_short_momentum')" id="subbtn-03" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 03：弱勢破線做空避險
+        </button>
+        <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 04：可轉債定價伏擊
+        </button>
+      </div>
+
+      <!-- 策略表格容器 -->
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex justify-between items-center">
+          <div>
+            <h2 id="currentStrategyTitle" class="text-base font-bold text-white">策略入選清單</h2>
+            <p id="currentStrategyDesc" class="text-xs text-slate-400 mt-0.5">即時載入最新選股結果...</p>
+          </div>
+          <span id="currentStrategyCount" class="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700">0 檔入選</span>
+        </div>
+        
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700">
+              <tr id="tableHeadRow">
+                <!-- 動態注入欄位 -->
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-800/60 text-slate-300 font-mono">
+              <!-- 動態注入列 -->
+              <tr>
+                <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
+                  正在載入量化選股數據...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 視圖 2：個股即時量化診斷 -->
+    <div id="view-analyzer" class="hidden space-y-6">
+      <div class="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-800 border border-slate-800 shadow-2xl">
+        <div class="max-w-2xl mx-auto text-center space-y-3">
+          <h2 class="text-2xl font-black text-white tracking-wide">台股盤中即時隨傳隨查分析引擎</h2>
+          <p class="text-sm text-slate-400">支援輸入 4 碼股票代碼或中文名稱（例如：2330、台積電、8996、高力），秒級精算四大防線價位與操盤錦囊。</p>
+          
+          <form onsubmit="handleAnalyzeSubmit(event)" class="flex gap-2 pt-2">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute left-3.5 top-3"></i>
+              <input type="text" id="symbolInput" placeholder="輸入台股代碼或股名 (例如: 2330 或 台積電)..." class="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <button type="submit" id="analyzeBtn" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4"></i>
+              <span>即時診斷</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 分析結果呈現區 -->
+      <div id="analyzeResultCard" class="hidden max-w-4xl mx-auto p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl">
+        <div class="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-200" id="analyzeOutput">
+          <!-- 診斷文字報告 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 視圖 3：每週總體戰略週報 -->
+    <div id="view-weekly" class="hidden space-y-6">
+      <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i data-lucide="award" class="w-5 h-5 text-amber-400"></i>
+              每週日 20:00 全策略動態優化與升級總體戰報
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">每週日盤前由 GitHub Actions 雲端工作流自動校準產出</p>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">每週日定期升級</span>
+        </div>
+        
+        <div id="weeklyContent" class="prose prose-invert max-w-none text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
+          正在讀取 weekly_report.md...
+        </div>
+      </div>
+    </div>
+
+    <!-- 視圖 4：雲端與本機控制中心 -->
+    <div id="view-hub" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 雲端全自動架構 -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center space-x-3 text-emerald-400">
+            <i data-lucide="cloud-lightning" class="w-6 h-6"></i>
+            <h3 class="text-lg font-bold text-white">純雲端 100% 零開電腦控制台</h3>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            系統已完整委託 GitHub Actions 與 Render 雲端虛擬機全權託管，本機電腦完全無需開機即可自動每日選股與盤中監控。
+          </p>
+
+          <div class="space-y-2 pt-2">
+            <a href="https://github.com/chihyuan913-glitch/tw-stock-strategy/actions" target="_blank" class="flex items-center justify-between p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition group">
+              <div class="flex items-center space-x-3">
+                <span class="text-xl">⚙️</span>
+                <div>
+                  <div class="text-sm font-semibold text-white group-hover:text-emerald-400 transition">GitHub Actions 工作流</div>
+                  <div class="text-xs text-slate-400">盤後選股 (17:35) ｜ 盤中雷達 (08:58) ｜ 週日優化 (20:00)</div>
+                </div>
+              </div>
+              <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
+            </a>
+
+            <a href="https://uptimerobot.com/dashboard" target="_blank" class="flex items-center justify-between p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition group">
+              <div class="flex items-center space-x-3">
+                <span class="text-xl">🟢</span>
+                <div>
+                  <div class="text-sm font-semibold text-white group-hover:text-emerald-400 transition">UptimeRobot 24H 防休眠監控台</div>
+                  <div class="text-xs text-slate-400">確保 Render Webhook 伺服器永遠保持清醒秒回</div>
+                </div>
+              </div>
+              <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
+            </a>
+
+            <a href="https://developers.line.biz/console/" target="_blank" class="flex items-center justify-between p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition group">
+              <div class="flex items-center space-x-3">
+                <span class="text-xl">💬</span>
+                <div>
+                  <div class="text-sm font-semibold text-white group-hover:text-emerald-400 transition">LINE Developers 後台</div>
+                  <div class="text-xs text-slate-400">Channel Access Token 與 Webhook URL 設定</div>
+                </div>
+              </div>
+              <i data-lucide="external-link" class="w-4 h-4 text-slate-400"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- 本地手動快速指令 -->
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center space-x-3 text-indigo-400">
+            <i data-lucide="terminal" class="w-6 h-6"></i>
+            <h3 class="text-lg font-bold text-white">本機手動即時觸發 (Local Trigger)</h3>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            若想提早手動重跑或即時測試，可在此一鍵直接觸發本機執行任務：
+          </p>
+
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button onclick="triggerAction('run_screener')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
+              <div class="text-sm font-bold text-emerald-400 mb-1">🚀 重新全選股</div>
+              <div class="text-xs text-slate-400">立即執行四大策略選股器</div>
+            </button>
+            <button onclick="triggerAction('run_radar')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
+              <div class="text-sm font-bold text-cyan-400 mb-1">🚨 盤中到價掃描</div>
+              <div class="text-xs text-slate-400">單次巡邏全標的四大防線</div>
+            </button>
+            <button onclick="triggerAction('run_optimizer')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
+              <div class="text-sm font-bold text-amber-400 mb-1">🏆 週日動態優化</div>
+              <div class="text-xs text-slate-400">同步官方字典與校準位階</div>
+            </button>
+            <button onclick="triggerAction('test_line')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
+              <div class="text-sm font-bold text-purple-400 mb-1">💬 LINE 連線測試</div>
+              <div class="text-xs text-slate-400">發送四大策略推播測試</div>
+            </button>
+          </div>
+
+          <div id="actionStatus" class="text-xs text-slate-400 mt-2 font-mono min-h-[20px]"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
+    台股量化選股策略最高總指揮中心 ｜ 遵循 4+1 維度硬性標準與四大防線價位原則 ｜ 投資請嚴守停損紀律
+  </footer>
+
+  <script>
+    // 初始化 Lucide 圖標
+    lucide.createIcons();
+
+    // 更新時間
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('currentTime').innerText = now.toLocaleString('zh-TW', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // 標籤切換
+    function switchTab(tab) {
+      const tabs = ['strategies', 'analyzer', 'weekly', 'hub'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`btn-tab-${t}`);
+        if (t === tab) {
+          view.classList.remove('hidden');
+          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow";
+        } else {
+          view.classList.add('hidden');
+          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800";
+        }
+      });
+      lucide.createIcons();
+    }
+
+    // 載入策略資料
+    let currentStrategy = '01_bollinger_reversal';
+    async function loadStrategyData(stratId) {
+      currentStrategy = stratId;
+      const subbtns = ['01', '02', '03', '04'];
+      subbtns.forEach(idx => {
+        const b = document.getElementById(`subbtn-${idx}`);
+        if (stratId.startsWith(idx)) {
+          b.className = "px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700 shadow";
+        } else {
+          b.className = "px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200";
+        }
+      });
+
+      try {
+        const resp = await fetch(`/api/strategy/${stratId}`);
+        const data = await resp.json();
+        renderStrategyTable(data);
+      } catch (e) {
+        console.error("載入策略失敗:", e);
+      }
+    }
+
+    function renderStrategyTable(data) {
+      document.getElementById('currentStrategyTitle').innerText = data.name;
+      document.getElementById('currentStrategyDesc').innerText = data.desc;
+      document.getElementById('currentStrategyCount').innerText = `${data.rows.length} 檔入選`;
+
+      const headRow = document.getElementById('tableHeadRow');
+      const body = document.getElementById('tableBody');
+      headRow.innerHTML = '';
+      body.innerHTML = '';
+
+      if (!data.columns || data.columns.length === 0) {
+        body.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-500">目前無入選標的</td></tr>';
+        return;
+      }
+
+      data.columns.forEach(col => {
+        const th = document.createElement('th');
+        th.className = "py-3 px-4";
+        th.innerText = col;
+        headRow.appendChild(th);
+      });
+
+      if (data.rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-500 font-sans">目前市場條件下無符合嚴格 4+1 條件之標的，空手觀望保留實力。</td></tr>';
+        return;
+      }
+
+      data.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition";
+        data.columns.forEach(col => {
+          const td = document.createElement('td');
+          td.className = "py-3 px-4";
+          let val = row[col] || '';
+
+          // 視覺化四大防線價格晶片
+          if (col.includes('進場')) {
+            td.innerHTML = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">🟢 ${val}</span>`;
+          } else if (col.includes('加碼')) {
+            td.innerHTML = `<span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20">🔵 ${val}</span>`;
+          } else if (col.includes('停利')) {
+            td.innerHTML = `<span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20">🔴 ${val}</span>`;
+          } else if (col.includes('停損')) {
+            td.innerHTML = `<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">🛑 ${val}</span>`;
+          } else if (col.includes('星級')) {
+            td.innerHTML = `<span class="text-amber-400 font-sans">${val}</span>`;
+          } else {
+            td.innerText = val;
+          }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    // 個股診斷查詢
+    async function handleAnalyzeSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('symbolInput').value.trim();
+      if (!input) return;
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>分析中...</span>`;
+      lucide.createIcons();
+
+      try {
+        const resp = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ query: input })
+        });
+        const data = await resp.json();
+        document.getElementById('analyzeResultCard').classList.remove('hidden');
+        document.getElementById('analyzeOutput').innerText = data.result || "分析失敗，請檢查代碼。";
+      } catch (err) {
+        alert("查詢失敗: " + err);
+      } finally {
+        btn.innerHTML = `<i data-lucide="zap" class="w-4 h-4"></i><span>即時診斷</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    // 觸發本機動作
+    async function triggerAction(actionName) {
+      const statusBox = document.getElementById('actionStatus');
+      statusBox.innerText = `[*] 正在觸發指令: ${actionName}...`;
+      try {
+        const resp = await fetch(`/api/action/${actionName}`, { method: 'POST' });
+        const res = await resp.json();
+        statusBox.innerText = `[✓] ${res.message}`;
+      } catch (e) {
+        statusBox.innerText = `[!] 觸發失敗: ${e}`;
+      }
+    }
+
+    // 刷新全域資料
+    async function refreshData() {
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('animate-spin');
+      try {
+        // 載入 overview
+        const resp = await fetch('/api/overview');
+        const d = await resp.json();
+        document.getElementById('twiiPrice').innerText = d.market.close;
+        document.getElementById('twiiMa20').innerText = d.market.ma20;
+        document.getElementById('twiiBias').innerText = `月線乖離 ${d.market.bias_ma20 > 0 ? '+' : ''}${d.market.bias_ma20}%`;
+        document.getElementById('marketRegime').innerText = d.market.regime;
+        document.getElementById('marketAdvice').innerText = d.market.risk_advice;
+        document.getElementById('marketTrendTag').innerText = d.market.trend;
+        document.getElementById('totalCandidatesCount').innerText = d.total_candidates;
+
+        // 載入當前策略
+        await loadStrategyData(currentStrategy);
+
+        // 載入週報
+        const rep = await fetch('/api/weekly_report');
+        const repData = await rep.json();
+        document.getElementById('weeklyContent').innerText = repData.content || "尚無週報內容";
+      } catch (e) {
+        console.error("刷新失敗:", e);
+      } finally {
+        setTimeout(() => icon.classList.remove('animate-spin'), 600);
+      }
+    }
+
+    // 初始化加載
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshData();
+    });
+  </script>
+</body>
+</html>
