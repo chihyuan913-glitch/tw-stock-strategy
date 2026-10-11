@@ -539,9 +539,65 @@
       }
     }
 
+    // ==============================================================================
+    // 瀏覽器生命週期監視器 (LOCAL_WEB_APP_LIFECYCLE_RULE_V1：關閉瀏覽器即自動停止後端)
+    // ==============================================================================
+    function initBrowserLifecycleWatcher() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/session`;
+      let ws = null;
+      let heartbeatTimer = null;
+
+      // 1. 定期發送 HTTP 連線心跳 (每 1.5 秒)
+      function sendHttpHeartbeat() {
+        try {
+          fetch('/api/heartbeat', { method: 'POST', keepalive: true }).catch(() => {});
+        } catch(e) {}
+      }
+      sendHttpHeartbeat();
+      setInterval(sendHttpHeartbeat, 1500);
+
+      // 2. WebSocket 連線保活
+      function connect() {
+        try {
+          ws = new WebSocket(wsUrl);
+          ws.onopen = () => {
+            console.log('[系統] 瀏覽器生命週期監控已連線 (關閉瀏覽器將自動停止伺服器釋放資源)');
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = setInterval(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('ping');
+              }
+            }, 1500);
+          };
+
+          ws.onclose = () => {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            setTimeout(connect, 1500);
+          };
+
+          ws.onerror = () => {};
+        } catch (err) {}
+      }
+      connect();
+
+      // 3. 當頁面被關閉或切換網址時，發送信標通知後端
+      const sendLeaveSignal = () => {
+        try {
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon('/api/browser-leaving');
+          }
+        } catch (e) {}
+      };
+
+      window.addEventListener('beforeunload', sendLeaveSignal);
+      window.addEventListener('pagehide', sendLeaveSignal);
+    }
+
     // 初始化加載
     window.addEventListener('DOMContentLoaded', () => {
       refreshData();
+      initBrowserLifecycleWatcher();
     });
   </script>
 </body>

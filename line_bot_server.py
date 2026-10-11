@@ -20,7 +20,9 @@ import re
 import json
 import urllib.request
 from pathlib import Path
-from fastapi import FastAPI, Request, BackgroundTasks
+import threading
+from typing import Set, Optional
+from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse
 import uvicorn
 
@@ -392,8 +394,117 @@ async def startup_event():
                 print(f"[!] Render 防休眠心跳例外: {e}", flush=True)
             await asyncio.sleep(600)  # 每 10 分鐘 ping 一次 (Render 休眠門檻為 15 分鐘)
 
+    if os.environ.get("LOCAL_WEB_MODE") == "1":
+        server_start_time = time.time()
+        def lifecycle_watchdog():
+            time.sleep(15)
+            while True:
+                time.sleep(1.0)
+                with shutdown_lock:
+                    now = time.time()
+                    if not has_ever_connected and (now - server_start_time) > 30:
+                        print("\n[系統提醒] 啟動後 30 秒內未偵測到任何瀏覽器開啟連線，已自動結束伺服器釋放資源。", flush=True)
+                        os._exit(0)
+                    if has_ever_connected and (now - last_heartbeat_time) > 5.0 and len(active_websockets) == 0:
+                        try:
+                            print("\n" + "=" * 70, flush=True)
+                            print(" [STOP] 偵測到所有瀏覽器視窗/分頁已關閉！", flush=True)
+                            print(" [STOP] 系統已自動停止 Web 伺服器運作，並完全釋放 8989 連線埠與電腦記憶體。", flush=True)
+                            print("=" * 70 + "\n", flush=True)
+                        except Exception:
+                            pass
+                        os._exit(0)
+        threading.Thread(target=lifecycle_watchdog, daemon=True).start()
+
     asyncio.create_task(intraday_radar_worker())
     asyncio.create_task(render_keep_alive_worker())
+
+# ==============================================================================
+# 本機 Web 應用程式生命週期管理 (LOCAL_WEB_APP_LIFECYCLE_RULE_V1)
+# 核心規範：單一圖示啟動、關閉瀏覽器即自動釋放通訊埠與記憶體資源
+# ==============================================================================
+LOCAL_AUTO_SHUTDOWN = os.environ.get("LOCAL_WEB_MODE") == "1"
+active_websockets: Set[WebSocket] = set()
+shutdown_timer: Optional[threading.Timer] = None
+shutdown_lock = threading.RLock()
+has_ever_connected = False
+last_heartbeat_time: float = 0.0
+
+def schedule_server_shutdown(delay: float = 4.0):
+    """排程關閉伺服器。若在 delay 秒內無新連線/心跳，則終止 Python 行程並釋放資源"""
+    global shutdown_timer
+    if not LOCAL_AUTO_SHUTDOWN:
+        return
+    with shutdown_lock:
+        if shutdown_timer and shutdown_timer.is_alive():
+            shutdown_timer.cancel()
+        
+        def _terminate():
+            with shutdown_lock:
+                if len(active_websockets) == 0:
+                    try:
+                        print("\n" + "=" * 70, flush=True)
+                        print(" [STOP] 偵測到所有台股戰情儀表板視窗/分頁已關閉！", flush=True)
+                        print(" [STOP] 系統已自動觸發自我終止，完全釋放 8989 連線埠與電腦記憶體。", flush=True)
+                        print("=" * 70 + "\n", flush=True)
+                    except Exception:
+                        pass
+                    os._exit(0)
+        
+        shutdown_timer = threading.Timer(delay, _terminate)
+        shutdown_timer.daemon = True
+        shutdown_timer.start()
+
+def cancel_server_shutdown():
+    """取消關閉伺服器排程（當有頁面重整、切換或新連線建立時）"""
+    global shutdown_timer
+    with shutdown_lock:
+        if shutdown_timer and shutdown_timer.is_alive():
+            shutdown_timer.cancel()
+            shutdown_timer = None
+
+@app.websocket("/ws/session")
+async def websocket_session(websocket: WebSocket):
+    """WebSocket 即時心跳監控 (維持生命週期)"""
+    global has_ever_connected
+    await websocket.accept()
+    with shutdown_lock:
+        active_websockets.add(websocket)
+        has_ever_connected = True
+        cancel_server_shutdown()
+    try:
+        while True:
+            msg = await websocket.receive_text()
+            cancel_server_shutdown()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        with shutdown_lock:
+            active_websockets.discard(websocket)
+            if len(active_websockets) == 0 and LOCAL_AUTO_SHUTDOWN:
+                # 重新整理保護：內建 4 秒寬限期防 F5 中斷
+                schedule_server_shutdown(delay=4.0)
+
+@app.post("/api/heartbeat")
+def receive_heartbeat():
+    """接收前端定期心跳，維護伺服器運作狀態"""
+    global last_heartbeat_time, has_ever_connected
+    with shutdown_lock:
+        last_heartbeat_time = time.time()
+        has_ever_connected = True
+        cancel_server_shutdown()
+    return {"status": "ok", "time": last_heartbeat_time}
+
+@app.post("/api/browser-leaving")
+def browser_leaving():
+    """當瀏覽器頁面觸發 beforeunload / pagehide 時送出之信標 (Navigator.sendBeacon)"""
+    if LOCAL_AUTO_SHUTDOWN:
+        with shutdown_lock:
+            if len(active_websockets) <= 1:
+                schedule_server_shutdown(delay=3.0)
+    return {"status": "leaving_acknowledged"}
 
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 

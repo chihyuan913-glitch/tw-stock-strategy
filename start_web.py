@@ -93,9 +93,10 @@ def main():
 
     # 3. 啟動伺服器
     print(f"\n[🚀] 伺服器正在獨立連接埠 {port} 啟動中，請稍候...")
-    print("    💡 提示：使用完畢後，直接關閉本黑色視窗（或點擊桌面「關閉台股戰情系統」）即可關閉。\n")
+    print("    💡 提示：本系統具備生命週期綁定規範，關閉瀏覽器分頁即會自動安全終止並釋放資源。\n")
     try:
         os.environ["PORT"] = str(port)
+        os.environ["LOCAL_WEB_MODE"] = "1"
         uvicorn.run(
             "line_bot_server:app",
             host=host,
