@@ -9,6 +9,8 @@ on:
 jobs:
   weekly-optimization:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: 檢出專案程式碼
         uses: actions/checkout@v4
@@ -37,8 +39,8 @@ jobs:
 
       - name: 自動提交並推送升級報表與資料庫至 Git 倉庫
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Optimizer"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add stock_dict.json weekly_report.md strategies/*/result.csv strategies/*/result.md || true
           if git diff --staged --quiet; then
             echo "[i] 無檔案異動需要提交。"

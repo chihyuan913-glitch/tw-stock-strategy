@@ -80,6 +80,8 @@ def run_intraday_single(strat, extra_args):
         print(f"[!] 發生未預期錯誤: {e}")
         return False
 
+TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
 def main():
     parser = argparse.ArgumentParser(description="台股總指揮中心 - 全策略盤中到價即時雷達總調度")
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
@@ -88,9 +90,10 @@ def main():
     parser.add_argument("--strategy", type=str, default=None, help="指定單一策略 (01, 02, 03, 04)")
     args = parser.parse_args()
 
+    now_tw = datetime.datetime.now(TZ_TW)
     print(f"============================================================")
     print(f" 🎯 台股量化策略總指揮中心 - 全策略盤中到價即時雷達")
-    print(f" 🕒 啟動時間: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f" 🕒 啟動時間: {now_tw.strftime('%Y-%m-%d %H:%M:%S')} (台灣時間)")
     print(f"============================================================")
 
     targets = INTRADAY_STRATEGIES
@@ -108,14 +111,44 @@ def main():
     else:
         extra_args.extend(["--interval", str(args.interval)])
 
-    success = 0
-    for strat in targets:
-        if run_intraday_single(strat, extra_args):
-            success += 1
+    # 單次巡邏或推播測試：循序執行
+    if args.once or args.test_push:
+        success = 0
+        for strat in targets:
+            if run_intraday_single(strat, extra_args):
+                success += 1
 
-    print("\n" + "=" * 70)
-    print(f"🏁 全策略到價調度總結: 完成 {success}/{len(targets)} 項策略。")
-    print("=" * 70)
+        print("\n" + "=" * 70)
+        print(f"🏁 全策略到價調度總結: 完成 {success}/{len(targets)} 項策略。")
+        print("=" * 70)
+    else:
+        # 常駐輪詢監控模式：平行啟動所有策略雷達行程，各自獨立盯盤至 13:35
+        print(f"\n[🚀] 平行啟動全策略 ({len(targets)} 項) 盤中即時雷達行程...")
+        processes = []
+        for strat in targets:
+            cmd = [sys.executable, str(strat['script'])] + extra_args
+            p = subprocess.Popen(cmd, cwd=strat['cwd'])
+            processes.append((strat['name'], p))
+            print(f"  • [已在線] {strat['name']} (PID: {p.pid})")
+
+        print("\n[*] 全策略盤中到價雷達已全數在線監控中，持續盯盤至 13:35 收盤 (按 Ctrl+C 可停止)...")
+        try:
+            for name, p in processes:
+                p.wait()
+            print("\n[✓] 今日盤中監控圓滿收工，所有策略雷達已自動退出。")
+        except KeyboardInterrupt:
+            print("\n[🛑] 收到中斷信號，正在停止所有策略雷達進程...")
+            for name, p in processes:
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+            for name, p in processes:
+                try:
+                    p.wait()
+                except Exception:
+                    pass
+            print("[✓] 所有策略雷達已完全終止。")
 
 if __name__ == '__main__':
     main()

@@ -24,6 +24,8 @@ import argparse
 import pandas as pd
 import yfinance as yf
 
+TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
 # 加入專案根目錄至 sys.path 以便引用共用模組 (line_sender)
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
@@ -335,7 +337,7 @@ def run_intraday_scanner(interval=60, once=False, force_test=False):
     notified_events = {}
 
     while True:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(TZ_TW)
         now_time = now.time()
         start_time = datetime.time(9, 0)
         end_time = datetime.time(13, 35)
