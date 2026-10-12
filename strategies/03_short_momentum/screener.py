@@ -44,6 +44,8 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from algo_guards import evaluate_overnight_broker_risk
+
 # 匯入 LINE 發送模組
 from line_sender import send_to_line
 
@@ -436,6 +438,16 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
             # 以標準級距 13.5% 估算一口放空保證金
             margin_1lot = int(round(curr_close * 2000 * 0.135, -1))
 
+            og_risk = evaluate_overnight_broker_risk(
+                code,
+                meta={
+                    'volume': q['volume'],
+                    'dealer_hedge': meta['inst_today_lots'] * 1000,
+                    'foreign': meta['f_3d_lots'] * 1000,
+                    'inst_ratio': meta['inst_sell_ratio']
+                }
+            )
+
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
@@ -449,6 +461,7 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
                 '停利TP2': tp2_cover,
                 '停損價位': sl_cover,
                 '停損回補': sl_cover,
+                '隔日沖風控': og_risk['tag'],
                 '1口保證金(約)': margin_1lot,
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線負乖離%': round(bias_ma20_pct, 2),

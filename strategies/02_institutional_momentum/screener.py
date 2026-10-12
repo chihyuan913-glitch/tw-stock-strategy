@@ -33,6 +33,8 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from algo_guards import evaluate_overnight_broker_risk
+
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -334,6 +336,17 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
             sl_hard = round(curr_close * 0.95, 2)  # 盤中硬停損 -5.0%
             sl_p = round(ma20_curr * 0.98, 2)    # 收盤波段停損 (跌破月線 2%)
 
+            c_today_info = chips_history.get(code, {}).get(latest_date, {})
+            og_risk = evaluate_overnight_broker_risk(
+                code,
+                meta={
+                    'volume': q['volume'],
+                    'dealer_hedge': c_today_info.get('dealer', 0),
+                    'foreign': c_today_info.get('foreign', 0),
+                    'inst_ratio': meta['inst_ratio']
+                }
+            )
+
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
@@ -344,6 +357,7 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
                 '停利TP1': tp1_p,
                 '停利TP2': tp2_p,
                 '停損價位': sl_p,
+                '隔日沖風控': og_risk['tag'],
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線乖離%': round(bias_ma20_pct, 2),
                 '當日成交量(張)': q['volume'] // 1000,

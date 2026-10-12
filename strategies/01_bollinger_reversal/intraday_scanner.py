@@ -32,6 +32,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from line_sender import send_to_line
+from algo_guards import GLOBAL_TICK_GUARD
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -319,6 +320,10 @@ def scan_once(targets, notified_events, force_test=False):
 
         # 1. 停損警戒判定 (優先級最高: 現價 <= 停損價)
         if price <= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', price, target['sl_price'], force_pass=force_test)
+            if not confirmed:
+                print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
+                continue
             events_for_code.add('STOP_LOSS')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'STOP_LOSS',
@@ -329,6 +334,10 @@ def scan_once(targets, notified_events, force_test=False):
 
         # 2. 停利 TP2 判定 (現價 >= 布林上軌 TP2)
         if price >= target['tp2_price'] and 'TP2' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', price, target['tp2_price'], force_pass=force_test)
+            if not confirmed:
+                print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
+                continue
             events_for_code.add('TP2')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'TP2',
@@ -339,6 +348,10 @@ def scan_once(targets, notified_events, force_test=False):
 
         # 3. 停利 TP1 判定 (現價 >= 布林中軌 TP1)
         if price >= target['tp1_price'] and 'TP1' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', price, target['tp1_price'], force_pass=force_test)
+            if not confirmed:
+                print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
+                continue
             events_for_code.add('TP1')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'TP1',
@@ -349,6 +362,10 @@ def scan_once(targets, notified_events, force_test=False):
 
         # 4. 突破加碼判定 (現價 >= 加碼價位)
         if price >= target['addon_price'] and 'ADDON' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ADDON', price, target['addon_price'], force_pass=force_test)
+            if not confirmed:
+                print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
+                continue
             events_for_code.add('ADDON')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ADDON',
@@ -359,6 +376,10 @@ def scan_once(targets, notified_events, force_test=False):
 
         # 5. 進場觸底判定 (現價落入進場價位區間)
         if (target['sl_price'] < price <= target['entry_price'] * 1.015) and 'ENTRY' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', price, target['entry_price'], force_pass=force_test)
+            if not confirmed:
+                print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
+                continue
             events_for_code.add('ENTRY')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ENTRY',

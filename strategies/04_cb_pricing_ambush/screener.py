@@ -23,6 +23,8 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from algo_guards import evaluate_overnight_broker_risk
+
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -227,6 +229,12 @@ def score_and_analyze_cb(cb_item, market_data):
     else:
         entry_price_str = f"{entry_low} ～ {entry_high}"
 
+    og_risk = evaluate_overnight_broker_risk(
+        cb_item['code'],
+        meta={'volume': vol * 1000, 'close': price}
+    )
+    score = max(0, score - og_risk['penalty_score'])
+
     return {
         '代號': cb_item['code'],
         '名稱': cb_item['name'],
@@ -239,6 +247,7 @@ def score_and_analyze_cb(cb_item, market_data):
         '停利TP1': tp1_price,
         '停利TP2': tp2_price,
         '停損價位': sl_price,
+        '隔日沖風控': og_risk['tag'],
         '最後執行死線': lockup_end,
         '空間極限130%': target_130_pct,
         '退場規則說明': cb_item.get('exit_rule', f'{lockup_end} 閉鎖解禁前出清'),

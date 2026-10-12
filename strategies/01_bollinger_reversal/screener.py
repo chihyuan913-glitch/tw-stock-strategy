@@ -26,6 +26,8 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from algo_guards import evaluate_overnight_broker_risk
+
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -343,6 +345,18 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
                     upside_pct=upside_pct
                 )
 
+                # 程式交易隔日沖分點風控評估
+                og_risk = evaluate_overnight_broker_risk(
+                    code,
+                    meta={
+                        'volume': meta['volume'],
+                        'dealer_hedge': meta.get('dealer', 0),
+                        'foreign': meta['foreign'],
+                        'inst_ratio': meta['inst_ratio']
+                    }
+                )
+                score = max(0, score - og_risk['penalty_score'])
+
                 ma20_val = round(float(ma20), 2)
                 ub_val = round(float(upper_band), 2)
                 lb_val = round(float(lower_band), 2)
@@ -361,6 +375,7 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
                     '停利TP1': ma20_val,
                     '停利TP2': ub_val,
                     '停損價位': sl_val,
+                    '隔日沖風控': og_risk['tag'],
                     '布林下軌': lb_val,
                     '布林中軌': ma20_val,
                     '布林上軌': ub_val,
