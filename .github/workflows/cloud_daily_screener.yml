@@ -34,11 +34,14 @@ jobs:
       - name: 執行全策略盤後選股並定向推播至專屬 LINE 視窗
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_CHANNEL_ACCESS_TOKEN_BACKUP: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN_BACKUP }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           LINE_TARGET_STRATEGY_01: ${{ secrets.LINE_TARGET_STRATEGY_01 }}
           LINE_TARGET_STRATEGY_02: ${{ secrets.LINE_TARGET_STRATEGY_02 }}
           LINE_TARGET_STRATEGY_03: ${{ secrets.LINE_TARGET_STRATEGY_03 }}
           LINE_TARGET_STRATEGY_04: ${{ secrets.LINE_TARGET_STRATEGY_04 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python run_all.py --line
 

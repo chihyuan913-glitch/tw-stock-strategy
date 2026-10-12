@@ -29,11 +29,14 @@ jobs:
       - name: 執行每週日全策略動態優化與再升級總引擎
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_CHANNEL_ACCESS_TOKEN_BACKUP: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN_BACKUP }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
           LINE_TARGET_STRATEGY_01: ${{ secrets.LINE_TARGET_STRATEGY_01 }}
           LINE_TARGET_STRATEGY_02: ${{ secrets.LINE_TARGET_STRATEGY_02 }}
           LINE_TARGET_STRATEGY_03: ${{ secrets.LINE_TARGET_STRATEGY_03 }}
           LINE_TARGET_STRATEGY_04: ${{ secrets.LINE_TARGET_STRATEGY_04 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python optimize_all.py --line
 
