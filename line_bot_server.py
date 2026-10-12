@@ -545,10 +545,15 @@ async def get_overview():
             except Exception:
                 pass
 
+    from radar_manager import load_watchlist
+    watchlist = load_watchlist()
+    radar_count = len(watchlist)
+
     return {
         "status": "online",
         "market": market_data,
         "total_candidates": total_candidates,
+        "radar_count": radar_count,
         "strategies": strat_dirs
     }
 
@@ -626,6 +631,75 @@ async def analyze_endpoint(request: Request):
         return {"result": "請輸入有效之台股代碼或股票名稱。"}
     res = analyze_stock(query)
     return {"result": res}
+
+@app.get("/api/radar/watchlist")
+async def get_radar_watchlist_endpoint():
+    """取得盤中雷達即時自選監控清單"""
+    from radar_manager import load_watchlist
+    watchlist = load_watchlist()
+    items = list(watchlist.values())
+    # 按照加入時間由新到舊排序
+    items.sort(key=lambda x: str(x.get('added_at', '')), reverse=True)
+    return {
+        "status": "ok",
+        "count": len(items),
+        "items": items
+    }
+
+@app.post("/api/radar/add")
+async def add_to_radar_endpoint(request: Request):
+    """手動將標的加入盤中到價雷達 (支援代碼、多檔批次、中文股名、題材概念股)"""
+    from radar_manager import batch_add_to_radar, load_watchlist
+    body = await request.json()
+    query = body.get("query", "").strip()
+    if not query:
+        return {"success": False, "message": "請輸入有效之股票代碼、中文名稱或概念題材。"}
+    res = batch_add_to_radar(query)
+    watchlist = load_watchlist()
+    return {
+        "success": True,
+        "message": res,
+        "count": len(watchlist)
+    }
+
+@app.post("/api/radar/remove")
+async def remove_from_radar_endpoint(request: Request):
+    """自盤中到價雷達移除指定標的"""
+    from radar_manager import remove_stock_from_radar, load_watchlist
+    body = await request.json()
+    code = body.get("code", "").strip()
+    if not code:
+        return {"success": False, "message": "請指定要移除之股票代碼或名稱。"}
+    res = remove_stock_from_radar(code)
+    watchlist = load_watchlist()
+    return {
+        "success": True,
+        "message": res,
+        "count": len(watchlist)
+    }
+
+@app.post("/api/radar/clear")
+async def clear_radar_endpoint():
+    """清空盤中雷達所有監控標的"""
+    from radar_manager import clear_all_radar
+    res = clear_all_radar()
+    return {"success": True, "message": res, "count": 0}
+
+@app.post("/api/radar/reset_alerts")
+async def reset_alerts_endpoint():
+    """重置今日到價警報狀態"""
+    from radar_manager import reset_today_alerts
+    res = reset_today_alerts()
+    return {"success": True, "message": res}
+
+@app.post("/api/radar/sync")
+async def sync_radar_endpoint():
+    """連動四大選股日報精選黑馬標的進雷達"""
+    from radar_manager import sync_screener_to_radar, load_watchlist
+    res = sync_screener_to_radar()
+    watchlist = load_watchlist()
+    return {"success": True, "message": res, "count": len(watchlist)}
+
 
 @app.post("/api/action/{action_name}")
 async def trigger_action_endpoint(action_name: str, background_tasks: BackgroundTasks):

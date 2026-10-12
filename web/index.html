@@ -78,12 +78,16 @@
           <span id="currentTime" class="font-mono text-slate-300">2026-10-11 12:00:00</span>
         </div>
         <div class="flex items-center space-x-2">
+          <button onclick="openAddRadarModal()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>➕ 手動加入監控</span>
+          </button>
           <a href="https://github.com/chihyuan913-glitch/tw-stock-strategy/actions" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center gap-1.5 transition">
             <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
             <span>GitHub Actions</span>
           </a>
-          <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center gap-1.5 shadow transition">
-            <i data-lucide="refresh-cw" id="refreshIcon" class="w-4 h-4"></i>
+          <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium flex items-center gap-1.5 shadow transition">
+            <i data-lucide="refresh-cw" id="refreshIcon" class="w-4 h-4 text-emerald-400"></i>
             <span>即時刷新</span>
           </button>
         </div>
@@ -120,17 +124,18 @@
       </div>
 
       <!-- 監控標的統計 -->
-      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
-        <div class="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
-          <i data-lucide="crosshair" class="w-4 h-4 text-amber-400"></i>
-          <span>四大策略精選入選總檔數</span>
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden cursor-pointer hover:border-slate-700 transition" onclick="switchTab('radar')" title="點擊切換至盤中雷達監控池">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span class="flex items-center gap-1.5"><i data-lucide="crosshair" class="w-4 h-4 text-amber-400"></i> 盤中雷達即時監控</span>
+          <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">即時盯盤</span>
         </div>
         <div class="flex items-baseline space-x-2">
-          <span class="text-2xl font-black font-mono text-amber-400" id="totalCandidatesCount">17</span>
-          <span class="text-xs text-slate-400">檔嚴選標的 (已就緒)</span>
+          <span class="text-2xl font-black font-mono text-emerald-400" id="radarCountBanner">38</span>
+          <span class="text-xs text-slate-400">檔監控中 (策略嚴選: <span id="totalCandidatesCount" class="font-mono text-amber-400">17</span> 檔)</span>
         </div>
-        <div class="text-xs text-slate-400 mt-1">
-          包含布林超跌、法人起動、弱勢空頭、CB伏擊
+        <div class="text-xs text-slate-400 mt-1 flex items-center justify-between">
+          <span>四大防線全自動巡邏</span>
+          <span class="text-emerald-400 flex items-center gap-0.5">查看清單 <i data-lucide="chevron-right" class="w-3 h-3"></i></span>
         </div>
       </div>
 
@@ -159,6 +164,10 @@
       <div class="flex space-x-2" id="tabButtons">
         <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
           📊 四大選股策略戰報
+        </button>
+        <button onclick="switchTab('radar')" id="btn-tab-radar" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
+          🎯 盤中雷達監控池
+          <span id="tabRadarBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-emerald-400 border border-slate-700">38</span>
         </button>
         <button onclick="switchTab('analyzer')" id="btn-tab-analyzer" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
           🔍 個股即時量化診斷
@@ -225,7 +234,78 @@
       </div>
     </div>
 
-    <!-- 視圖 2：個股即時量化診斷 -->
+    <!-- 視圖 2：盤中雷達即時監控池 -->
+    <div id="view-radar" class="hidden space-y-6">
+      <!-- 雷達頂部控制列 -->
+      <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white text-xl shadow-lg shadow-emerald-600/20 font-black">
+            🎯
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h2 class="text-base font-bold text-white tracking-wide">盤中到價即時雷達監控池</h2>
+              <span id="radarTableCount" class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold border border-emerald-500/30">0 檔監控中</span>
+              <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs border border-slate-700 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                09:00 ~ 13:35 雲端自動盯盤
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">每 60 秒即時比對四大防線（🟢進場、🔵加碼、🔴停利、🛑停損），觸發即刻推播至 LINE 獨立專屬視窗</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <button onclick="openAddRadarModal()" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>➕ 手動加入監控</span>
+          </button>
+          <button onclick="syncRadarFromScreener()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+            <i data-lucide="download-cloud" class="w-4 h-4 text-cyan-400"></i>
+            <span>🤖 同步今日選股日報</span>
+          </button>
+          <button onclick="resetRadarAlerts()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+            <i data-lucide="rotate-ccw" class="w-4 h-4 text-amber-400"></i>
+            <span>🔄 重置今日警報</span>
+          </button>
+          <button onclick="clearAllRadar()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-800/60 flex items-center gap-1.5 transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span>清空監控</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 監控池表格容器 -->
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700">
+              <tr>
+                <th class="py-3 px-4">證券代號</th>
+                <th class="py-3 px-4">證券名稱</th>
+                <th class="py-3 px-4">基準現價</th>
+                <th class="py-3 px-4">🟢 建議進場價位</th>
+                <th class="py-3 px-4">🔵 動能加碼價位</th>
+                <th class="py-3 px-4">🔴 第一停利(TP1)</th>
+                <th class="py-3 px-4">🔴 波段滿足(TP2)</th>
+                <th class="py-3 px-4">🛑 嚴格停損防線</th>
+                <th class="py-3 px-4">掛入時間</th>
+                <th class="py-3 px-4 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="radarTableBody" class="divide-y divide-slate-800/60 text-slate-300 font-mono">
+              <tr>
+                <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
+                  正在載入盤中雷達監控標的...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 視圖 3：個股即時量化診斷 -->
     <div id="view-analyzer" class="hidden space-y-6">
       <div class="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-800 border border-slate-800 shadow-2xl">
         <div class="max-w-2xl mx-auto text-center space-y-3">
@@ -246,7 +326,17 @@
       </div>
 
       <!-- 分析結果呈現區 -->
-      <div id="analyzeResultCard" class="hidden max-w-4xl mx-auto p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl">
+      <div id="analyzeResultCard" class="hidden max-w-4xl mx-auto p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span class="text-sm font-bold text-white" id="analyzeResultStockTitle">個股診斷結果</span>
+          </div>
+          <button id="addDiagnosedToRadarBtn" onclick="addCurrentAnalyzedToRadar()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30">
+            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+            <span>⚡ 一鍵加入盤中到價雷達監控</span>
+          </button>
+        </div>
         <div class="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-200" id="analyzeOutput">
           <!-- 診斷文字報告 -->
         </div>
@@ -362,6 +452,86 @@
     台股量化選股策略最高總指揮中心 ｜ 遵循 4+1 維度硬性標準與四大防線價位原則 ｜ 投資請嚴守停損紀律
   </footer>
 
+  <!-- 手動加入監控 Modal -->
+  <div id="addRadarModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div class="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+      <!-- Modal 標題 -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center font-bold">
+            ➕
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">手動加入盤中到價雷達監控</h3>
+            <p class="text-[11px] text-slate-400">盤中即時比對四大防線，到價自動推播 LINE 獨立視窗</p>
+          </div>
+        </div>
+        <button onclick="closeAddRadarModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal 內容 -->
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">
+            請輸入股票代碼、中文名稱、多檔批次或題材：
+          </label>
+          <div class="relative">
+            <input type="text" id="manualRadarInput" placeholder="例如: 2330 或 台積電 或 批次: 2330 2454 3221" class="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-mono" onkeydown="if(event.key==='Enter') submitManualAddRadar()">
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1.5">
+            💡 支援輸入單檔（2330）、中文股名（長榮）、多檔批次貼上（2330 2454 3221）或題材名（矽光子）
+          </p>
+        </div>
+
+        <!-- 快速題材標籤雲 -->
+        <div>
+          <span class="block text-xs font-semibold text-slate-400 mb-2">🔥 熱門概念題材一鍵打包掛入：</span>
+          <div class="flex flex-wrap gap-1.5 text-xs">
+            <button type="button" onclick="quickAddTheme('矽光子')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              ⚡ 矽光子 (CPO)
+            </button>
+            <button type="button" onclick="quickAddTheme('機器人')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              🤖 機器人
+            </button>
+            <button type="button" onclick="quickAddTheme('散熱')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              ❄️ 散熱族群
+            </button>
+            <button type="button" onclick="quickAddTheme('COWOS')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              📦 CoWoS 先進封裝
+            </button>
+            <button type="button" onclick="quickAddTheme('AI伺服器')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              🖥️ AI 伺服器
+            </button>
+            <button type="button" onclick="quickAddTheme('低軌衛星')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              🛰️ 低軌衛星
+            </button>
+            <button type="button" onclick="quickAddTheme('重電')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-950/60 hover:text-emerald-400 hover:border-emerald-800/60 border border-slate-700 text-slate-300 transition">
+              ⚡ 重電與綠能
+            </button>
+          </div>
+        </div>
+
+        <div id="modalStatusMsg" class="text-xs font-mono min-h-[18px]"></div>
+      </div>
+
+      <!-- Modal 底部按鈕 -->
+      <div class="px-6 py-3.5 bg-slate-900/60 border-t border-slate-800 flex justify-end gap-2.5">
+        <button type="button" onclick="closeAddRadarModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+          取消
+        </button>
+        <button type="button" id="btnSubmitManualRadar" onclick="submitManualAddRadar()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow shadow-emerald-600/30">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>確認掛入雷達</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 訊息通知容器 -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+
   <script>
     // 初始化 Lucide 圖標
     lucide.createIcons();
@@ -376,10 +546,11 @@
 
     // 標籤切換
     function switchTab(tab) {
-      const tabs = ['strategies', 'analyzer', 'weekly', 'hub'];
+      const tabs = ['strategies', 'radar', 'analyzer', 'weekly', 'hub'];
       tabs.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`btn-tab-${t}`);
+        if (!view || !btn) return;
         if (t === tab) {
           view.classList.remove('hidden');
           btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow";
@@ -388,7 +559,343 @@
           btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800";
         }
       });
+      if (tab === 'radar') {
+        loadRadarWatchlist();
+      }
       lucide.createIcons();
+    }
+
+    // Toast 提示通知
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const isSuccess = type === 'success';
+      toast.className = `p-4 rounded-xl border shadow-2xl backdrop-blur-md transition-all duration-300 transform translate-y-2 opacity-0 flex items-center gap-2.5 text-xs font-semibold ${
+        isSuccess 
+          ? 'bg-slate-900/95 text-emerald-400 border-emerald-500/40 shadow-emerald-950/40' 
+          : 'bg-slate-900/95 text-rose-400 border-rose-500/40 shadow-rose-950/40'
+      }`;
+      toast.innerHTML = `
+        <span class="text-base">${isSuccess ? '✅' : '⚠️'}</span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      
+      // 動畫淡入
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      // 3.5 秒後淡出並移除
+      setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Modal 開關控制
+    function openAddRadarModal(prefill = '') {
+      const modal = document.getElementById('addRadarModal');
+      const input = document.getElementById('manualRadarInput');
+      const statusMsg = document.getElementById('modalStatusMsg');
+      modal.classList.remove('hidden');
+      statusMsg.innerText = '';
+      if (prefill) {
+        input.value = prefill;
+      }
+      setTimeout(() => input.focus(), 50);
+      lucide.createIcons();
+    }
+
+    function closeAddRadarModal() {
+      document.getElementById('addRadarModal').classList.add('hidden');
+    }
+
+    // 快捷點選題材
+    function quickAddTheme(theme) {
+      document.getElementById('manualRadarInput').value = theme;
+      submitManualAddRadar();
+    }
+
+    // 送出手動加入雷達
+    async function submitManualAddRadar() {
+      const input = document.getElementById('manualRadarInput');
+      const query = input.value.trim();
+      const statusMsg = document.getElementById('modalStatusMsg');
+      const btn = document.getElementById('btnSubmitManualRadar');
+
+      if (!query) {
+        statusMsg.className = "text-xs font-mono text-rose-400";
+        statusMsg.innerText = "[!] 請輸入股票代碼、中文名稱或題材名稱";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>掛入中...</span>`;
+      lucide.createIcons();
+      statusMsg.className = "text-xs font-mono text-cyan-400";
+      statusMsg.innerText = `[*] 正在精算四大防線並掛入【${query}】...`;
+
+      try {
+        const resp = await fetch('/api/radar/add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ query: query })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          statusMsg.className = "text-xs font-mono text-emerald-400";
+          statusMsg.innerText = `[✓] 成功掛入！雷達共監控 ${data.count} 檔`;
+          showToast(`已成功將【${query}】加入盤中到價雷達！`);
+          input.value = '';
+          setTimeout(() => {
+            closeAddRadarModal();
+            loadRadarWatchlist();
+            refreshData();
+          }, 800);
+        } else {
+          statusMsg.className = "text-xs font-mono text-rose-400";
+          statusMsg.innerText = `[!] 失敗: ${data.message}`;
+        }
+      } catch (err) {
+        statusMsg.className = "text-xs font-mono text-rose-400";
+        statusMsg.innerText = `[!] 連線錯誤: ${err}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="plus" class="w-4 h-4"></i><span>確認掛入雷達</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    // 載入盤中雷達自選監控清單
+    async function loadRadarWatchlist() {
+      const tbody = document.getElementById('radarTableBody');
+      const countBadge = document.getElementById('radarTableCount');
+      const bannerCount = document.getElementById('radarCountBanner');
+      const tabBadge = document.getElementById('tabRadarBadge');
+
+      try {
+        const resp = await fetch('/api/radar/watchlist');
+        const data = await resp.json();
+        const items = data.items || [];
+        
+        if (countBadge) countBadge.innerText = `${items.length} 檔監控中`;
+        if (bannerCount) bannerCount.innerText = `${items.length}`;
+        if (tabBadge) tabBadge.innerText = `${items.length}`;
+
+        renderRadarTable(items);
+      } catch (e) {
+        console.error("載入雷達清單失敗:", e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-rose-400">載入失敗: ${e}</td></tr>`;
+      }
+    }
+
+    // 渲染雷達表格
+    function renderRadarTable(items) {
+      const tbody = document.getElementById('radarTableBody');
+      tbody.innerHTML = '';
+
+      if (!items || items.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
+              目前盤中雷達監控池為空。點擊上方「➕ 手動加入監控」或「🤖 同步今日選股日報」立即開始自動盯盤！
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      items.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition";
+
+        const code = it.code || '';
+        const name = it.name || code;
+        const bp = Number(it.base_price || 0).toFixed(2);
+        const el = Number(it.entry_low || 0).toFixed(2);
+        const eh = Number(it.entry_high || 0).toFixed(2);
+        const ad = Number(it.addon_price || 0).toFixed(2);
+        const tp1 = Number(it.tp1_price || 0).toFixed(2);
+        const tp2 = Number(it.tp2_price || 0).toFixed(2);
+        const sl = Number(it.sl_price || 0).toFixed(2);
+        const addedAt = (it.added_at || '').substring(5, 16);
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold text-white">${code}</td>
+          <td class="py-3 px-4 text-slate-200 font-sans font-medium">${name}</td>
+          <td class="py-3 px-4 text-slate-100 font-bold">${bp}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+              🟢 ${el} ~ ${eh}
+            </span>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20">
+              🔵 ${ad}
+            </span>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20">
+              🔴 ${tp1}
+            </span>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20">
+              🔴 ${tp2}
+            </span>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+              🛑 ${sl}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-slate-400 text-[11px]">${addedAt}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5 font-sans">
+              <button onclick="jumpToAnalyze('${code}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs transition" title="個股即時診斷">
+                診斷
+              </button>
+              <button onclick="removeStockFromRadar('${code}', '${name}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 text-xs transition" title="自雷達移除">
+                移除
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 跳轉診斷
+    function jumpToAnalyze(symbol) {
+      switchTab('analyzer');
+      document.getElementById('symbolInput').value = symbol;
+      handleAnalyzeSubmit(new Event('submit'));
+    }
+
+    // 自雷達移除單檔
+    async function removeStockFromRadar(code, name) {
+      if (!confirm(`確定要自盤中到價雷達移除【${code} ${name}】嗎？`)) {
+        return;
+      }
+      try {
+        const resp = await fetch('/api/radar/remove', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ code: code })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          showToast(`已自雷達移除【${code} ${name}】`);
+          loadRadarWatchlist();
+          refreshData();
+        } else {
+          alert("移除失敗: " + data.message);
+        }
+      } catch (e) {
+        alert("請求失敗: " + e);
+      }
+    }
+
+    // 清空全部雷達
+    async function clearAllRadar() {
+      if (!confirm("⚠️ 警告：確定要清空盤中雷達所有的監控標的嗎？")) {
+        return;
+      }
+      try {
+        const resp = await fetch('/api/radar/clear', { method: 'POST' });
+        const data = await resp.json();
+        showToast("已清空盤中雷達所有標的！");
+        loadRadarWatchlist();
+        refreshData();
+      } catch (e) {
+        alert("清空失敗: " + e);
+      }
+    }
+
+    // 重置今日警報
+    async function resetRadarAlerts() {
+      try {
+        const resp = await fetch('/api/radar/reset_alerts', { method: 'POST' });
+        const data = await resp.json();
+        showToast("已重置今日全部標的之警報觸發狀態！");
+      } catch (e) {
+        alert("重置失敗: " + e);
+      }
+    }
+
+    // 同步今日選股日報
+    async function syncRadarFromScreener() {
+      showToast("正在連動讀取四大策略最新選股日報...");
+      try {
+        const resp = await fetch('/api/radar/sync', { method: 'POST' });
+        const data = await resp.json();
+        showToast(`已成功同步最新精選黑馬標的！目前共監控 ${data.count} 檔`);
+        loadRadarWatchlist();
+        refreshData();
+      } catch (e) {
+        alert("同步失敗: " + e);
+      }
+    }
+
+    // 快捷加入：來自策略表格或外部
+    async function quickAddFromTable(code) {
+      showToast(`正在將【${code}】加入盤中雷達...`);
+      try {
+        const resp = await fetch('/api/radar/add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ query: code })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          showToast(`✅ 已成功將【${code}】掛入盤中到價雷達！`);
+          loadRadarWatchlist();
+          refreshData();
+        } else {
+          alert("加入失敗: " + data.message);
+        }
+      } catch (e) {
+        alert("加入失敗: " + e);
+      }
+    }
+
+    // 診斷結果快捷加入雷達
+    let currentAnalyzedSymbol = '';
+    async function addCurrentAnalyzedToRadar() {
+      if (!currentAnalyzedSymbol) {
+        alert("請先完成個股診斷。");
+        return;
+      }
+      const btn = document.getElementById('addDiagnosedToRadarBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>掛入中...</span>`;
+      lucide.createIcons();
+
+      try {
+        const resp = await fetch('/api/radar/add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ query: currentAnalyzedSymbol })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          showToast(`⚡ 已成功將【${currentAnalyzedSymbol}】加入盤中雷達！`);
+          btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i><span>已加入盤中雷達</span>`;
+          btn.className = "px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow";
+          loadRadarWatchlist();
+          refreshData();
+        } else {
+          alert("加入失敗: " + data.message);
+          btn.innerHTML = `<i data-lucide="plus-circle" class="w-3.5 h-3.5"></i><span>⚡ 一鍵加入盤中到價雷達監控</span>`;
+        }
+      } catch (e) {
+        alert("加入失敗: " + e);
+        btn.innerHTML = `<i data-lucide="plus-circle" class="w-3.5 h-3.5"></i><span>⚡ 一鍵加入盤中到價雷達監控</span>`;
+      } finally {
+        btn.disabled = false;
+        lucide.createIcons();
+      }
     }
 
     // 載入策略資料
@@ -398,6 +905,7 @@
       const subbtns = ['01', '02', '03', '04'];
       subbtns.forEach(idx => {
         const b = document.getElementById(`subbtn-${idx}`);
+        if (!b) return;
         if (stratId.startsWith(idx)) {
           b.className = "px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700 shadow";
         } else {
@@ -436,18 +944,30 @@
         headRow.appendChild(th);
       });
 
+      // 增加操作欄表頭
+      const thAction = document.createElement('th');
+      thAction.className = "py-3 px-4 text-center font-sans";
+      thAction.innerText = "雷達監控";
+      headRow.appendChild(thAction);
+
       if (data.rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-500 font-sans">目前市場條件下無符合嚴格 4+1 條件之標的，空手觀望保留實力。</td></tr>';
+        body.innerHTML = '<tr><td colspan="11" class="p-8 text-center text-slate-500 font-sans">目前市場條件下無符合嚴格 4+1 條件之標的，空手觀望保留實力。</td></tr>';
         return;
       }
 
       data.rows.forEach(row => {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-800/40 transition";
+        let stockCode = '';
+
         data.columns.forEach(col => {
           const td = document.createElement('td');
           td.className = "py-3 px-4";
           let val = row[col] || '';
+
+          if (col.includes('代號') || col.includes('代碼')) {
+            stockCode = String(val).trim();
+          }
 
           // 視覺化四大防線價格晶片
           if (col.includes('進場')) {
@@ -465,19 +985,39 @@
           }
           tr.appendChild(td);
         });
+
+        // 操作欄位單元格
+        const tdAction = document.createElement('td');
+        tdAction.className = "py-3 px-4 text-center font-sans";
+        if (stockCode) {
+          tdAction.innerHTML = `
+            <button onclick="quickAddFromTable('${stockCode}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-400 text-xs font-semibold border border-slate-700 hover:border-emerald-500 transition shadow" title="一鍵加入盤中到價雷達">
+              + 監控
+            </button>
+          `;
+        } else {
+          tdAction.innerText = "-";
+        }
+        tr.appendChild(tdAction);
+
         body.appendChild(tr);
       });
     }
 
     // 個股診斷查詢
     async function handleAnalyzeSubmit(e) {
-      e.preventDefault();
+      if (e) e.preventDefault();
       const input = document.getElementById('symbolInput').value.trim();
       if (!input) return;
 
+      currentAnalyzedSymbol = input;
       const btn = document.getElementById('analyzeBtn');
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>分析中...</span>`;
       lucide.createIcons();
+
+      const addBtn = document.getElementById('addDiagnosedToRadarBtn');
+      addBtn.innerHTML = `<i data-lucide="plus-circle" class="w-3.5 h-3.5"></i><span>⚡ 一鍵加入盤中到價雷達監控</span>`;
+      addBtn.className = "px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30";
 
       try {
         const resp = await fetch('/api/analyze', {
@@ -487,6 +1027,7 @@
         });
         const data = await resp.json();
         document.getElementById('analyzeResultCard').classList.remove('hidden');
+        document.getElementById('analyzeResultStockTitle').innerText = `【${input}】即時操盤指引與四大防線`;
         document.getElementById('analyzeOutput').innerText = data.result || "分析失敗，請檢查代碼。";
       } catch (err) {
         alert("查詢失敗: " + err);
@@ -524,6 +1065,13 @@
         document.getElementById('marketAdvice').innerText = d.market.risk_advice;
         document.getElementById('marketTrendTag').innerText = d.market.trend;
         document.getElementById('totalCandidatesCount').innerText = d.total_candidates;
+        
+        if (d.radar_count !== undefined) {
+          const bannerCount = document.getElementById('radarCountBanner');
+          const tabBadge = document.getElementById('tabRadarBadge');
+          if (bannerCount) bannerCount.innerText = d.radar_count;
+          if (tabBadge) tabBadge.innerText = d.radar_count;
+        }
 
         // 載入當前策略
         await loadStrategyData(currentStrategy);
@@ -532,6 +1080,9 @@
         const rep = await fetch('/api/weekly_report');
         const repData = await rep.json();
         document.getElementById('weeklyContent').innerText = repData.content || "尚無週報內容";
+
+        // 同步載入雷達清單
+        await loadRadarWatchlist();
       } catch (e) {
         console.error("刷新失敗:", e);
       } finally {
