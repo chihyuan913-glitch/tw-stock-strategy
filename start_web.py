@@ -108,37 +108,50 @@ def wait_for_server_and_open_browser(url: str, port: int):
     time.sleep(0.4)
     webbrowser.open(url)
 
+def get_lan_ip() -> str:
+    """取得本機區域網路 IP 位址"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 def main():
-    host = "127.0.0.1"
     port, already_running = find_available_port(BASE_PORT)
-    url = f"http://{host}:{port}"
+    local_url = f"http://127.0.0.1:{port}"
+    lan_ip = get_lan_ip()
+    lan_url = f"http://{lan_ip}:{port}"
 
     print("=" * 72, flush=True)
     print("    📈 台股量化選股策略 - 最高總指揮中心戰情儀表板", flush=True)
-    print(f"    本機獨立專屬服務網址：{url} (專屬獨立埠，絕不衝突其他網頁)", flush=True)
+    print(f"    本機操作網址：{local_url}", flush=True)
+    print(f"    別台電腦 / 手機看盤網址 (同Wi-Fi)：{lan_url}", flush=True)
     print("    整合功能：📊 四大選股戰報 ｜ 🔍 個股即時診斷 ｜ 🧭 週日優化 ｜ 🚀 雲端直達", flush=True)
     print("    核心準則：4+1 維度嚴選 ｜ 操盤四大防線價位 (進場、加碼、停利、停損)", flush=True)
     print("=" * 72, flush=True)
 
     # 1. 若台股系統已經在背景運行，直接喚起既有瀏覽器並安全退出（防重複啟動保護）
     if already_running:
-        print(f"\n[⚡] 偵測到台股戰情系統已在背景運行中 (埠號 {port})，直接為您喚起瀏覽器：{url}", flush=True)
-        webbrowser.open(url)
+        print(f"\n[⚡] 偵測到台股戰情系統已在背景運行中 (埠號 {port})，直接為您喚起瀏覽器：{local_url}", flush=True)
+        webbrowser.open(local_url)
         time.sleep(1.0)
         return
 
     # 2. 啟動背景線程：等待伺服器正式就緒後自動開啟瀏覽器
-    threading.Thread(target=wait_for_server_and_open_browser, args=(url, port), daemon=True).start()
+    threading.Thread(target=wait_for_server_and_open_browser, args=(local_url, port), daemon=True).start()
 
-    # 3. 啟動伺服器
+    # 3. 啟動伺服器 (綁定 0.0.0.0 允許區網別台電腦連線看盤)
     print(f"\n[🚀] 伺服器正在獨立連接埠 {port} 啟動中，請稍候...", flush=True)
-    print("    💡 提示：本系統具備生命週期綁定規範，關閉瀏覽器分頁即會自動安全終止並釋放資源。\n", flush=True)
+    print(f"    💡 提示：同 Wi-Fi 內的別台電腦或手機，直接在瀏覽器輸入 {lan_url} 即可即時看盤！\n", flush=True)
     try:
         os.environ["PORT"] = str(port)
         os.environ["LOCAL_WEB_MODE"] = "1"
         uvicorn.run(
             "line_bot_server:app",
-            host=host,
+            host="0.0.0.0",
             port=port,
             log_level="warning",
             reload=False
