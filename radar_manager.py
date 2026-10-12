@@ -127,7 +127,7 @@ def generate_test_alert(token: str, target_id: str = "") -> str:
 觸發：🔵【動能追擊通知・突破加碼防線觸發】
 
 🎯 操盤四大防線現況：
-🟢 建議進場：1,045.00 ~ 1,060.00 元
+🟢 建議進場：1,060.00 元 (買進上限)
 🔵 動能加碼：1,080.00 元 (已突破！)
 🔴 第一停利：1,120.00 元 (波段空間 +3.2%)
 🛑 嚴格停損：1,020.00 元 (風控底線 -5.9%)
@@ -230,20 +230,17 @@ def calculate_stock_defense(code: str) -> dict:
         sl_base = min(tech['low_5d'] * 0.985, current_price * 0.95)
     stop_loss = round(sl_base, 2)
 
-    # 進場
+    # 進場基準上限價 (Entry Price: 單一確定買進上限價)
     if bias20 > 8.0:
-        entry_low = round(min(ma10, current_price * 0.965), 2)
-        entry_high = round(current_price * 0.985, 2)
+        entry_price = round(current_price * 0.985, 2)
+        entry_floor = round(min(ma10, current_price * 0.965), 2)
     elif bias20 < -8.0:
-        entry_low = round(max(bb_dn, current_price * 0.98), 2)
-        entry_high = round(current_price, 2)
+        entry_price = round(current_price, 2)
+        entry_floor = round(max(bb_dn, current_price * 0.98), 2)
     else:
+        entry_price = round(current_price, 2)
         entry_cand1 = min(ma10, current_price * 0.975) if current_price < ma10 else max(ma10, current_price * 0.975)
-        entry_low = round(min(entry_cand1, current_price * 0.985), 2)
-        entry_high = round(current_price, 2)
-
-    if entry_low > entry_high:
-        entry_low, entry_high = entry_high, entry_low
+        entry_floor = round(min(entry_cand1, current_price * 0.985), 2)
 
     # 加碼
     high_ref = max(tech['last_high'], current_price)
@@ -257,8 +254,9 @@ def calculate_stock_defense(code: str) -> dict:
         'code': code,
         'name': stock_name,
         'base_price': current_price,
-        'entry_low': entry_low,
-        'entry_high': entry_high,
+        'entry_price': entry_price,
+        'entry_low': entry_floor,
+        'entry_high': entry_price,
         'addon_price': addon_price,
         'tp1_price': tp1_price,
         'tp2_price': tp2_price,
@@ -331,13 +329,14 @@ def batch_add_to_radar(user_text: str, target_id: str = "") -> str:
     # 若只有 1 檔，回傳詳細單檔卡片
     if len(added_list) == 1:
         it = added_list[0]
+        ep = it.get('entry_price', it.get('entry_high', it['base_price']))
         return f"""✅【已成功掛入盤中自動到價雷達！】
 ━━━━━━━━━━━━━━━
 標的：{it['code']} {it['name']}
 基準價：{it['base_price']:.2f} 元
 
 🎯 鎖定四大操盤防線：
-🟢 建議進場：{it['entry_low']:.2f} ~ {it['entry_high']:.2f} 元
+🟢 建議進場：{ep:.2f} 元 (買進上限)
 🔵 動能加碼：{it['addon_price']:.2f} 元
 🔴 第一停利(TP1)：{it['tp1_price']:.2f} 元
 🔴 波段滿足(TP2)：{it['tp2_price']:.2f} 元
@@ -355,8 +354,9 @@ def batch_add_to_radar(user_text: str, target_id: str = "") -> str:
         "━━━━━━━━━━━━━━━"
     ]
     for idx, it in enumerate(added_list, 1):
+        ep = it.get('entry_price', it.get('entry_high', it['base_price']))
         msg_lines.append(f"{idx}. 【{it['code']} {it['name']}】現價 {it['base_price']:.1f}")
-        msg_lines.append(f"   🟢進: {it['entry_low']:.1f}~{it['entry_high']:.1f} | 🔵加: {it['addon_price']:.1f}")
+        msg_lines.append(f"   🟢進: {ep:.1f}(上限) | 🔵加: {it['addon_price']:.1f}")
         msg_lines.append(f"   🔴利: {it['tp1_price']:.1f} | 🛑損: {it['sl_price']:.1f}")
 
     msg_lines.append("────────────────")
@@ -430,8 +430,9 @@ def sync_screener_to_radar(target_id: str = "") -> str:
         "已自各策略最新選股日報中提取精選標的："
     ]
     for idx, it in enumerate(synced_stocks, 1):
+        ep = it.get('entry_price', it.get('entry_high', it['base_price']))
         msg_lines.append(f"{idx}. 【{it['code']} {it['name']}】現價 {it['base_price']:.1f}")
-        msg_lines.append(f"   🟢進: {it['entry_low']:.1f}~{it['entry_high']:.1f} | 🛑損: {it['sl_price']:.1f}")
+        msg_lines.append(f"   🟢進: {ep:.1f}(上限) | 🛑損: {it['sl_price']:.1f}")
 
     msg_lines.append("────────────────")
     msg_lines.append("🕒 盤中開盤即自動啟動到價雷達巡邏，到價即推播！")
@@ -488,13 +489,12 @@ def get_radar_summary() -> str:
     for idx, (code, item) in enumerate(watchlist.items(), 1):
         name = item.get('name', code)
         bp = item.get('base_price', 0)
-        el = item.get('entry_low', 0)
-        eh = item.get('entry_high', 0)
+        ep = item.get('entry_price', item.get('entry_high', bp))
         ad = item.get('addon_price', 0)
         tp1 = item.get('tp1_price', 0)
         sl = item.get('sl_price', 0)
         msg_lines.append(f"\n{idx}. 【{code} {name}】基準: {bp:.1f}元")
-        msg_lines.append(f"   🟢進: {el:.1f}~{eh:.1f} | 🔵加: {ad:.1f}")
+        msg_lines.append(f"   🟢進: {ep:.1f}(上限) | 🔵加: {ad:.1f}")
         msg_lines.append(f"   🔴利: {tp1:.1f} | 🛑損: {sl:.1f}")
 
     msg_lines.append("────────────────")
@@ -575,8 +575,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
         curr_p = q['price']
         prev_p = q.get('prev_close', curr_p)
         name = item.get('name', q['name'])
-        entry_low = item.get('entry_low', 0)
-        entry_high = item.get('entry_high', 0)
+        entry_price = item.get('entry_price', item.get('entry_high', item.get('base_price', 0)))
         addon_p = item.get('addon_price', 0)
         tp1_p = item.get('tp1_price', 0)
         tp2_p = item.get('tp2_price', 0)
@@ -605,7 +604,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
             }
         # 2. 波段滿足 (現價 >= TP2)
         elif tp2_p > 0 and curr_p >= tp2_p and 'TP2' not in alerted:
-            gain_pct = ((curr_p - entry_high) / entry_high * 100) if entry_high else 0.0
+            gain_pct = ((curr_p - entry_price) / entry_price * 100) if entry_price else 0.0
             event_info = {
                 'type': 'TP2',
                 'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
@@ -625,16 +624,16 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
                 'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
                 'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
             }
-        # 5. 建倉進場 (現價回測進入黃金進場區間)
-        elif entry_low <= curr_p <= entry_high and 'ENTRY' not in alerted:
+        # 5. 建倉進場 (現價處於建議進場上限以下且未跌破停損線)
+        elif sl_p < curr_p <= entry_price and 'ENTRY' not in alerted:
             # 計算即時盈虧比
             risk = max(curr_p - sl_p, 0.1)
             reward = max(tp1_p - curr_p, 0.1)
             rr_ratio = reward / risk if risk > 0 else 1.0
             event_info = {
                 'type': 'ENTRY',
-                'badge': '🟢【黃金買點通知・拉回建倉區間觸發】',
-                'guide': f'現價回測穩守短均線，已落入黃金建倉區 ({entry_low:.2f} ~ {entry_high:.2f} 元)！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，風險有限、向上空間開闊，可依規劃分批佈局。'
+                'badge': '🟢【黃金買點通知・現價處於建議進場價以下】',
+                'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
             }
 
         if event_info and target_dest and token:
@@ -645,7 +644,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 狀態：{event_info['badge']}
 
 🎯 操盤四大防線現況：
-🟢 建議進場：{entry_low:.2f} ~ {entry_high:.2f} 元
+🟢 建議進場：{entry_price:.2f} 元 (買進上限)
 🔵 動能加碼：{addon_p:.2f} 元
 🔴 第一停利：{tp1_p:.2f} 元
 🛑 嚴格停損：{sl_p:.2f} 元

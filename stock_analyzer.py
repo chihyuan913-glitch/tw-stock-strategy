@@ -257,25 +257,18 @@ def analyze_stock(user_input: str) -> str:
         sl_base = min(tech['low_5d'] * 0.985, current_price * 0.95)
     stop_loss = round(sl_base, 2)
 
-    # B. 建議進場價位 (Entry Price)
+    # B. 建議進場價位 (Entry Price: 單一基準上限價)
     if bias20 > 8.0:
-        entry_low = round(min(ma10, current_price * 0.965), 2)
-        entry_high = round(current_price * 0.985, 2)
-        entry_strat = "正乖離偏高，切忌追高！待拉回 5MA/10MA 支撐不破再分批低接"
+        entry_price = round(current_price * 0.985, 2)
+        entry_strat = f"正乖離偏高切忌追高，待拉回至 {entry_price:.2f} 元以下分批佈局"
     elif bias20 < -8.0:
-        entry_low = round(max(bb_dn, current_price * 0.98), 2)
-        entry_high = round(current_price, 2)
-        entry_strat = "跌深進入布林下軌超跌區，支撐浮現，可於區間內分批小量試單"
+        entry_price = round(current_price, 2)
+        entry_strat = f"進入布林下軌超跌區，{entry_price:.2f} 元以下皆為黃金試單點"
     else:
-        entry_cand1 = min(ma10, current_price * 0.975) if current_price < ma10 else max(ma10, current_price * 0.975)
-        entry_low = round(min(entry_cand1, current_price * 0.985), 2)
-        entry_high = round(current_price, 2)
-        entry_strat = "黃金回測支撐區，守穩 5MA/10MA 均線分批佈局"
+        entry_price = round(current_price, 2)
+        entry_strat = f"位階安全未追高，{entry_price:.2f} 元以下皆為合適建倉點"
 
-    if entry_low > entry_high:
-        entry_low, entry_high = entry_high, entry_low
-
-    entry_target_mid = (entry_low + entry_high) / 2.0
+    entry_target_mid = entry_price
 
     # C. 加碼價位 (Add-on Price)
     high_ref = max(tech['last_high'], current_price)
@@ -336,11 +329,11 @@ def analyze_stock(user_input: str) -> str:
 
     if int_score >= 4:
         eval_badge = "🟢【偏多優質・進場高勝率】"
-        playbook_empty = f"目前盈虧比與均線型態俱佳，空手者可於【{entry_low:.2f} ~ {entry_high:.2f} 元】分批掛單建倉，切勿重壓。"
+        playbook_empty = f"目前盈虧比與均線型態俱佳，空手者可於【{entry_price:.2f} 元以下】直接進場建倉，不追高。"
         playbook_hold = f"持股者續抱！以【{stop_loss:.2f} 元】為移動停損防守；放量過【{addon_price:.2f} 元】可順勢加碼，攻抵【{tp1_price:.2f} 元】分批拔檔 1/2。"
     elif bias20 > 8.0:
         eval_badge = "🟡【短線過熱・等待拉回】"
-        playbook_empty = f"正乖離偏高，現價急追容易挨套！空手者請耐心等待盤中拉回【{entry_low:.2f} ~ {entry_high:.2f} 元】再考慮出手。"
+        playbook_empty = f"正乖離偏高，現價急追容易挨套！空手者請耐心等待盤中拉回【{entry_price:.2f} 元以下】再考慮出手。"
         playbook_hold = f"持股者嚴禁再加碼！可逢高於【{tp1_price:.2f} 元】分批獲利減碼入袋，跌破【{stop_loss:.2f} 元】獲利全數了結。"
     elif not is_above_ma20:
         eval_badge = "🟠【弱勢震盪・慎防破底】"
@@ -348,7 +341,7 @@ def analyze_stock(user_input: str) -> str:
         playbook_hold = f"持股者建議反彈逢高減碼，若摜破【{stop_loss:.2f} 元】防守線務必無條件停損退場。"
     else:
         eval_badge = "🔵【區間震盪・伺機低接】"
-        playbook_empty = f"目前處於整理箱型內，建議於箱底支撐【{entry_low:.2f} ~ {entry_high:.2f} 元】低接，不追高。"
+        playbook_empty = f"目前處於整理箱型內，建議於【{entry_price:.2f} 元以下】分批低接，不追高。"
         playbook_hold = f"持股者以【{stop_loss:.2f} 元】嚴守防守線，待帶量突破【{addon_price:.2f} 元】再行加碼。"
 
     # 6. 組裝頂級旗艦版 LINE 戰報卡片
@@ -362,7 +355,7 @@ def analyze_stock(user_input: str) -> str:
 
 🎯 操盤四大防線價位 (標準指引)：
 ────────────────
-🟢 建議進場：{entry_low:.2f} ~ {entry_high:.2f} 元
+🟢 建議進場：{entry_price:.2f} 元 (買進上限)
    ▶ 建倉策略：{entry_strat}
 🔵 動能加碼：{addon_price:.2f} 元
    ▶ 加碼策略：帶量突破近高確認續強時，右側順勢加碼 1/3

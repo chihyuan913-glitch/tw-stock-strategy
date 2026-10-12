@@ -68,22 +68,18 @@ def load_cb_targets():
                 code = str(row['代號']).strip()
                 # 解析進場區間 "1635.0 ～ 1710.0"
                 entry_str = str(row['進場價位'])
-                entry_low, entry_high = None, None
                 if '～' in entry_str:
                     parts = entry_str.split('～')
-                    entry_low = float(parts[0].strip())
-                    entry_high = float(parts[1].strip())
+                    entry_price = float(parts[-1].split('(')[0].strip())
                 else:
-                    entry_low = float(entry_str) * 0.98
-                    entry_high = float(entry_str)
+                    entry_price = float(entry_str)
                     
                 targets[code] = {
                     'code': code,
                     'name': str(row['名稱']).strip(),
                     'stars': str(row.get('星級', '★★★★☆')),
                     'score': row.get('評分', 80),
-                    'entry_low': entry_low,
-                    'entry_high': entry_high,
+                    'entry_price': entry_price,
                     'addon_price': float(row['加碼價位']),
                     'tp1_price': float(row['停利TP1']),
                     'tp2_price': float(row['停利TP2']),
@@ -111,8 +107,7 @@ def load_cb_targets():
                     'name': item['name'],
                     'stars': '★★★★☆',
                     'score': 80,
-                    'entry_low': conv_p * 0.98,
-                    'entry_high': conv_p * 1.03,
+                    'entry_price': round(conv_p * 1.03, 1),
                     'addon_price': conv_p * 1.05,
                     'tp1_price': conv_p * 1.10,
                     'tp2_price': conv_p * 1.20,
@@ -185,7 +180,7 @@ def scan_once(targets, notified_events, force_test=False):
             continue
 
         price = rt['price']
-        print(f"  • {code} {target['name']}: 現價 {price} (進場 {target['entry_low']}~{target['entry_high']}, 加碼 {target['addon_price']}, TP1 {target['tp1_price']}, 停損 {target['sl_price']})")
+        print(f"  • {code} {target['name']}: 現價 {price} (進場上限 {target['entry_price']}, 加碼 {target['addon_price']}, TP1 {target['tp1_price']}, 停損 {target['sl_price']})")
 
         events_for_code = notified_events.setdefault(code, set())
 
@@ -259,9 +254,9 @@ def scan_once(targets, notified_events, force_test=False):
             })
             continue
 
-        # 6. 左側伏擊進場區間判定
-        if target['entry_low'] <= price <= target['entry_high'] and 'ENTRY' not in events_for_code:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', price, target['entry_high'], force_pass=force_test)
+        # 6. 左側伏擊進場判定 (現價處於買進上限價以下且未破停損)
+        if target['sl_price'] < price <= target['entry_price'] and 'ENTRY' not in events_for_code:
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', price, target['entry_price'], force_pass=force_test)
             if not confirmed:
                 print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
                 continue
@@ -269,7 +264,7 @@ def scan_once(targets, notified_events, force_test=False):
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ENTRY',
                 'event_title': '🟢 伏擊進場買點觸發',
-                'event_desc': '現價已回測至季線/轉換價黃金伏擊區，賣壓竭盡量縮，可依計畫分批試單 30% 建倉！'
+                'event_desc': f'現價 {price} 元 處於建議進場上限 {target["entry_price"]} 元 以下且穩守防守線，賣壓竭盡量縮，可直接以現價或限價立即進場建倉！'
             })
             continue
 

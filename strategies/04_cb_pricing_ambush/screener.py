@@ -223,11 +223,8 @@ def score_and_analyze_cb(cb_item, market_data):
         tp2_price = round(max(conv_price * 1.22, price * 1.22), 1)
         sl_price = round(min(ma60 * 0.95, price * 0.91, conv_price * 0.92), 1)
 
-    # 進場文字說明 (若溢價過高提示拉回)
-    if price_to_conv_ratio > 1.08:
-        entry_price_str = f"{entry_low} ～ {entry_high} (現價溢價{price_to_conv_ratio:.2f}倍偏高，待拉回)"
-    else:
-        entry_price_str = f"{entry_low} ～ {entry_high}"
+    # 進場價位 (單一買進上限價)
+    entry_price = entry_high
 
     og_risk = evaluate_overnight_broker_risk(
         cb_item['code'],
@@ -242,7 +239,7 @@ def score_and_analyze_cb(cb_item, market_data):
         '評分': score,
         '現價': price,
         '進度狀態': cb_item['status_desc'],
-        '進場價位': entry_price_str,
+        '進場價位': entry_price,
         '加碼價位': addon_price,
         '停利TP1': tp1_price,
         '停利TP2': tp2_price,

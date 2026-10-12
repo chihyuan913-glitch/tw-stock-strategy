@@ -11,7 +11,8 @@
     "sl_price": 55.68,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 58.3
   },
   "2476": {
     "code": "2476",
@@ -25,7 +26,8 @@
     "sl_price": 121.45,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 130.5
   },
   "3221": {
     "code": "3221",
@@ -39,7 +41,8 @@
     "sl_price": 51.64,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 54.17
   },
   "2603": {
     "code": "2603",
@@ -53,7 +56,8 @@
     "sl_price": 220.88,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 232.5
   },
   "3017": {
     "code": "3017",
@@ -67,7 +71,8 @@
     "sl_price": 3285.2,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:51",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 3440.0
   },
   "3324": {
     "code": "3324",
@@ -81,21 +86,8 @@
     "sl_price": 1451.6,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:51",
-    "alerted_today": {}
-  },
-  "8996": {
-    "code": "8996",
-    "name": "高力[可轉債伏擊]",
-    "base_price": 1710.0,
-    "entry_low": 1588.5,
-    "entry_high": 1684.35,
-    "addon_price": 1752.75,
-    "tp1_price": 1829.7,
-    "tp2_price": 1966.5,
-    "sl_price": 1482.55,
-    "target_id": "test",
-    "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 1520.0
   },
   "2421": {
     "code": "2421",
@@ -109,7 +101,8 @@
     "sl_price": 160.44,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:51",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 168.0
   },
   "3653": {
     "code": "3653",
@@ -123,7 +116,8 @@
     "sl_price": 6726.2,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:51",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 7057.52
   },
   "3034": {
     "code": "3034",
@@ -137,7 +131,8 @@
     "sl_price": 504.45,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 531.0
   },
   "1102": {
     "code": "1102",
@@ -151,7 +146,8 @@
     "sl_price": 34.71,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 36.35
   },
   "2855": {
     "code": "2855",
@@ -165,7 +161,8 @@
     "sl_price": 55.62,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 58.6
   },
   "1319": {
     "code": "1319",
@@ -179,7 +176,8 @@
     "sl_price": 77.16,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 80.8
   },
   "2317": {
     "code": "2317",
@@ -193,7 +191,8 @@
     "sl_price": 236.55,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 249.0
   },
   "2352": {
     "code": "2352",
@@ -207,7 +206,8 @@
     "sl_price": 27.12,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 28.55
   },
   "2891": {
     "code": "2891",
@@ -221,7 +221,8 @@
     "sl_price": 63.93,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 67.3
   },
   "4916": {
     "code": "4916",
@@ -235,7 +236,8 @@
     "sl_price": 97.41,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 102.0
   },
   "2344": {
     "code": "2344",
@@ -249,6 +251,7 @@
     "sl_price": 169.03,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {}
+    "alerted_today": {},
+    "entry_price": 177.0
   }
 }

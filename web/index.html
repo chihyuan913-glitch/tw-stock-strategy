@@ -287,7 +287,7 @@
                 <th class="py-3 px-4">證券代號</th>
                 <th class="py-3 px-4">證券名稱</th>
                 <th class="py-3 px-4">基準現價</th>
-                <th class="py-3 px-4">🟢 建議進場價位</th>
+                <th class="py-3 px-4">🟢 建議進場(買進上限)</th>
                 <th class="py-3 px-4">🔵 動能加碼價位</th>
                 <th class="py-3 px-4">🔴 第一停利(TP1)</th>
                 <th class="py-3 px-4">🔴 波段滿足(TP2)</th>
@@ -716,8 +716,7 @@
         const code = it.code || '';
         const name = it.name || code;
         const bp = Number(it.base_price || 0).toFixed(2);
-        const el = Number(it.entry_low || 0).toFixed(2);
-        const eh = Number(it.entry_high || 0).toFixed(2);
+        const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
         const ad = Number(it.addon_price || 0).toFixed(2);
         const tp1 = Number(it.tp1_price || 0).toFixed(2);
         const tp2 = Number(it.tp2_price || 0).toFixed(2);
@@ -729,8 +728,8 @@
           <td class="py-3 px-4 text-slate-200 font-sans font-medium">${name}</td>
           <td class="py-3 px-4 text-slate-100 font-bold">${bp}</td>
           <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
-              🟢 ${el} ~ ${eh}
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 whitespace-nowrap">
+              🟢 ${ep} (上限)
             </span>
           </td>
           <td class="py-3 px-4">
