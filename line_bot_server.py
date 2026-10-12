@@ -516,7 +516,12 @@ WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 async def serve_dashboard():
     """提供深色科技風「台股量化選股策略最高總指揮中心」戰情儀表板"""
     if WEB_INDEX.exists():
-        return FileResponse(WEB_INDEX)
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+        return FileResponse(WEB_INDEX, headers=headers)
     return HTMLResponse("<h1>台股量化選股策略最高總指揮中心</h1><p>請確認 web/index.html 是否存在。</p>")
 
 @app.get("/api/overview")
