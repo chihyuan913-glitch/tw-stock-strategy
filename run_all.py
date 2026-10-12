@@ -83,7 +83,7 @@ def run_strategy(strat_info, line=False):
 def main():
     parser = argparse.ArgumentParser(description="台股選股策略總指揮 - 一鍵執行所有策略")
     parser.add_argument("--line", action="store_true", help="執行後推播各策略結果至 LINE")
-    parser.add_argument("--strategy", type=str, default=None, help="指定單一策略執行 (01, 02, 03)")
+    parser.add_argument("--strategy", type=str, default=None, help="指定單一策略執行 (01, 02, 03, 04)")
     args = parser.parse_args()
 
     print(f"============================================================")

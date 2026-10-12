@@ -37,6 +37,8 @@ ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
 from line_sender import send_to_line
 
 def sync_stock_dictionary():
@@ -167,7 +169,7 @@ def audit_cb_pool():
             with open(cb_file, "r", encoding="utf-8") as f:
                 pool = json.load(f)
             
-            today = datetime.date.today()
+            today = datetime.datetime.now(TZ_TW).date()
             for item in pool:
                 lockup_str = item.get("lockup_end_date", "")
                 is_expired = False
@@ -230,7 +232,7 @@ def collect_latest_candidates():
 def generate_weekly_report(dict_info, market_info, cb_info, candidates, send_line=False):
     """任務五：產出週報與 LINE 推播"""
     print("\n[*] 【任務五/五】正在產生【每週全策略優化與升級總體戰報】...")
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_str = datetime.datetime.now(TZ_TW).strftime("%Y-%m-%d %H:%M")
     
     dict_total, dict_added = dict_info
     cb_active, _ = cb_info
