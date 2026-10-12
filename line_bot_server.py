@@ -403,8 +403,8 @@ async def startup_event():
                 time.sleep(1.0)
                 with shutdown_lock:
                     now = time.time()
-                    if not has_ever_connected and (now - server_start_time) > 45:
-                        print("\n[系統提醒] 啟動後 45 秒內未偵測到任何瀏覽器開啟連線，已自動結束伺服器釋放資源。", flush=True)
+                    if not has_ever_connected and (now - server_start_time) > 90:
+                        print("\n[系統提醒] 啟動後 90 秒內未偵測到任何瀏覽器開啟連線，已自動結束伺服器釋放資源。", flush=True)
                         os._exit(0)
                     if has_ever_connected and (now - last_heartbeat_time) > 8.0 and len(active_websockets) == 0:
                         try:
