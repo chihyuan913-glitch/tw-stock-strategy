@@ -107,5 +107,12 @@ def main():
     print(f"🏁 總指揮中心執行總結: 完成 {success_count}/{len(targets)} 項策略。")
     print("=" * 70)
 
+    # 自動跨日滾動校準雷達監控池四大防線與移動停利
+    try:
+        from radar_manager import rollover_watchlist_defense
+        rollover_watchlist_defense(verbose=True)
+    except Exception as e:
+        print(f"[!] 雷達監控池跨日滾動校準跳過或失敗: {e}")
+
 if __name__ == '__main__':
     main()

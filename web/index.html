@@ -267,6 +267,10 @@
             <i data-lucide="download-cloud" class="w-4 h-4 text-cyan-400"></i>
             <span>🤖 同步今日選股日報</span>
           </button>
+          <button onclick="rolloverRadarDefense()" id="btnRolloverRadar" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="以最新收盤價重新計算四大防線並自動墊高移動停損">
+            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+            <span>📈 動態滾動校準 (移動停利)</span>
+          </button>
           <button onclick="resetRadarAlerts()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
             <i data-lucide="rotate-ccw" class="w-4 h-4 text-amber-400"></i>
             <span>🔄 重置今日警報</span>
@@ -837,6 +841,36 @@
         refreshData();
       } catch (e) {
         alert("同步失敗: " + e);
+      }
+    }
+
+    // 跨日動態滾動校準與自動移動停利
+    async function rolloverRadarDefense() {
+      const btn = document.getElementById('btnRolloverRadar');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i><span>校準計算中...</span>`;
+        lucide.createIcons();
+      }
+      showToast("正在重新計算最新技術均線與動態移動停利...");
+      try {
+        const resp = await fetch('/api/radar/rollover', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+          showToast(data.message);
+          loadRadarWatchlist();
+          refreshData();
+        } else {
+          alert("動態校準失敗: " + data.message);
+        }
+      } catch (e) {
+        alert("連線失敗: " + e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i><span>📈 動態滾動校準 (移動停利)</span>`;
+          lucide.createIcons();
+        }
       }
     }
 

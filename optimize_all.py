@@ -343,6 +343,13 @@ def main():
     # 4. 全策略盤前自動選股
     run_strategies_premarket()
 
+    # 4.5 雷達監控池跨日動態滾動校準與自動移動停利 (Auto Trailing Stop)
+    try:
+        from radar_manager import rollover_watchlist_defense
+        rollover_watchlist_defense(verbose=True)
+    except Exception as e:
+        print(f"[!] 週日雷達監控池滾動校準失敗: {e}")
+
     # 5. 彙整候選標的
     candidates = collect_latest_candidates()
 

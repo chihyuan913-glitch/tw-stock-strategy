@@ -705,6 +705,16 @@ async def sync_radar_endpoint():
     watchlist = load_watchlist()
     return {"success": True, "message": res, "count": len(watchlist)}
 
+@app.post("/api/radar/rollover")
+async def rollover_radar_endpoint():
+    """執行雷達監控池跨日動態滾動校準與自動移動停利"""
+    from radar_manager import rollover_watchlist_defense, load_watchlist
+    res = rollover_watchlist_defense(verbose=False)
+    watchlist = load_watchlist()
+    msg = f"已完成動態校準！共更新 {res['updated']}/{res['total']} 檔標的，其中 {res['trailed']} 檔成功墊高移動停利！"
+    return {"success": True, "message": msg, "data": res, "count": len(watchlist)}
+
+
 
 @app.post("/api/action/{action_name}")
 async def trigger_action_endpoint(action_name: str, background_tasks: BackgroundTasks):

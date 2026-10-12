@@ -313,6 +313,20 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "sl_desc": "跌破防守線",
             "color_theme": "#7C3AED"
         }
+    elif sid == "RADAR":
+        return {
+            "id": "RADAR",
+            "name": "盤中即時監控雷達",
+            "entry_label": "🟢 建議進場",
+            "addon_label": "🔵 動能加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 嚴格停損",
+            "entry_desc": "買進上限價",
+            "addon_desc": "突破續強點",
+            "tp_desc": "TP1反壓 / TP2滿足",
+            "sl_desc": "關鍵防守線",
+            "color_theme": "#0D9488"
+        }
     else:
         return {
             "id": sid,

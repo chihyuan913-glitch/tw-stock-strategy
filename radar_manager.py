@@ -30,6 +30,14 @@ WATCHLIST_FILE = ROOT_DIR / "watchlist.json"
 RADAR_CHANNEL_FILE = ROOT_DIR / "radar_channel.json"
 TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
 
+# 引入程式交易防毛刺守門引擎與旗艦視覺化推播模組
+from algo_guards import GLOBAL_TICK_GUARD
+from line_sender import (
+    build_price_alert_card,
+    format_clean_price_alert_text,
+    send_to_line
+)
+
 def get_radar_channel() -> str:
     """取得獨立雷達專屬推播目標 ID (Group ID)"""
     env_target = os.environ.get("LINE_TARGET_RADAR", "")
@@ -596,90 +604,169 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 
         # 1. 停損警戒 (現價 <= 停損線) - 優先級第一！
         if sl_p > 0 and curr_p <= sl_p and 'STOP_LOSS' not in alerted:
-            sl_drop = ((curr_p - sl_p) / sl_p * 100)
-            event_info = {
-                'type': 'STOP_LOSS',
-                'badge': '🛑【最高風控警報・破線停損警戒觸發】',
-                'guide': f'現價已跌破嚴格防守停損線 {sl_p:.2f} 元 (破線幅度 {sl_drop:.1f}%)！\n多頭結構已遭破壞，請無條件依紀律嚴格執行停損退場，保留實力鎖定最大風險！'
-            }
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', curr_p, sl_p)
+            if not confirmed:
+                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+            else:
+                sl_drop = ((curr_p - sl_p) / sl_p * 100)
+                event_info = {
+                    'type': 'STOP_LOSS',
+                    'badge': '🛑【最高風控警報・破線停損警戒觸發】',
+                    'guide': f'現價已跌破嚴格防守停損線 {sl_p:.2f} 元 (破線幅度 {sl_drop:.1f}%)！\n多頭結構已遭破壞，請無條件依紀律嚴格執行停損退場，保留實力鎖定最大風險！'
+                }
         # 2. 波段滿足 (現價 >= TP2)
         elif tp2_p > 0 and curr_p >= tp2_p and 'TP2' not in alerted:
-            gain_pct = ((curr_p - entry_price) / entry_price * 100) if entry_price else 0.0
-            event_info = {
-                'type': 'TP2',
-                'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
-                'guide': f'現價強勢衝抵第二波段等幅滿足點 {tp2_p:.2f} 元 (累積獲利估 +{gain_pct:.1f}%)！\n主升段利潤豐碩，建議獲利全數落袋為安，或緊縮移動停利線至今日低點保本！'
-            }
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', curr_p, tp2_p)
+            if not confirmed:
+                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+            else:
+                gain_pct = ((curr_p - entry_price) / entry_price * 100) if entry_price else 0.0
+                event_info = {
+                    'type': 'TP2',
+                    'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
+                    'guide': f'現價強勢衝抵第二波段等幅滿足點 {tp2_p:.2f} 元 (累積獲利估 +{gain_pct:.1f}%)！\n主升段利潤豐碩，建議獲利全數落袋為安，或緊縮移動停利線至今日低點保本！'
+                }
         # 3. 前高停利 (現價 >= TP1)
         elif tp1_p > 0 and curr_p >= tp1_p and 'TP1' not in alerted:
-            event_info = {
-                'type': 'TP1',
-                'badge': '🔴【獲利了結通知・TP1 第一目標觸發】',
-                'guide': f'現價已攻抵第一反壓目標區 {tp1_p:.2f} 元！前方逢前波密集解套區，建議先獲利了結 1/2 倉位落袋，其餘半數拉高成本線續抱讓利潤奔馳！'
-            }
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', curr_p, tp1_p)
+            if not confirmed:
+                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+            else:
+                event_info = {
+                    'type': 'TP1',
+                    'badge': '🔴【獲利了結通知・TP1 第一目標觸發】',
+                    'guide': f'現價已攻抵第一反壓目標區 {tp1_p:.2f} 元！前方逢前波密集解套區，建議先獲利了結 1/2 倉位落袋，其餘半數拉高成本線續抱讓利潤奔馳！'
+                }
         # 4. 突破加碼 (現價 >= 加碼價)
         elif addon_p > 0 and curr_p >= addon_p and 'ADDON' not in alerted:
-            event_info = {
-                'type': 'ADDON',
-                'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
-                'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
-            }
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ADDON', curr_p, addon_p)
+            if not confirmed:
+                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+            else:
+                event_info = {
+                    'type': 'ADDON',
+                    'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
+                    'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
+                }
         # 5. 建倉進場 (現價處於建議進場上限以下且未跌破停損線)
         elif sl_p < curr_p <= entry_price and 'ENTRY' not in alerted:
-            # 計算即時盈虧比
-            risk = max(curr_p - sl_p, 0.1)
-            reward = max(tp1_p - curr_p, 0.1)
-            rr_ratio = reward / risk if risk > 0 else 1.0
-            event_info = {
-                'type': 'ENTRY',
-                'badge': '🟢【黃金買點通知・現價處於建議進場價以下】',
-                'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
-            }
+            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', curr_p, entry_price)
+            if not confirmed:
+                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+            else:
+                risk = max(curr_p - sl_p, 0.1)
+                reward = max(tp1_p - curr_p, 0.1)
+                rr_ratio = reward / risk if risk > 0 else 1.0
+                event_info = {
+                    'type': 'ENTRY',
+                    'badge': '🟢【黃金買點通知・現價處於建議進場價以下】',
+                    'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
+                }
 
-        if event_info and target_dest and token:
-            card = f"""⚡【盤中到價即時雷達警報】
-━━━━━━━━━━━━━━━
-標的：{code} {name}
-現價：{price_display}
-狀態：{event_info['badge']}
-
-🎯 操盤四大防線現況：
-🟢 建議進場：{entry_price:.2f} 元 (買進上限)
-🔵 動能加碼：{addon_p:.2f} 元
-🔴 第一停利：{tp1_p:.2f} 元
-🛑 嚴格停損：{sl_p:.2f} 元
-────────────────
-💡 操盤錦囊與即時行動方針：
-{event_info['guide']}
-━━━━━━━━━━━━━━━
-⏰ 觸發時間：{time_str}
-🤖 盤中智慧防洗版：同一標的同事件當日僅推播一次"""
-
-            push_url = "https://api.line.me/v2/bot/message/push"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}"
+        if event_info and target_dest:
+            rt_dict = {
+                'price': curr_p,
+                'high': curr_p,
+                'low': curr_p,
+                'time': time_str,
+                'diff_pct': diff_pct
             }
-            body = {
-                "to": target_dest,
-                "messages": [{"type": "text", "text": card}]
-            }
-            try:
-                post_data = json.dumps(body, ensure_ascii=False).encode('utf-8')
-                p_req = urllib.request.Request(push_url, data=post_data, headers=headers, method="POST")
-                with urllib.request.urlopen(p_req, timeout=6) as p_resp:
-                    if p_resp.status == 200:
-                        print(f"[✓] 成功推送到價警訊至 [{target_dest[:8]}...]: {code} {event_info['type']}", flush=True)
-                        alerted.append(event_info['type'])
-                        watchlist_updated = True
-                        triggered_alerts.append(f"{code} {name} ({event_info['type']})")
-            except Exception as e:
-                print(f"[!] 推送到價警訊失敗: {e}", flush=True)
+            # 優先採用旗艦高對比 Flex Message 大字體卡片
+            flex_card = build_price_alert_card(
+                item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR"
+            )
+            success = send_to_line(flex_card, target_id=target_dest)
+            if not success:
+                # 雙軌備援：自然留白乾淨純文字
+                clean_text = format_clean_price_alert_text(
+                    item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR"
+                )
+                success = send_to_line(clean_text, target_id=target_dest)
+
+            if success:
+                print(f"[✓] 成功推送到價警訊至 [{target_dest[:8]}...]: {code} {event_info['type']}", flush=True)
+                alerted.append(event_info['type'])
+                watchlist_updated = True
+                triggered_alerts.append(f"{code} {name} ({event_info['type']})")
 
     if watchlist_updated:
         save_watchlist(watchlist)
 
     return triggered_alerts
+
+def rollover_watchlist_defense(verbose: bool = True) -> dict:
+    """
+    盤後/跨日自動動態滾動校準與移動停利機制 (Auto Trailing & Defense Rollover)
+    --------------------------------------------------------------------------
+    1. 遍歷 watchlist.json 所有監控標的。
+    2. 以最新收盤行情與日 K 均線結構，全面重新計算四大防線。
+    3. 落實「移動停損 (Trailing Stop) 棘輪法則 (Ratchet Principle)」：
+       - 若新停損價高於舊停損價，自動向上墊高停損價（鎖定累積利潤保本）；
+       - 若新停損價低於舊停損價（短期拉回），強制保留原較高停損價（絕不下移放水凹單）。
+    4. 更新基準價、進場上限、加碼點與停利點至最新結構。
+    5. 重置今日觸發紀錄 (alerted_today)，備妥次日交易日全新盯盤。
+    """
+    watchlist = load_watchlist()
+    if not watchlist:
+        if verbose:
+            print("[*] 監控池為空，無需執行滾動校準。")
+        return {"total": 0, "updated": 0, "trailed": 0}
+
+    today_str = datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d')
+    updated_count = 0
+    trailed_count = 0
+
+    if verbose:
+        print(f"\n[*] 啟動【盤中雷達監控池・跨日動態滾動校準與自動移動停利】(共 {len(watchlist)} 檔)...")
+
+    for code, item in list(watchlist.items()):
+        try:
+            # 重新計算最新四大防線
+            new_defense = calculate_stock_defense(code)
+            if not new_defense:
+                continue
+
+            old_sl = item.get('sl_price', 0)
+            new_sl = new_defense['sl_price']
+
+            # 棘輪法則：停損價只升不降 (Ratchet Trailing Stop)
+            if old_sl > 0 and new_sl > old_sl:
+                final_sl = new_sl
+                trailed_count += 1
+                if verbose:
+                    print(f"  [🔺 移動停利墊高] {code} {item.get('name')}: 停損價由 {old_sl:.2f} 向上推升至 {final_sl:.2f} 元 (鎖定獲利！)")
+            else:
+                final_sl = max(old_sl, new_sl) if old_sl > 0 else new_sl
+
+            # 更新四大防線
+            item['base_price'] = new_defense['base_price']
+            item['entry_price'] = new_defense['entry_price']
+            item['entry_low'] = new_defense.get('entry_low', new_defense['entry_price'])
+            item['entry_high'] = new_defense['entry_price']
+            item['addon_price'] = new_defense['addon_price']
+            item['tp1_price'] = new_defense['tp1_price']
+            item['tp2_price'] = new_defense['tp2_price']
+            item['sl_price'] = final_sl
+            item['last_rollover'] = today_str
+
+            # 清理過期日期紀錄，僅保留今天（若有）
+            alerted_dict = item.get('alerted_today', {})
+            item['alerted_today'] = {k: v for k, v in alerted_dict.items() if k == today_str}
+
+            updated_count += 1
+        except Exception as e:
+            if verbose:
+                print(f"  [!] 校準標的 {code} 失敗: {e}")
+
+    save_watchlist(watchlist)
+    if verbose:
+        print(f"[✓] 滾動校準完畢：成功更新 {updated_count}/{len(watchlist)} 檔標的，其中 {trailed_count} 檔觸發移動停利向上墊高！\n")
+
+    return {
+        "total": len(watchlist),
+        "updated": updated_count,
+        "trailed": trailed_count
+    }
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'list'
@@ -688,6 +775,8 @@ if __name__ == '__main__':
         print(batch_add_to_radar(t, "test"))
     elif cmd == 'sync':
         print(sync_screener_to_radar("test"))
+    elif cmd == 'rollover':
+        print(json.dumps(rollover_watchlist_defense(), ensure_ascii=False, indent=2))
     elif cmd == 'themes':
         print(get_themes_summary())
     elif cmd == 'list':
