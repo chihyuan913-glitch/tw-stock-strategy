@@ -32,7 +32,13 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from line_sender import send_to_line
+from line_sender import (
+    send_to_line,
+    build_price_alert_card,
+    format_clean_price_alert_text,
+    build_aggregated_alert_card,
+    format_clean_aggregated_text
+)
 from algo_guards import GLOBAL_TICK_GUARD
 
 # 設定標準輸出編碼為 UTF-8
@@ -198,96 +204,28 @@ def fetch_realtime_quotes(stock_codes):
     return results
 
 def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
-    """發送盤中到價 LINE 推播卡片 (採用旗艦卡片 UI 與操盤四大防線)"""
+    """發送盤中到價 LINE 推播卡片 (採用大字體、零引線、四大價位一目了然之高對比 Flex 卡)"""
     code = target['code']
     name = target['name']
-    contract = target['contract']
     price = rt['price']
-    high_p = rt['high']
-    low_p = rt['low']
-    ma20 = target['ma20']
-    neg_bias = round((price - ma20) / ma20 * 100, 2)
-
-    # 動態指引標籤
-    entry_tag = " ◄◄ 【空單進場基準！】" if event_type == "ENTRY" else ""
-    addon_tag = " ◄◄ 【破低加空追擊！】" if event_type == "ADDON" else ""
-    tp1_tag = " ◄◄ 【TP1達標(-10%)！】" if event_type == "TP1" else ""
-    tp2_tag = " ◄◄ 【TP2達標(-16%)！】" if event_type == "TP2" else ""
-    sl_tag = " ◄◄ 【站上月線停損！】" if event_type == "STOP_LOSS" else ""
-
-    msg_lines = [
-        "╔═══════════════════════╗",
-        "║  🚨【盤中雷達】弱勢做空到價即時快訊  ║",
-        "╚═══════════════════════╝",
-        f"📍 監控標的：{code} {name} ｜ ⚡ 股期: {contract}",
-        f"🔥 觸發事件：【{event_title}】",
-        f"💵 即時現價：{price:.2f} 元 (今日高: {high_p:.2f} / 低: {low_p:.2f})",
-        "━━━━━━━━━━━━━━━━━━━━",
-        "🎯 實戰操盤四大防線：",
-        f"├ 🟢 進場價位：{target['entry_price']:.2f} 元 (空單進場基準){entry_tag}",
-        f"├ 🔵 加碼價位：{target['addon_price']:.2f} 元 (破低加空追擊){addon_tag}",
-        f"├ 🔴 停利目標：TP1 {target['tp1_price']:.2f} (-10%){tp1_tag} ｜ TP2 {target['tp2_price']:.2f} (-16%){tp2_tag}",
-        f"└ 🛑 停損防守：{target['sl_price']:.2f} 元 (站上月線反壓){sl_tag}",
-        "────────────────────",
-        "💰 股期保證金與籌碼：",
-        f"• 1口保證金：約 {target['margin_1lot']:,} 元 (表彰2張現貨)",
-        f"• 均線反壓：月線 {ma20:.2f} 元 (下彎蓋頭反壓) ｜ 負乖離 {neg_bias:.2f}%",
-        f"• 法人賣超：佔比 {target['inst_sell_ratio']:.1f}% (外資3日{target['f_3d']:,}張, 投信3日{target['t_3d']:,}張)",
-        "────────────────────",
-        f"💡【實戰指引】{event_desc}",
-        f"⏰ 偵測時間：{rt.get('time', datetime.datetime.now().strftime('%H:%M:%S'))}",
-        "━━━━━━━━━━━━━━━━━━━━"
-    ]
-    message = "\n".join(msg_lines)
     print(f"\n[!] 觸發盤中做空到價警報 (策略03): {code} {name} 事件: {event_title} 現價: {price:.2f}")
-    send_to_line(message, strategy="03")
+
+    card = build_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id="03")
+    success = send_to_line(card, strategy="03")
+    if not success:
+        clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id="03")
+        send_to_line(clean_text, strategy="03")
 
 def send_aggregated_price_alerts(alerts):
     """將同週期多檔做空到價事件整合為單一戰訊卡發送，大幅節省 90% LINE 訊息則數並避免洗版"""
     now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
-
-    categories = {
-        'STOP_LOSS': ('🛑【突破月線反壓・空單停損回補警報】', []),
-        'TP2': ('🔴【摜破第二目標 TP2 (-16%)・分批回補】', []),
-        'TP1': ('🔴【摜破第一目標 TP1 (-10%)・分批回補】', []),
-        'ADDON': ('🔵【摜破關鍵低點・右側加空】', []),
-        'ENTRY': ('🟢【空單起跌建倉點觸發】', []),
-    }
-
-    for a in alerts:
-        ecode = a.get('event_code', 'ENTRY')
-        if ecode in categories:
-            categories[ecode][1].append(a)
-        else:
-            categories['ENTRY'][1].append(a)
-
-    lines = [
-        "🔔【策略 03：做空避險・盤中多檔到價快訊】",
-        "━━━━━━━━━━━━━━━━━━━━━",
-        f"⏱️ 偵測時間：{now_str} ｜ 本輪共觸發 {len(alerts)} 檔空方標的",
-        ""
-    ]
-
-    for ecode, (header, items) in categories.items():
-        if not items:
-            continue
-        lines.append(f"{header} (共 {len(items)} 檔)：")
-        for item in items:
-            t = item['target']
-            rt = item['rt']
-            p = rt['price']
-            chg_sign = "+" if rt.get('change_pct', 0) > 0 else ""
-            chg_str = f" ({chg_sign}{rt.get('change_pct', 0):.2f}%)" if rt.get('change_pct') is not None else ""
-            lines.append(f"  • {t['code']} {t['name']}：現價 {p:.2f}{chg_str} ({t['stars']})")
-            lines.append(f"    ↳ 🟢進場:{t['entry_price']:.2f} | 🔵加空:{t['addon_price']:.2f} | 🔴TP1:{t['tp1_price']:.2f} | 🛑停損:{t['sl_price']:.2f}")
-        lines.append("")
-
-    lines.append("━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("💡 操盤指引：個股期貨注意保證金風險，破線強勢反彈務必嚴守停損！")
-
-    message = "\n".join(lines)
     print(f"\n[⚡] 發送做空避險多檔合併戰訊卡 (共 {len(alerts)} 檔標的，僅消耗 1 則訊息額度！)")
-    send_to_line(message, strategy="03")
+
+    card = build_aggregated_alert_card(alerts, strategy_id="03", now_str=now_str)
+    success = send_to_line(card, strategy="03")
+    if not success:
+        clean_text = format_clean_aggregated_text(alerts, strategy_id="03", now_str=now_str)
+        send_to_line(clean_text, strategy="03")
 
 def scan_once(targets, notified_events, force_test=False):
     """執行一次全體標的盤中到價掃描 (支援多檔合併發送)"""

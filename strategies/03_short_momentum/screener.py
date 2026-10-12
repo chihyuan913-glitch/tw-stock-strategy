@@ -547,42 +547,14 @@ def main():
 
     if args.line:
         try:
-            from line_sender import send_to_line
-            target_date = args.date or (results[0]['證券代號'] and datetime.date.today().strftime('%Y%m%d')) or "今日"
-            msg_lines = [
-                "╔═══════════════════════╗",
-                "║  📉【台股盤後】弱勢破線做空避險日報  ║",
-                "╚═══════════════════════╝",
-                f"📅 交易日期：{target_date} 盤後結算",
-                "⚡ 避險工具：鎖定個股期貨（免借券／無回補限制）",
-                "🎯 核心邏輯：法人大賣 ＋ 跌破月線下彎 ＋ 起跌甜蜜點[-5%~0%]",
-                f"🔥 今日精選：共 {len(df_res)} 檔（嚴選前 {min(len(df_res), 6)} 檔精華）",
-                "━━━━━━━━━━━━━━━━━━━━"
-            ]
-            for i, r in enumerate(df_res.head(6).to_dict(orient='records'), 1):
-                msg_lines.append(
-                    f"【{i:02d}】📍 {r['證券代號']} {r['證券名稱']} ｜ ⚡ 股期: {r['期貨契約']}\n"
-                    f"💵 現價收盤：{r['收盤價']} 元 (月線負乖離 {r['月線負乖離%']}%)\n"
-                    f"────────────────────\n"
-                    f"🎯 操盤四大防線：\n"
-                    f"├ 🟢 進場價位：{r['收盤價']} 元 (空單進場基準)\n"
-                    f"├ 🔵 加碼價位：{r['加空價位']} 元 (破今日低點續跌加空)\n"
-                    f"├ 🔴 停利目標：TP1 {r['停利TP1']} (-10%) ｜ TP2 {r['停利TP2']} (-16%)\n"
-                    f"└ 🛑 停損防守：{r['停損回補']} 元 (站上月線反壓無條件停損)\n"
-                    f"────────────────────\n"
-                    f"💰 股期保證金與籌碼：\n"
-                    f"• 1口保證金：約 {r['1口保證金(約)']:,} 元 (表彰2張現貨)\n"
-                    f"• 法人賣超：佔比 {r['法人賣超佔比%']}% (外資3日{r['外資3日賣超(張)']:,}張, 投信3日{r['投信3日賣超(張)']:,}張)\n"
-                    f"• 均線反壓：月線 {r['月線(20MA)']} 元 (下彎蓋頭反壓)\n"
-                    "━━━━━━━━━━━━━━━━━━━━"
-                )
-            if len(df_res) > 6:
-                msg_lines.append(f"📋 其餘 {len(df_res)-6} 檔標的完整名單請查閱 result.csv")
-                msg_lines.append("━━━━━━━━━━━━━━━━━━━━")
-            msg_lines.append("💡【總指揮風控紀律】站上月線反壓無條件嚴格停損回補，絕不死抗！")
-            
+            from line_sender import send_to_line, build_screener_carousel, format_clean_screener_text
+            target_date = args.date or (results[0]['證券代號'] and datetime.date.today().strftime('%Y/%m/%d')) or "今日"
+            card = build_screener_carousel(results, target_date, strategy_id="03", max_stocks=6)
             print("[*] 正在發送做空選股清單至 LINE (策略 03)...")
-            send_to_line("\n".join(msg_lines), strategy="03")
+            success = send_to_line(card, strategy="03")
+            if not success:
+                clean_text = format_clean_screener_text(results, target_date, strategy_id="03", max_stocks=6)
+                send_to_line(clean_text, strategy="03")
         except Exception as e:
             print(f"[!] 發送 LINE 選股通知失敗: {e}")
 

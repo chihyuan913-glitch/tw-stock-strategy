@@ -264,67 +264,11 @@ def score_and_analyze_cb(cb_item, market_data):
     }
 
 def format_line_message(results, date_str=None):
-    """格式化產生高品質 LINE 戰報推播訊息（完整遵循四大價位與最後執行死線原則）"""
+    """格式化產生高品質 LINE 戰報推播訊息（零引線、四大價位一目了然）"""
     if not date_str:
         date_str = datetime.date.today().strftime('%Y/%m/%d')
-        
-    msg_lines = [
-        "╔═══════════════════════╗",
-        "║ 📊【台股可轉債】CB定價伏擊旗艦戰報 ║",
-        "╚═══════════════════════╝",
-        f"📅 交易日期：{date_str} 盤後檢核",
-        "🎯 核心邏輯：壓低定價伏擊 ＋ 籌碼洗淨 ＋ 閉鎖期紅利",
-        f"🔥 今日入選：共 {len(results)} 檔優選標的",
-        "━━━━━━━━━━━━━━━━━━━━"
-    ]
-    
-    for i, r in enumerate(results, 1):
-        code = r['代號']
-        name = r['名稱']
-        stars = r['星級']
-        score = r['評分']
-        price = r['現價']
-        status_desc = r['進度狀態']
-        cb_name = r['CB期次']
-        conv_p = r['轉換價格']
-        vol = r['成交量(張)']
-        vol_r = r['量縮比率%']
-        purpose = r['資金用途']
-        
-        entry_p = r['進場價位']
-        addon_p = r['加碼價位']
-        tp1 = r['停利TP1']
-        tp2 = r['停利TP2']
-        sl = r['停損價位']
-        exit_deadline = r['最後執行死線']
-        target_130 = r['空間極限130%']
-        exit_rule = r['退場規則說明']
-
-        msg_lines.append(
-            f"【{i:02d}】📍 {code} {name} ｜ {stars} (評分:{score})\n"
-            f"📌 發行期次：{cb_name} (規模: {r['發行規模(億)']} 億元)\n"
-            f"💵 現價收盤：{price} 元 ｜ 進度：{status_desc}\n"
-            f"────────────────────\n"
-            f"🎯 操盤四大防線：\n"
-            f"├ 🟢 進場價位：{entry_p} 元 (伏擊建倉 30%)\n"
-            f"├ 🔵 加碼價位：{addon_p} 元 (突破放量確認加碼 70%)\n"
-            f"├ 🔴 停利目標：TP1 {tp1} 元 ｜ TP2 {tp2} 元\n"
-            f"└ 🛑 停損防守：{sl} 元 (破線無條件退場，嚴守紀律)\n"
-            f"────────────────────\n"
-            f"⏳ 個股最後執行死線 (強制退場)：\n"
-            f"• 時間極限：{exit_deadline}\n"
-            f"  └ 說明：{exit_rule}\n"
-            f"• 空間極限：{target_130} 元 (轉換價 130% 啟動強制贖回，獲利終止)\n"
-            f"────────────────────\n"
-            f"📈 籌碼與定價數據：\n"
-            f"• 轉換價格：{conv_p} 元 ｜ 現價轉換比：{r['現價轉換比']:.2f} 倍\n"
-            f"• 量能表現：成交 {vol:,} 張 (量能比 {vol_r}%)\n"
-            f"• 資金用途：{purpose}\n"
-            "━━━━━━━━━━━━━━━━━━━━"
-        )
-        
-    msg_lines.append("💡【總指揮風控紀律】CB發行壓盤目的達成即反彈！請密切緊盯「最後執行日期」，解禁日前不論盈虧全數出清，拒接轉股拋售！")
-    return "\n".join(msg_lines)
+    from line_sender import format_clean_screener_text
+    return format_clean_screener_text(results, date_str, strategy_id="04", max_stocks=6)
 
 def run_screener(date_str=None, export_path=None, send_line=False):
     """執行可轉債定價伏擊選股器"""
@@ -377,9 +321,12 @@ def run_screener(date_str=None, export_path=None, send_line=False):
     if send_line:
         print("\n[+] 正在發送 LINE 推播戰報 (策略代號: 04)...")
         try:
-            from line_sender import send_to_line
-            line_msg = format_line_message(results, date_str)
-            success = send_to_line(line_msg, strategy="04")
+            from line_sender import send_to_line, build_screener_carousel, format_clean_screener_text
+            card = build_screener_carousel(results, date_str, strategy_id="04", max_stocks=6)
+            success = send_to_line(card, strategy="04")
+            if not success:
+                clean_text = format_clean_screener_text(results, date_str, strategy_id="04", max_stocks=6)
+                success = send_to_line(clean_text, strategy="04")
             if success:
                 print("[✓] LINE 戰報推播發送成功！")
             else:

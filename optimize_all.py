@@ -288,21 +288,19 @@ def generate_weekly_report(dict_info, market_info, cb_info, candidates, send_lin
 
     if send_line:
         print("\n[*] 正在將每週戰略週報摘要推播至 LINE...")
-        # 組合手機 LINE 專用精煉戰報
+        # 組合手機 LINE 專用精煉戰報 (零引線、高對比)
         line_msg = [
-            "╔═══════════════════════╗",
-            "║ 🏆【週日全策略優化與升級戰報】║",
-            "╚═══════════════════════╝",
+            "🏆【台股總指揮中心・每週全策略優化與升級戰報】",
             f"📅 校準時間：{now_str}",
             f"🧭 下週大盤：{market_info['regime']}",
             f"📊 指數現價：{market_info['close']} (月線乖離 {market_info['bias_ma20']:+.1f}%)",
-            "━━━━━━━━━━━━━━━━━━━━",
-            "⚙️【全策略系統升級完成】",
+            "",
+            "⚙️ 全策略基礎工程升級：",
             f"• 股票字典同步：{dict_total} 檔 (新增/更新 {dict_added})",
             f"• 可轉債有效池：{cb_active} 檔 (過期已除帳)",
-            f"• 四大防線與 4+1 濾網：校準就緒",
-            "━━━━━━━━━━━━━━━━━━━━",
-            "🎯【下週焦點監控精選】"
+            "• 四大防線與 4+1 濾網：校準就緒",
+            "",
+            "🎯 下週焦點監控精選："
         ]
 
         for sname, stocks in candidates.items():
@@ -314,9 +312,8 @@ def generate_weekly_report(dict_info, market_info, cb_info, candidates, send_lin
                 line_msg.append(f"• {short_sname}：觀望保留現金")
 
         line_msg.extend([
-            "────────────────────",
+            "",
             f"💡【作戰提示】{market_info['risk_advice'][:45]}...",
-            "━━━━━━━━━━━━━━━━━━━━",
             "📱 詳細報告已更新至 weekly_report.md"
         ])
 

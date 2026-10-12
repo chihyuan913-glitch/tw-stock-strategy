@@ -394,64 +394,10 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
 
     return results
 
-def format_line_message(results, date_str, args):
-    """將 V2.0 選股清單格式化為手機 LINE 專業視覺化戰報"""
-    sorted_res = sorted(results, key=lambda x: x['評分'], reverse=True)
-    msg_lines = [
-        "╔═══════════════════════╗",
-        "║  📊【台股盤後】布林超跌旗艦日報  ║",
-        "╚═══════════════════════╝",
-        f"📅 交易日期：{date_str} 盤後結算",
-        "🎯 核心邏輯：超跌轉折 ＋ 法人逆勢 ＋ 止跌型態",
-        f"🔥 今日精選：共 {len(sorted_res)} 檔（嚴選前 {min(len(sorted_res), 6)} 檔精華）",
-        "━━━━━━━━━━━━━━━━━━━━"
-    ]
-    
-    for i, r in enumerate(sorted_res[:6], 1):
-        name = r['證券名稱']
-        code = r['證券代號']
-        stars = r['星級推薦']
-        score = r['評分']
-        dist = r['距下軌%']
-        dist_sign = "+" if dist > 0 else ""
-        upside = r['反彈空間%']
-        tot_inst = r['法人買超(張)']
-        ratio = r['法人佔比%']
-        f_inst = r['外資買超']
-        t_inst = r['投信買超']
-        pattern = r['K線型態']
-        dual_str = " 🔥土洋同買" if r['土洋同買'] == "是" else ""
-
-        detail_items = []
-        if f_inst != 0:
-            detail_items.append(f"外資{'+' if f_inst>0 else ''}{f_inst}")
-        if t_inst != 0:
-            detail_items.append(f"投信{'+' if t_inst>0 else ''}{t_inst}")
-
-        msg_lines.append(
-            f"【{i:02d}】📍 {code} {name} ｜ {stars} (評分:{score})\n"
-            f"💵 現價收盤：{r['收盤價']} 元 (距下軌 {dist_sign}{dist}%)\n"
-            f"────────────────────\n"
-            f"🎯 操盤四大防線：\n"
-            f"├ 🟢 進場價位：{r['進場價位']} 元 (轉折支撐區建倉)\n"
-            f"├ 🔵 加碼價位：{r['加碼價位']} 元 (突破今日高點續彈)\n"
-            f"├ 🔴 停利目標：TP1 {r['停利TP1']} (中軌) ｜ TP2 {r['停利TP2']} (上軌)\n"
-            f"└ 🛑 停損防守：{r['停損價位']} 元 (跌破下軌-5%無條件離場)\n"
-            f"────────────────────\n"
-            f"📈 空間與籌碼純度：\n"
-            f"• 潛在空間：+{upside}% (目標看中軌 20MA)\n"
-            f"• 法人籌碼：買超 +{tot_inst:,} 張 (佔比 {ratio}%){dual_str}\n"
-            f"• 細項分佈：{', '.join(detail_items) if detail_items else '主力買盤支撐'}\n"
-            f"• K線型態：{pattern}\n"
-            "━━━━━━━━━━━━━━━━━━━━"
-        )
-        
-    if len(sorted_res) > 6:
-        msg_lines.append(f"📋 其餘 {len(sorted_res)-6} 檔標的完整數據請查閱 result.csv")
-        msg_lines.append("━━━━━━━━━━━━━━━━━━━━")
-        
-    msg_lines.append("💡【總指揮風控紀律】優先鎖定 ★★★★☆ 以上標的，嚴守四大防線紀律！")
-    return "\n".join(msg_lines)
+def format_line_message(results, date_str, args=None):
+    """將 V2.0 選股清單格式化為手機 LINE 專業視覺化戰報 (零引線、四大價位一目了然)"""
+    from line_sender import format_clean_screener_text
+    return format_clean_screener_text(results, date_str, strategy_id="01", max_stocks=6)
 
 def main():
     parser = argparse.ArgumentParser(description="台股布林通道下軌 + 法人逆勢買超選股策略 V2.0 旗艦版")
@@ -519,11 +465,14 @@ def main():
 
     if args.line:
         try:
-            from line_sender import send_to_line
+            from line_sender import send_to_line, build_screener_carousel, format_clean_screener_text
             target_date = args.date or get_latest_trading_date() or "今日"
-            line_msg = format_line_message(results, target_date, args)
+            card = build_screener_carousel(results, target_date, strategy_id="01", max_stocks=6)
             print("[*] 正在發送 V2.0 選股清單至 LINE (策略 01)...")
-            send_to_line(line_msg, strategy="01")
+            success = send_to_line(card, strategy="01")
+            if not success:
+                clean_text = format_clean_screener_text(results, target_date, strategy_id="01", max_stocks=6)
+                send_to_line(clean_text, strategy="01")
         except Exception as e:
             print(f"[!] 發送 LINE 訊息過程發生異常: {e}")
 
