@@ -81,6 +81,10 @@
           <span id="currentTime" class="font-mono text-slate-300">2026-10-11 12:00:00</span>
         </div>
         <div class="flex items-center space-x-2">
+          <button id="btnCopyTunnelUrl" onclick="copyTunnelUrl()" class="hidden px-3 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-medium flex items-center gap-1.5 transition" title="點擊複製外網專屬連線網址">
+            <i data-lucide="globe" class="w-4 h-4 text-teal-400"></i>
+            <span id="tunnelUrlText">🌐 外網專屬網址 (複製)</span>
+          </button>
           <button onclick="openAddRadarModal()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>➕ 手動加入監控</span>
@@ -542,6 +546,36 @@
   <script>
     // 初始化 Lucide 圖標
     lucide.createIcons();
+
+    let currentTunnelUrl = '';
+    async function checkNetworkInfo() {
+      try {
+        const resp = await fetch('/api/system/network_info');
+        const data = await resp.json();
+        if (data.tunnel_url) {
+          currentTunnelUrl = data.tunnel_url;
+          const btn = document.getElementById('btnCopyTunnelUrl');
+          if (btn) btn.classList.remove('hidden');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    checkNetworkInfo();
+    setInterval(checkNetworkInfo, 8000);
+
+    function copyTunnelUrl() {
+      if (!currentTunnelUrl) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(currentTunnelUrl).then(() => {
+          showToast(`已複製外網專屬連線網址！可在別台電腦或手機直接貼上開啟`);
+        }).catch(() => {
+          prompt("請手動複製以下外網專屬網址：", currentTunnelUrl);
+        });
+      } else {
+        prompt("請手動複製以下外網專屬網址：", currentTunnelUrl);
+      }
+    }
 
     // 更新時間
     function updateClock() {

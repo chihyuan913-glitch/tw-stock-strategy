@@ -414,6 +414,11 @@ async def startup_event():
                             print("=" * 70 + "\n", flush=True)
                         except Exception:
                             pass
+                        try:
+                            from tunnel_manager import stop_tunnel
+                            stop_tunnel()
+                        except Exception:
+                            pass
                         os._exit(0)
         threading.Thread(target=lifecycle_watchdog, daemon=True).start()
 
@@ -448,6 +453,11 @@ def schedule_server_shutdown(delay: float = 4.0):
                         print(" [STOP] 偵測到所有台股戰情儀表板視窗/分頁已關閉！", flush=True)
                         print(" [STOP] 系統已自動觸發自我終止，完全釋放 8989 連線埠與電腦記憶體。", flush=True)
                         print("=" * 70 + "\n", flush=True)
+                    except Exception:
+                        pass
+                    try:
+                        from tunnel_manager import stop_tunnel
+                        stop_tunnel()
                     except Exception:
                         pass
                     os._exit(0)
@@ -511,6 +521,31 @@ def browser_leaving():
     return {"status": "leaving_acknowledged"}
 
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
+
+@app.get("/api/system/network_info")
+def get_network_info_endpoint():
+    """提供本機、區域網路與外網 Cloudflare 專屬連線資訊"""
+    import socket
+    try:
+        from tunnel_manager import get_current_tunnel_url
+        tunnel_url = get_current_tunnel_url()
+    except Exception:
+        tunnel_url = ""
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        lan_ip = "127.0.0.1"
+
+    port = os.environ.get("PORT", "8989")
+    return {
+        "local_url": f"http://127.0.0.1:{port}",
+        "lan_url": f"http://{lan_ip}:{port}",
+        "tunnel_url": tunnel_url
+    }
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():

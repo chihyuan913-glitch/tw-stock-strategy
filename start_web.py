@@ -143,7 +143,14 @@ def main():
     # 2. 啟動背景線程：等待伺服器正式就緒後自動開啟瀏覽器
     threading.Thread(target=wait_for_server_and_open_browser, args=(local_url, port), daemon=True).start()
 
-    # 3. 啟動伺服器 (綁定 0.0.0.0 允許區網別台電腦連線看盤)
+    # 3. 啟動 Cloudflare 外網專屬連線通道 (允許全世界別台電腦與手機隨時存取)
+    try:
+        from tunnel_manager import start_tunnel_async, stop_tunnel
+        start_tunnel_async(port=port, notify_line=True)
+    except Exception as e:
+        print(f"[!] 啟動外網隧道失敗: {e}")
+
+    # 4. 啟動伺服器 (綁定 0.0.0.0 允許區網與外網連線看盤)
     print(f"\n[🚀] 伺服器正在獨立連接埠 {port} 啟動中，請稍候...", flush=True)
     print(f"    💡 提示：同 Wi-Fi 內的別台電腦或手機，直接在瀏覽器輸入 {lan_url} 即可即時看盤！\n", flush=True)
     try:
@@ -160,6 +167,12 @@ def main():
         print("\n[🛑] 伺服器已安全停止。", flush=True)
     except Exception as e:
         print(f"\n[❌] 伺服器發生異常：{e}", flush=True)
+    finally:
+        try:
+            from tunnel_manager import stop_tunnel
+            stop_tunnel()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
