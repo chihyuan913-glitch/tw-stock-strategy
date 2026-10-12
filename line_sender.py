@@ -220,7 +220,12 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None) -> b
         send_telegram(tg_token, tg_chat, message)
 
     if tokens and to_id:
-        return send_line_messaging_api(tokens, to_id, message, target_label=target_label)
+        success = send_line_messaging_api(tokens, to_id, message, target_label=target_label)
+        default_user_id = os.environ.get("LINE_USER_ID") or env.get("LINE_USER_ID")
+        if not success and default_user_id and to_id != default_user_id:
+            print(f"[⚡] 專屬群組推播未成功 (機器人可能尚未加入該群組)，自動觸發 Fallback 轉送至個人聊天室...")
+            return send_line_messaging_api(tokens, default_user_id, message, target_label="個人聊天室 (Fallback 備援)")
+        return success
     elif notify_token:
         return send_line_notify(notify_token, message)
     else:
