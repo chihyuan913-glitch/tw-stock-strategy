@@ -252,13 +252,61 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
     print(f"\n[!] 觸發盤中到價警報 (策略01): {code} {name} 事件: {event_title} 現價: {price:.2f}")
     send_to_line(message, strategy="01")
 
+def send_aggregated_price_alerts(alerts):
+    """將同週期多檔布林超跌到價事件整合為單一戰訊卡發送，大幅節省 90% LINE 訊息則數並避免洗版"""
+    now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
+
+    categories = {
+        'STOP_LOSS': ('🛑【跌破下軌防線・停損離場警報】', []),
+        'TP2': ('🔴【攻抵第二停利 TP2 (布林上軌)】', []),
+        'TP1': ('🔴【攻抵第一停利 TP1 (布林中軌)】', []),
+        'ADDON': ('🔵【突破關鍵高點・右側加碼】', []),
+        'ENTRY': ('🟢【觸底轉折區・進場買點觸發】', []),
+    }
+
+    for a in alerts:
+        ecode = a.get('event_code', 'ENTRY')
+        if ecode in categories:
+            categories[ecode][1].append(a)
+        else:
+            categories['ENTRY'][1].append(a)
+
+    lines = [
+        "🔔【策略 01：布林超跌・盤中多檔到價快訊】",
+        "━━━━━━━━━━━━━━━━━━━━━",
+        f"⏱️ 偵測時間：{now_str} ｜ 本輪共觸發 {len(alerts)} 檔超跌標的",
+        ""
+    ]
+
+    for ecode, (header, items) in categories.items():
+        if not items:
+            continue
+        lines.append(f"{header} (共 {len(items)} 檔)：")
+        for item in items:
+            t = item['target']
+            rt = item['rt']
+            p = rt['price']
+            chg_sign = "+" if rt.get('change_pct', 0) > 0 else ""
+            chg_str = f" ({chg_sign}{rt.get('change_pct', 0):.2f}%)" if rt.get('change_pct') is not None else ""
+            lines.append(f"  • {t['code']} {t['name']}：現價 {p:.2f}{chg_str} ({t['stars']})")
+            lines.append(f"    ↳ 🟢進場:{t['entry_price']:.2f} | 🔵加碼:{t['addon_price']:.2f} | 🔴TP1:{t['tp1_price']:.2f} | 🛑停損:{t['sl_price']:.2f}")
+        lines.append("")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("💡 操盤指引：請留意布林下軌支撐強度，反彈觸及中軌先分批獲利！")
+
+    message = "\n".join(lines)
+    print(f"\n[⚡] 發送布林超跌多檔合併戰訊卡 (共 {len(alerts)} 檔標的，僅消耗 1 則訊息額度！)")
+    send_to_line(message, strategy="01")
+
 def scan_once(targets, notified_events, force_test=False):
-    """執行一次全體標的盤中到價掃描"""
-    now_str = datetime.datetime.now().strftime('%H:%M:%S')
+    """執行一次全體標的盤中到價掃描 (支援多檔合併發送)"""
+    now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
     print(f"\n[*] [{now_str}] 正在檢查 {len(targets)} 檔布林超跌標的盤中到價情況...")
 
     codes = list(targets.keys())
     rt_quotes = fetch_realtime_quotes(codes)
+    triggered_alerts = []
 
     for code, target in targets.items():
         rt = rt_quotes.get(code)
@@ -272,56 +320,72 @@ def scan_once(targets, notified_events, force_test=False):
         # 1. 停損警戒判定 (優先級最高: 現價 <= 停損價)
         if price <= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
             events_for_code.add('STOP_LOSS')
-            send_intraday_price_alert(
-                target, rt, 'STOP_LOSS', '🛑 跌破下軌防線 - 停損離場警報',
-                '股價已跌破布林下軌-5%風控底線！破線無支撐，請嚴守紀律立即執行停損離場保護本金！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'STOP_LOSS',
+                'event_title': '🛑 跌破下軌防線 - 停損離場警報',
+                'event_desc': '股價已跌破布林下軌-5%風控底線！破線無支撐，請嚴守紀律立即執行停損離場保護本金！'
+            })
             continue
 
         # 2. 停利 TP2 判定 (現價 >= 布林上軌 TP2)
         if price >= target['tp2_price'] and 'TP2' not in events_for_code:
             events_for_code.add('TP2')
-            send_intraday_price_alert(
-                target, rt, 'TP2', '🔴 達成第二停利目標 TP2 (布林上軌)',
-                '股價已強勢攻抵布林上軌壓力區！反彈波段滿足，建議再獲利了結剩餘部位，落袋為安！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TP2',
+                'event_title': '🔴 達成第二停利目標 TP2 (布林上軌)',
+                'event_desc': '股價已強勢攻抵布林上軌壓力區！反彈波段滿足，建議再獲利了結剩餘部位，落袋為安！'
+            })
             continue
 
         # 3. 停利 TP1 判定 (現價 >= 布林中軌 TP1)
         if price >= target['tp1_price'] and 'TP1' not in events_for_code:
             events_for_code.add('TP1')
-            send_intraday_price_alert(
-                target, rt, 'TP1', '🔴 達成第一停利目標 TP1 (布林中軌)',
-                '股價已反彈觸及 20MA 布林中軌！短線目標滿足，建議先分批獲利了結 1/3 至 1/2 部位！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TP1',
+                'event_title': '🔴 達成第一停利目標 TP1 (布林中軌)',
+                'event_desc': '股價已反彈觸及 20MA 布林中軌！短線目標滿足，建議先分批獲利了結 1/3 至 1/2 部位！'
+            })
             continue
 
         # 4. 突破加碼判定 (現價 >= 加碼價位)
         if price >= target['addon_price'] and 'ADDON' not in events_for_code:
             events_for_code.add('ADDON')
-            send_intraday_price_alert(
-                target, rt, 'ADDON', '🔵 突破關鍵高點 - 右側加碼點',
-                '現價已突破關鍵高點，轉折反彈動能確認！可依操盤計畫加碼乘勝追擊！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'ADDON',
+                'event_title': '🔵 突破關鍵高點 - 右側加碼點',
+                'event_desc': '現價已突破關鍵高點，轉折反彈動能確認！可依操盤計畫加碼乘勝追擊！'
+            })
             continue
 
         # 5. 進場觸底判定 (現價落入進場價位區間)
         if (target['sl_price'] < price <= target['entry_price'] * 1.015) and 'ENTRY' not in events_for_code:
             events_for_code.add('ENTRY')
-            send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 觸底轉折區 - 進場買點觸發',
-                '現價回測布林下軌支撐區，法人逆勢買超籌碼護盤，可依計畫分批試單進場建倉！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'ENTRY',
+                'event_title': '🟢 觸底轉折區 - 進場買點觸發',
+                'event_desc': '現價回測布林下軌支撐區，法人逆勢買超籌碼護盤，可依計畫分批試單進場建倉！'
+            })
             continue
 
         # 測試推播
         if force_test and 'TEST' not in events_for_code:
             events_for_code.add('TEST')
-            send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 測試推播：布林超跌到價快訊',
-                '【盤中雷達連線測試】系統即時監控中，到達四大價位將即時推播！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TEST',
+                'event_title': '🟢 測試推播：布林超跌到價快訊',
+                'event_desc': '【盤中雷達連線測試】系統即時監控中，到達四大價位將即時推播！'
+            })
             break
+
+    # 派發推播：單檔發送詳細卡，多檔發送合併戰訊卡
+    if not triggered_alerts:
+        return
+
+    if len(triggered_alerts) == 1 or force_test:
+        a = triggered_alerts[0]
+        send_intraday_price_alert(a['target'], a['rt'], a['event_code'], a['event_title'], a['event_desc'])
+    else:
+        send_aggregated_price_alerts(triggered_alerts)
 
 def run_intraday_scanner(interval=60, once=False, force_test=False):
     """盤中雷達常駐主迴圈"""

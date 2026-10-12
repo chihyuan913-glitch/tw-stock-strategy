@@ -82,13 +82,60 @@ def resolve_target_id(strategy: str = None, target_id: str = None, env: dict = N
     default_id = os.environ.get("LINE_USER_ID") or env.get("LINE_USER_ID")
     return default_id, "預設個人聊天視窗 (LINE_USER_ID)"
 
-def send_line_messaging_api(token: str, to_id: str, message: str, target_label: str = "") -> bool:
-    """使用 LINE Messaging API (Push Message) 發送訊息至指定對話或群組"""
-    url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
+def resolve_tokens(strategy: str = None, env: dict = None) -> list:
+    """取得優先嘗試的 Token 清單 (專屬 Token -> 主 Token -> 備援 Token)"""
+    tokens = []
+    if env is None:
+        env = load_env()
+
+    if strategy:
+        strat_key = str(strategy).strip()
+        strat_num = f"0{strat_key}" if strat_key.isdigit() and len(strat_key) == 1 else strat_key[:2]
+        st = os.environ.get(f"LINE_CHANNEL_ACCESS_TOKEN_{strat_num}") or env.get(f"LINE_CHANNEL_ACCESS_TOKEN_{strat_num}")
+        if st and st.strip():
+            tokens.append(st.strip())
+
+    main_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or env.get("LINE_CHANNEL_ACCESS_TOKEN")
+    if main_token and main_token.strip() and main_token.strip() not in tokens:
+        tokens.append(main_token.strip())
+
+    backup_candidates = [
+        "LINE_CHANNEL_ACCESS_TOKEN_BACKUP",
+        "LINE_CHANNEL_ACCESS_TOKEN_02",
+        "LINE_CHANNEL_ACCESS_TOKEN_01",
+    ]
+    for bc in backup_candidates:
+        bt = os.environ.get(bc) or env.get(bc)
+        if bt and bt.strip() and bt.strip() not in tokens:
+            tokens.append(bt.strip())
+
+    return tokens
+
+def send_telegram(token: str, chat_id: str, message: str) -> bool:
+    """使用 Telegram Bot API 發送即時戰報 (100% 永久免費・無每月則數上限)"""
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "disable_web_page_preview": True
     }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            if resp.status == 200:
+                print(f"[✓] Telegram 備援推播發送成功！目標頻道: {chat_id}")
+                return True
+    except Exception as e:
+        print(f"[!] Telegram 發送失敗: {e}")
+    return False
+
+def send_line_messaging_api(tokens: list, to_id: str, message: str, target_label: str = "") -> bool:
+    """使用 LINE Messaging API 發送訊息，內建 429 額度超額自動切換備援 Token 機制"""
+    if isinstance(tokens, str):
+        tokens = [tokens]
+
+    url = "https://api.line.me/v2/bot/message/push"
     payload = {
         "to": to_id,
         "messages": [
@@ -99,24 +146,41 @@ def send_line_messaging_api(token: str, to_id: str, message: str, target_label: 
         ]
     }
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status == 200:
-                masked_id = f"{to_id[:5]}...{to_id[-4:]}" if len(to_id) > 10 else to_id
-                label_info = f" [{target_label}]" if target_label else ""
-                print(f"[✓] LINE Messaging API 推播發送成功！目標: {masked_id}{label_info}")
-                return True
+
+    for idx, token in enumerate(tokens):
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status == 200:
+                    masked_id = f"{to_id[:5]}...{to_id[-4:]}" if len(to_id) > 10 else to_id
+                    label_info = f" [{target_label}]" if target_label else ""
+                    token_info = f" (Token #{idx+1})" if len(tokens) > 1 else ""
+                    print(f"[✓] LINE Messaging API 推播發送成功！目標: {masked_id}{label_info}{token_info}")
+                    return True
+                else:
+                    print(f"[!] LINE 推播失敗，狀態碼: {resp.status}")
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='ignore')
+            if e.code == 429:
+                print(f"[⚠️] LINE Token #{idx+1} 本月免費額度已達上限 (429: reached monthly limit)")
+                if idx + 1 < len(tokens):
+                    print(f"[⚡] 正在無縫切換至備援 Token #{idx+2} 重試發送...")
+                    continue
+                else:
+                    print(f"[X] 所有可用的 LINE Token 本月額度皆已耗盡！")
+                    return False
             else:
-                print(f"[!] LINE 推播失敗，狀態碼: {resp.status}")
+                print(f"[X] LINE Messaging API HTTP 錯誤 {e.code}: {err_body}")
                 return False
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8', errors='ignore')
-        print(f"[X] LINE Messaging API HTTP 錯誤 {e.code}: {err_body}")
-        return False
-    except Exception as e:
-        print(f"[X] 發送 LINE 訊息異常: {e}")
-        return False
+        except Exception as e:
+            print(f"[X] 發送 LINE 訊息異常: {e}")
+            return False
+
+    return False
 
 def send_line_notify(token: str, message: str) -> bool:
     """使用 LINE Notify 發送 (相容舊版或第三方轉接服務)"""
@@ -139,17 +203,24 @@ def send_line_notify(token: str, message: str) -> bool:
 
 def send_to_line(message: str, strategy: str = None, target_id: str = None) -> bool:
     """
-    通用 LINE 發送入口：
-    支援以 strategy 代號 ("01", "02", "03") 定向投遞至獨立 LINE 視窗/群組！
-    未設定專屬目標時自動 fallback 至 LINE_USER_ID。
+    通用即時推播發送入口：
+    1. 支援多策略獨立 LINE 視窗/群組定向投遞 (strategy="01", "02", "03", "04")
+    2. 支援多 Token 自動容錯輪替 (主 Token 額度超額自動切換至備援 Token)
+    3. 支援 Telegram Bot 雙軌平行備援 (永不受限)
     """
     env = load_env()
-    line_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or env.get("LINE_CHANNEL_ACCESS_TOKEN")
+    tokens = resolve_tokens(strategy=strategy, env=env)
     to_id, target_label = resolve_target_id(strategy=strategy, target_id=target_id, env=env)
     notify_token = os.environ.get("LINE_NOTIFY_TOKEN") or env.get("LINE_NOTIFY_TOKEN")
 
-    if line_token and to_id:
-        return send_line_messaging_api(line_token, to_id, message, target_label=target_label)
+    # Telegram 雙軌備援
+    tg_token = os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")
+    tg_chat = os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID")
+    if tg_token and tg_chat:
+        send_telegram(tg_token, tg_chat, message)
+
+    if tokens and to_id:
+        return send_line_messaging_api(tokens, to_id, message, target_label=target_label)
     elif notify_token:
         return send_line_notify(notify_token, message)
     else:

@@ -190,10 +190,61 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
     print(f"\n[!] 觸發盤中到價警報：{code} {name} 事件: {event_title} 現價: {price}")
     send_to_line(message, strategy="04")
 
+def send_aggregated_price_alerts(alerts):
+    """將同週期多檔 CB 伏擊到價事件整合為單一戰訊卡發送，大幅節省 90% LINE 訊息則數並避免洗版"""
+    now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
+
+    categories = {
+        'STOP_LOSS': ('🛑【跌破防守線・停損離場警報】', []),
+        'LIMIT_130': ('⏳【觸及130%空間極限・強制清倉】', []),
+        'TP2': ('🔴【攻抵第二停利 TP2 (前高/頸線)】', []),
+        'TP1': ('🔴【攻抵第一停利 TP1 (轉換價阻力)】', []),
+        'ADDON': ('🔵【帶量突破加碼點・右側追擊】', []),
+        'ENTRY': ('🟢【伏擊進場買點觸發】', []),
+    }
+
+    for a in alerts:
+        ecode = a.get('event_code', 'ENTRY')
+        if ecode in categories:
+            categories[ecode][1].append(a)
+        else:
+            categories['ENTRY'][1].append(a)
+
+    lines = [
+        "🔔【策略 04：可轉債伏擊・盤中多檔到價快訊】",
+        "━━━━━━━━━━━━━━━━━━━━━",
+        f"⏱️ 偵測時間：{now_str} ｜ 本輪共觸發 {len(alerts)} 檔 CB 焦點標的",
+        ""
+    ]
+
+    for ecode, (header, items) in categories.items():
+        if not items:
+            continue
+        lines.append(f"{header} (共 {len(items)} 檔)：")
+        for item in items:
+            t = item['target']
+            rt = item['rt']
+            p = rt['price']
+            chg_sign = "+" if rt.get('change_pct', 0) > 0 else ""
+            chg_str = f" ({chg_sign}{rt.get('change_pct', 0):.2f}%)" if rt.get('change_pct') is not None else ""
+            cb_info = f" [CB:{t.get('cb_name', '')}]" if t.get('cb_name') else ""
+            lines.append(f"  • {t['code']} {t['name']}{cb_info}：現價 {p}{chg_str}")
+            lines.append(f"    ↳ 🟢進場:{t['entry_low']}~{t['entry_high']} | 🔵加碼:{t['addon_price']} | 🔴TP1:{t['tp1_price']} | 🛑停損:{t['sl_price']}")
+        lines.append("")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("💡 操盤指引：請留意可轉債發行前壓盤與閉鎖期解禁時機，嚴守紀律！")
+
+    message = "\n".join(lines)
+    print(f"\n[⚡] 發送可轉債伏擊多檔合併戰訊卡 (共 {len(alerts)} 檔標的，僅消耗 1 則訊息額度！)")
+    send_to_line(message, strategy="04")
+
 def scan_once(targets, notified_events, force_test=False):
-    """執行一次盤中到價掃描"""
-    now_str = datetime.datetime.now().strftime('%H:%M:%S')
+    """執行一次盤中到價掃描 (支援多檔合併發送)"""
+    now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
     print(f"\n[*] [{now_str}] 正在檢查 {len(targets)} 檔 CB 標的即時到價情況...")
+
+    triggered_alerts = []
 
     for code, target in targets.items():
         rt = fetch_realtime_quote(code)
@@ -208,65 +259,82 @@ def scan_once(targets, notified_events, force_test=False):
         # 1. 停損警戒判定 (優先級最高)
         if price <= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
             events_for_code.add('STOP_LOSS')
-            send_intraday_price_alert(
-                target, rt, 'STOP_LOSS', '🛑 跌破防守線 - 停損離場警報',
-                '股價已跌破關鍵停損點！請嚴守紀律立即執行停損離場，保留實力。'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'STOP_LOSS',
+                'event_title': '🛑 跌破防守線 - 停損離場警報',
+                'event_desc': '股價已跌破關鍵停損點！請嚴守紀律立即執行停損離場，保留實力。'
+            })
             continue
 
         # 2. 空間極限 130% 逼轉判定
         if price >= target['target_130'] and 'LIMIT_130' not in events_for_code:
             events_for_code.add('LIMIT_130')
-            send_intraday_price_alert(
-                target, rt, 'LIMIT_130', '⏳ 觸及130%空間極限 - 強制清倉',
-                '股價已達轉換價 130%，公司隨時將啟動強制贖回條款，主力目標已達成，請全數獲利了結！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'LIMIT_130',
+                'event_title': '⏳ 觸及130%空間極限 - 強制清倉',
+                'event_desc': '股價已達轉換價 130%，公司隨時將啟動強制贖回條款，主力目標已達成，請全數獲利了結！'
+            })
             continue
 
         # 3. 停利 TP2 判定
         if price >= target['tp2_price'] and 'TP2' not in events_for_code:
             events_for_code.add('TP2')
-            send_intraday_price_alert(
-                target, rt, 'TP2', '🔴 達成第二停利目標 TP2',
-                '股價已達前波起跌頸線壓力區，建議再獲利了結 1/3，並將剩餘部位停損點上移至成本保本。'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TP2',
+                'event_title': '🔴 達成第二停利目標 TP2',
+                'event_desc': '股價已達前波起跌頸線壓力區，建議再獲利了結 1/3，並將剩餘部位停損點上移至成本保本。'
+            })
             continue
 
         # 4. 停利 TP1 判定
         if price >= target['tp1_price'] and 'TP1' not in events_for_code:
             events_for_code.add('TP1')
-            send_intraday_price_alert(
-                target, rt, 'TP1', '🔴 達成第一停利目標 TP1',
-                '股價已觸碰轉換價格阻力區，短線壓盤反彈目標達成，建議先落袋為安 1/3 至 1/2 部位！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TP1',
+                'event_title': '🔴 達成第一停利目標 TP1',
+                'event_desc': '股價已觸碰轉換價格阻力區，短線壓盤反彈目標達成，建議先落袋為安 1/3 至 1/2 部位！'
+            })
             continue
 
         # 5. 右側突破加碼判定
         if price >= target['addon_price'] and 'ADDON' not in events_for_code:
             events_for_code.add('ADDON')
-            send_intraday_price_alert(
-                target, rt, 'ADDON', '🔵 帶量突破加碼點',
-                '現價已突破定價週高點/5MA阻力，壓盤結束、右側動能展開，可依計畫加碼 70%！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'ADDON',
+                'event_title': '🔵 帶量突破加碼點',
+                'event_desc': '現價已突破定價週高點/5MA阻力，壓盤結束、右側動能展開，可依計畫加碼 70%！'
+            })
             continue
 
         # 6. 左側伏擊進場區間判定
         if target['entry_low'] <= price <= target['entry_high'] and 'ENTRY' not in events_for_code:
             events_for_code.add('ENTRY')
-            send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 伏擊進場買點觸發',
-                '現價已回測至季線/轉換價黃金伏擊區，賣壓竭盡量縮，可依計畫分批試單 30% 建倉！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'ENTRY',
+                'event_title': '🟢 伏擊進場買點觸發',
+                'event_desc': '現價已回測至季線/轉換價黃金伏擊區，賣壓竭盡量縮，可依計畫分批試單 30% 建倉！'
+            })
             continue
 
         # 測試模式：強制推播首選標的
         if force_test and 'TEST' not in events_for_code:
             events_for_code.add('TEST')
-            send_intraday_price_alert(
-                target, rt, 'ENTRY', '🟢 測試推播：伏擊進場買點',
-                '【盤中雷達連線測試】系統即時監控中，到價將即時推播！'
-            )
+            triggered_alerts.append({
+                'target': target, 'rt': rt, 'event_code': 'TEST',
+                'event_title': '🟢 測試推播：伏擊進場買點',
+                'event_desc': '【盤中雷達連線測試】系統即時監控中，到價將即時推播！'
+            })
             break
+
+    # 派發推播：單檔發送詳細卡，多檔發送合併戰訊卡
+    if not triggered_alerts:
+        return
+
+    if len(triggered_alerts) == 1 or force_test:
+        a = triggered_alerts[0]
+        send_intraday_price_alert(a['target'], a['rt'], a['event_code'], a['event_title'], a['event_desc'])
+    else:
+        send_aggregated_price_alerts(triggered_alerts)
 
 def run_intraday_scanner(interval=180, once=False, force_test=False):
     """盤中雷達常駐迴圈"""
