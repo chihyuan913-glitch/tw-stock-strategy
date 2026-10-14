@@ -170,7 +170,7 @@
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-6">
       <div class="flex space-x-2" id="tabButtons">
         <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
-          📊 四大選股策略戰報
+          📊 五大選股策略戰報
         </button>
         <button onclick="switchTab('radar')" id="btn-tab-radar" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
           🎯 個股診斷與盤中雷達
@@ -193,10 +193,10 @@
       </div>
     </div>
 
-    <!-- 視圖 1：四大選股策略戰報 -->
+    <!-- 視圖 1：五大選股策略戰報 -->
     <div id="view-strategies" class="space-y-6">
       <!-- 策略子標籤 -->
-      <div class="flex space-x-2 border-b border-slate-800/60 pb-2">
+      <div class="flex flex-wrap gap-2 border-b border-slate-800/60 pb-2">
         <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700">
           策略 01：布林下軌超跌反轉
         </button>
@@ -209,19 +209,38 @@
         <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
           策略 04：可轉債定價伏擊
         </button>
+        <button onclick="loadStrategyData('05_stock_futures_long')" id="subbtn-05" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 05：個股期法人強勢波段
+        </button>
       </div>
 
-      <!-- 策略表格容器 -->
+      <!-- 策略內容容器 -->
       <div class="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
-        <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex justify-between items-center">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex flex-wrap justify-between items-center gap-3">
           <div>
             <h2 id="currentStrategyTitle" class="text-base font-bold text-white">策略入選清單</h2>
             <p id="currentStrategyDesc" class="text-xs text-slate-400 mt-0.5">即時載入最新選股結果...</p>
           </div>
-          <span id="currentStrategyCount" class="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700">0 檔入選</span>
+          <div class="flex items-center gap-3">
+            <span id="currentStrategyCount" class="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700">0 檔入選</span>
+            <div class="flex items-center p-0.5 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs">
+              <button onclick="toggleStrategyView('cards')" id="stratBtnViewCards" class="px-2.5 py-1 rounded-md font-semibold transition bg-emerald-600 text-white shadow">
+                🔲 卡片模式
+              </button>
+              <button onclick="toggleStrategyView('table')" id="stratBtnViewTable" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-white">
+                📋 表格模式
+              </button>
+            </div>
+          </div>
         </div>
         
-        <div class="overflow-x-auto custom-scrollbar">
+        <!-- 卡片模式容器 (預設) -->
+        <div id="strategyCardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+          <!-- 動態卡片 -->
+        </div>
+
+        <!-- 表格模式容器 -->
+        <div id="strategyTableContainer" class="overflow-x-auto custom-scrollbar hidden">
           <table class="w-full text-left text-xs whitespace-nowrap">
             <thead class="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700">
               <tr id="tableHeadRow">
@@ -501,7 +520,7 @@
           <div class="grid grid-cols-2 gap-3 pt-2">
             <button onclick="triggerAction('run_screener')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-emerald-400 mb-1">🚀 重新全選股</div>
-              <div class="text-xs text-slate-400">立即執行四大策略選股器</div>
+              <div class="text-xs text-slate-400">立即執行五大策略選股器</div>
             </button>
             <button onclick="triggerAction('run_radar')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-cyan-400 mb-1">🚨 盤中到價掃描</div>
@@ -513,7 +532,7 @@
             </button>
             <button onclick="triggerAction('test_line')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-purple-400 mb-1">💬 LINE 連線測試</div>
-              <div class="text-xs text-slate-400">發送四大策略推播測試</div>
+              <div class="text-xs text-slate-400">發送五大策略推播測試</div>
             </button>
           </div>
 
@@ -1405,9 +1424,31 @@
 
     // 載入策略資料
     let currentStrategy = '01_bollinger_reversal';
+    let currentStrategyView = 'cards'; // 'cards' | 'table'
+
+    function toggleStrategyView(mode) {
+      currentStrategyView = mode;
+      const btnCards = document.getElementById('stratBtnViewCards');
+      const btnTable = document.getElementById('stratBtnViewTable');
+      const grid = document.getElementById('strategyCardGrid');
+      const table = document.getElementById('strategyTableContainer');
+      if (!btnCards || !btnTable || !grid || !table) return;
+      if (mode === 'cards') {
+        btnCards.className = "px-2.5 py-1 rounded-md font-semibold transition bg-emerald-600 text-white shadow";
+        btnTable.className = "px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-white";
+        grid.classList.remove('hidden');
+        table.classList.add('hidden');
+      } else {
+        btnTable.className = "px-2.5 py-1 rounded-md font-semibold transition bg-emerald-600 text-white shadow";
+        btnCards.className = "px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-white";
+        grid.classList.add('hidden');
+        table.classList.remove('hidden');
+      }
+    }
+
     async function loadStrategyData(stratId) {
       currentStrategy = stratId;
-      const subbtns = ['01', '02', '03', '04'];
+      const subbtns = ['01', '02', '03', '04', '05'];
       subbtns.forEach(idx => {
         const b = document.getElementById(`subbtn-${idx}`);
         if (!b) return;
@@ -1421,10 +1462,175 @@
       try {
         const resp = await fetch(`/api/strategy/${stratId}`);
         const data = await resp.json();
+        document.getElementById('currentStrategyTitle').innerText = data.name || stratId;
+        document.getElementById('currentStrategyDesc').innerText = data.desc || '';
+        document.getElementById('currentStrategyCount').innerText = `${data.rows ? data.rows.length : 0} 檔入選`;
+        renderStrategyCards(data);
         renderStrategyTable(data);
       } catch (e) {
         console.error("載入策略失敗:", e);
       }
+    }
+
+    // 渲染策略個股字卡矩陣 (預設模式)
+    function renderStrategyCards(data) {
+      const container = document.getElementById('strategyCardGrid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!data.rows || data.rows.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+            <div class="text-4xl">🛡️</div>
+            <div class="text-sm font-bold text-slate-300">目前無符合 4+1 條件之標的</div>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">
+              嚴守 4+1 維度硬性標準與風控紀律，條件未達標時空手觀望，保留實力。
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      data.rows.forEach(r => {
+        const code = String(r['證券代號'] || r['代號'] || r['代碼'] || r['code'] || '').trim();
+        const name = String(r['證券名稱'] || r['名稱'] || r['name'] || code).trim();
+        const price = r['收盤價'] || r['現價'] || r['期貨收盤價'] || r['close'] || '--';
+        const stars = r['星級推薦'] || r['星級'] || r['stars'] || '★★★★☆';
+        const score = r['評分'] || r['score'] || '';
+
+        // 四大防線
+        const entry = r['進場價位'] || r['多單進場'] || r['空單進場'] || r['現貨進場'] || '--';
+        const addon = r['加碼價位'] || r['突破加碼'] || r['加空價位'] || r['現貨加碼'] || '--';
+        const tp1 = r['停利TP1'] || r['現貨TP1'] || '--';
+        const tp2 = r['停利TP2'] || r['現貨TP2'] || '';
+        const sl = r['停損價位'] || r['停損防守'] || r['停損回補'] || r['現貨停損'] || '--';
+
+        // 股期特徵 (策略 03 & 05)
+        const futContract = r['期貨契約'] || '';
+        const futMonth = r['期貨月份'] || '';
+        const futPrice = r['期貨收盤價'] || '';
+        const basis = r['價差(Basis)'] || '';
+        const oi = r['期貨未平倉(OI)'] || '';
+        const margin = r['1口保證金(約)'] || '';
+        const settlement = r['結算倒數'] || '';
+        const nextMonth = r['次月合約'] || '';
+        const nextEntry = r['次月進場參考'] || '';
+
+        // 可轉債特徵 (策略 04)
+        const cbStage = r['進度狀態'] || '';
+
+        // 隔日沖與風控
+        const ogRisk = r['隔日沖風控'] || '';
+        const vol = r['當日成交量(張)'] || r['日成交量(張)'] || r['成交量'] || '';
+        const bias = r['月線正乖離%'] || r['月線乖離%'] || '';
+
+        const card = document.createElement('div');
+        card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-4 relative group flex flex-col justify-between";
+
+        let badgesHtml = '';
+        if (futContract) {
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 font-bold text-[10px] border border-sky-500/30">股期 ${futContract} ${futMonth}</span> `;
+        }
+        if (cbStage) {
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold text-[10px] border border-purple-500/30">${cbStage}</span> `;
+        }
+        if (settlement && settlement.includes('⚠️')) {
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">次月新倉</span> `;
+        }
+
+        let futInfoHtml = '';
+        if (futContract) {
+          futInfoHtml = `
+            <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-[11px] space-y-1">
+              <div class="flex items-center justify-between text-slate-300">
+                <span class="text-slate-400">期現價差 ｜ OI：</span>
+                <span class="font-mono font-bold text-sky-300">${basis || '--'} ｜ ${oi ? Number(oi).toLocaleString() + '口' : '--'}</span>
+              </div>
+              ${margin ? `
+              <div class="flex items-center justify-between text-slate-300">
+                <span class="text-slate-400">1口保證金(表彰2張)：</span>
+                <span class="font-mono font-bold text-emerald-300">約 $${Number(margin).toLocaleString()} 元</span>
+              </div>` : ''}
+              ${settlement ? `
+              <div class="text-[10px] text-amber-400 font-medium">${settlement}</div>` : ''}
+              ${nextMonth && nextEntry ? `
+              <div class="text-[10px] text-sky-400 font-medium">次月 ${nextMonth} 參考進場: ${nextEntry} 元</div>` : ''}
+            </div>
+          `;
+        }
+
+        let riskHtml = '';
+        if (ogRisk && ogRisk.includes('⚠️')) {
+          riskHtml = `<div class="text-[10px] text-rose-400 bg-rose-950/30 border border-rose-500/20 rounded-lg px-2 py-1">${ogRisk}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-lg font-black font-mono text-white">${code}</span>
+                  <span class="text-base font-bold text-slate-100">${name}</span>
+                  ${badgesHtml}
+                </div>
+                <div class="text-[11px] text-slate-400 mt-0.5 font-sans flex items-center gap-1.5 flex-wrap">
+                  <span class="text-amber-400 font-bold">${stars}</span>
+                  ${score ? `<span class="text-slate-400 font-mono">(${score}分)</span>` : ''}
+                  ${bias ? `<span class="text-slate-400">｜ 乖離 ${bias}%</span>` : ''}
+                  ${vol ? `<span class="text-slate-400">｜ 量 ${Number(vol).toLocaleString()}張</span>` : ''}
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-[10px] text-slate-400">${futPrice ? '期貨收盤' : '現價'}</div>
+                <div class="text-xl font-black font-mono text-emerald-400">${futPrice || price}</div>
+                ${futPrice && price ? `<div class="text-[10px] text-slate-400 font-mono">現貨 ${price}</div>` : ''}
+              </div>
+            </div>
+
+            <!-- 四大防線 -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
+                <div class="text-[10px] font-bold text-emerald-400">🟢 建議進場</div>
+                <div class="text-base font-black font-mono text-emerald-400 mt-0.5">${entry}</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-blue-950/20 border border-blue-500/20">
+                <div class="text-[10px] font-bold text-blue-400">🔵 動能加碼</div>
+                <div class="text-base font-black font-mono text-blue-400 mt-0.5">${addon}</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20">
+                <div class="text-[10px] font-bold text-rose-400">🔴 目標停利</div>
+                <div class="text-xs font-black font-mono text-rose-400 mt-1 truncate">TP1 ${tp1} ${tp2 ? '/ ' + tp2 : ''}</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20">
+                <div class="text-[10px] font-bold text-amber-400">🛑 嚴格停損</div>
+                <div class="text-base font-black font-mono text-amber-400 mt-0.5">${sl}</div>
+              </div>
+            </div>
+
+            ${futInfoHtml}
+            ${riskHtml}
+          </div>
+
+          <!-- 操作按鈕 -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs mt-3">
+            <button onclick="jumpToAnalyze('${code}')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold transition flex items-center gap-1">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>診斷個股</span>
+            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="pushDiagnosedToLine('${code}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-teal-300 transition" title="推播診斷字卡至 LINE">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="quickAddFromTable('${code}')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1 shadow" title="掛入盤中雷達">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>掛入雷達</span>
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      lucide.createIcons();
     }
 
     function renderStrategyTable(data) {

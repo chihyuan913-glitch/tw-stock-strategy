@@ -629,12 +629,18 @@ async def get_overview():
         "bias_ma20": 3.41,
         "regime": "🟢【多頭良性主升波段】",
         "trend": "多頭排列",
-        "risk_advice": "均線呈多頭排列，可積極佈局策略 02 法人起漲股與策略 04 可轉債伏擊股。"
+        "risk_advice": "均線呈多頭排列，可積極佈局策略 02 法人起漲股、策略 04 可轉債伏擊股與策略 05 股票期貨強勢波段。"
     }
 
-    # 計算四大策略總入選數
+    # 計算五大策略總入選數
     total_candidates = 0
-    strat_dirs = ["01_bollinger_reversal", "02_institutional_momentum", "03_short_momentum", "04_cb_pricing_ambush"]
+    strat_dirs = [
+        "01_bollinger_reversal",
+        "02_institutional_momentum",
+        "03_short_momentum",
+        "04_cb_pricing_ambush",
+        "05_stock_futures_long"
+    ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
         if csv_file.exists():
@@ -676,6 +682,10 @@ async def get_strategy_data(strat_id: str):
         "04_cb_pricing_ambush": {
             "name": "策略 04：可轉債 (CB) 定價伏擊與區間博弈策略",
             "desc": "捕捉可轉債定價日前後主力壓盤洗盤甜蜜點，伏擊右側拉抬紅利，嚴守3個月閉鎖解禁前清倉死線。"
+        },
+        "05_stock_futures_long": {
+            "name": "策略 05：台股個股期貨法人強勢波段多方策略",
+            "desc": "鎖定期交所 252 檔活躍個股期、外資投信重金吃貨、剛脫離月線起漲之強勢波段股，優先呈現期貨報價與未平倉量 (OI) 深度評估。"
         }
     }
 

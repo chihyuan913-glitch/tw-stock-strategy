@@ -12,7 +12,8 @@
     "sl_price": 54.12,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 22:06:52",
-    "alerted_today": {}
+    "alerted_today": {},
+    "last_rollover": "2026-10-14"
   },
   "2476": {
     "code": "2476",
@@ -43,7 +44,8 @@
     "sl_price": 51.34,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 21:46:59",
-    "alerted_today": {}
+    "alerted_today": {},
+    "last_rollover": "2026-10-14"
   },
   "2603": {
     "code": "2603",
