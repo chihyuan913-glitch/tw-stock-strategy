@@ -71,43 +71,95 @@ def log_debug(msg: str):
     print(formatted, flush=True)
     SERVER_LOGS.append(formatted)
 
-def reply_line_message(reply_token: str, text: str):
-    """呼叫 LINE Messaging API Reply Token 回覆訊息 (免費無上限)"""
+def reply_line_message(reply_token: str, message_payload, target_id: str = None, fallback_text: str = None):
+    """
+    呼叫 LINE Messaging API Reply Token 回覆訊息 (免費無上限)
+    支援：純文字 (str) 或 旗艦 Flex Message 卡片 (dict)
+    具備雙軌防呆：若 Reply Token 逾時或出錯，且具備 target_id，自動無縫退回 Push API 確保 100% 送達。
+    """
     if not CHANNEL_ACCESS_TOKEN:
         log_debug("[!] 錯誤：未設定 LINE_CHANNEL_ACCESS_TOKEN 環境變數")
         return
-    if not reply_token:
-        log_debug("[!] 警告：reply_token 為空，無法回覆")
+    if not reply_token and not target_id:
+        log_debug("[!] 警告：reply_token 與 target_id 皆為空，無法回覆")
         return
 
-    url = "https://api.line.me/v2/bot/message/reply"
+    # 組裝 messages 陣列
+    if isinstance(message_payload, dict):
+        if message_payload.get("type") == "flex":
+            messages = [message_payload]
+        elif message_payload.get("type") == "bubble":
+            messages = [{
+                "type": "flex",
+                "altText": "📊 個股量化診斷戰報",
+                "contents": message_payload
+            }]
+        else:
+            messages = [message_payload]
+    else:
+        messages = [{"type": "text", "text": str(message_payload)}]
+
+    reply_url = "https://api.line.me/v2/bot/message/reply"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
     }
-    payload = {
-        "replyToken": reply_token,
-        "messages": [
-            {
-                "type": "text",
-                "text": text
+
+    # 1. 優先嘗試 Reply API
+    reply_succeeded = False
+    if reply_token:
+        try:
+            payload = {
+                "replyToken": reply_token,
+                "messages": messages
             }
-        ]
-    }
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
-            headers=headers,
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            log_debug(f"[✓] 成功回覆 LINE 訊息 (狀態碼: {resp.status})")
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8', errors='ignore')
-        log_debug(f"[!] LINE Reply 失敗 (HTTP {e.code}): {err_body}")
-    except Exception as e:
-        log_debug(f"[!] 回覆 LINE 訊息例外: {e}")
+            req = urllib.request.Request(
+                reply_url,
+                data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                log_debug(f"[✓] 成功回覆 LINE 訊息 (狀態碼: {resp.status})")
+                reply_succeeded = True
+                return
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='ignore')
+            log_debug(f"[!] LINE Reply 失敗 (HTTP {e.code}): {err_body}")
+            # 若為 Flex 訊息失敗且有備援純文字，嘗試發送純文字 Reply
+            if fallback_text:
+                try:
+                    alt_payload = {"replyToken": reply_token, "messages": [{"type": "text", "text": fallback_text}]}
+                    req = urllib.request.Request(reply_url, data=json.dumps(alt_payload, ensure_ascii=False).encode('utf-8'), headers=headers, method="POST")
+                    with urllib.request.urlopen(req, timeout=6) as resp:
+                        log_debug(f"[✓] 備援純文字 Reply 成功 (狀態碼: {resp.status})")
+                        reply_succeeded = True
+                        return
+                except Exception:
+                    pass
+        except Exception as e:
+            log_debug(f"[!] 回覆 LINE 訊息例外: {e}")
+
+    # 2. 若 Reply 失敗或 Reply Token 過期，但有 target_id，自動無縫退回 Push API
+    if not reply_succeeded and target_id:
+        log_debug(f"[*] 嘗試透過 Push API 發送訊息至目標視窗 [{target_id[:8]}...]...")
+        push_url = "https://api.line.me/v2/bot/message/push"
+        try:
+            push_payload = {
+                "to": target_id,
+                "messages": messages
+            }
+            req = urllib.request.Request(
+                push_url,
+                data=json.dumps(push_payload, ensure_ascii=False).encode('utf-8'),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                log_debug(f"[✓] 成功透過 Push API 發送至目標視窗 (狀態碼: {resp.status})")
+        except Exception as e:
+            log_debug(f"[!] Push API 發送失敗: {e}")
+
 
 def process_event_task(event: dict):
     """背景處理 LINE 訊息事件並進行即時個股分析"""
@@ -163,12 +215,13 @@ def process_event_task(event: dict):
     # 統一文字去空白並轉小寫做意圖比對
     u_norm = user_text.replace(" ", "").lower()
 
-    # 0. 設定獨立雷達視窗指令 (繁簡體與意圖全面涵蓋)
+    # 0. 設定獨立雷達視窗指令 (繁簡體與意圖精準比對，避免普通問答被誤判)
     is_bind_cmd = (
         u_norm in {'設定雷達視窗', '設為雷達視窗', '綁定雷達', '雷達視窗', 
                    '设定雷达视窗', '设为雷达视窗', '绑定雷达', '雷达视窗', 'bindradar'} or
-        ('雷達' in user_text and any(k in user_text for k in ('綁定', '設定', '視窗', '群組'))) or
-        ('雷达' in user_text and any(k in user_text for k in ('绑定', '设定', '视窗', '群组')))
+        (u_norm.startswith('綁定雷達') or u_norm.startswith('設定雷達') or 
+         u_norm.startswith('绑定雷达') or u_norm.startswith('设定雷达') or
+         u_norm == '設定為雷達視窗' or u_norm == '设定为雷达视窗')
     )
 
     if is_bind_cmd:
@@ -188,7 +241,7 @@ def process_event_task(event: dict):
 •「監控 矽光子」熱門概念股一鍵打包
 •「監控清單」查看目前盯盤標的與防線
 •「雷達測試」發送模擬到價警報卡片驗證"""
-            reply_line_message(reply_token, msg)
+            reply_line_message(reply_token, msg, target_id=target_dest)
             return
         else:
             msg = """💡【如何新設雷達獨立專屬視窗？】
@@ -200,79 +253,85 @@ def process_event_task(event: dict):
 3. 在該群組內發送一句「設定雷達視窗」或「綁定雷達」。
 
 系統即會將該新群組綁定為專屬雷達視窗！所有盤中到價推播只會在該群組發出，絕不干擾個人聊天室！"""
-            reply_line_message(reply_token, msg)
+            reply_line_message(reply_token, msg, target_id=target_dest)
             return
 
     # 測試推播 (繁簡相容)
     if u_norm in ('雷達測試', '測試推播', '雷达测试', '测试推送', '測試雷達', '测试雷达', 'testpush', 'test'):
         res = generate_test_alert(CHANNEL_ACCESS_TOKEN, target_dest)
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 查詢雷達狀態 (繁簡相容)
     if u_norm in ('雷達狀態', '監控狀態', '雷达状态', '监控状态', '系統狀態', '系统状态', 'status'):
         res = get_radar_status()
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 重置今日警報 (繁簡相容)
     if u_norm in ('重置警報', '重置警报', '重設警報', '重设警报', 'resetalerts', 'reset'):
         res = reset_today_alerts()
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 解除綁定指令 (繁簡相容)
     if u_norm in ('解除雷達視窗', '解綁雷達', '解除雷达视窗', '解绑雷达', 'unbind'):
         clear_radar_channel()
-        reply_line_message(reply_token, "🗑️ 已解除雷達專屬視窗綁定，到價警報將恢復預設發送。")
+        reply_line_message(reply_token, "🗑️ 已解除雷達專屬視窗綁定，到價警報將恢復預設發送。", target_id=target_dest)
         return
 
     # 方案二：全自動連動每日選股戰報 (繁簡相容)
     if u_norm in ('同步選股', '同步策略', '同步日報', '同步戰報', '同步选股', '同步策略', '同步日报', '同步战报', 'sync'):
         res = sync_screener_to_radar(target_id=target_dest)
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 方案四：查詢熱門題材清單 (繁簡相容)
     if u_norm in ('族群清單', '題材清單', '概念股清單', '熱門題材', '族群清单', '题材清单', '概念股清单', '热门题材', 'themes'):
         res = get_themes_summary()
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 清空所有監控 (繁簡相容)
     if u_norm in ('清空監控', '全部清空', '全部刪除', '清空监控', '全部删除', 'clear'):
         res = clear_all_radar()
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 查詢監控清單 (繁簡相容)
     if u_norm in ('監控清單', '清單', '查監控', '雷達清單', '监控清单', '清单', '查监控', '雷达清单', 'watchlist'):
         res = get_radar_summary()
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 方案一、三、四：掛入監控 (支援多檔批次貼上、題材打包、單檔，繁簡體與 + 號)
     if re.match(r'^(監控|加入|追蹤|盯盤|监控|追踪|盯盘|\+)\s*', user_text) or any(k in user_text for k in ('加入監控', '加入监控', '掛入雷達', '挂入雷达')):
         clean_target = re.sub(r'^(監控|加入|追蹤|盯盤|监控|追踪|盯盘|\+)\s*', '', user_text)
         res = batch_add_to_radar(clean_target, target_id=target_dest)
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
     # 移除監控指令 (繁簡相容)
     if re.match(r'^(刪除|取消|移除|删除|\-)\s*', user_text) or any(k in user_text for k in ('取消監控', '取消监控', '移除監控', '移除监控')):
         clean_target = re.sub(r'^(刪除|取消|移除|删除|\-)\s*', '', user_text)
         res = remove_stock_from_radar(clean_target)
-        reply_line_message(reply_token, res)
+        reply_line_message(reply_token, res, target_id=target_dest)
         return
 
-    # 一般即時個股查詢 (支援代碼或中文名稱)
-    from stock_analyzer import resolve_stock_input
+    # 一般即時個股查詢 (支援代碼或中文名稱，以旗艦視覺化 Flex 卡片呈現)
+    from stock_analyzer import resolve_stock_input, get_stock_analysis_data
+    from line_sender import build_stock_diagnosis_card, format_clean_stock_diagnosis_text
     stock_code, stock_name = resolve_stock_input(user_text)
     if stock_code:
-        log_debug(f"[*] 正在分析標的 【{stock_code} {stock_name}】...")
-        analysis_result = analyze_stock(user_text)
-        analysis_result += f"\n💡 盤中盯盤：輸入「監控 {stock_code}」即刻掛入雷達，到價自動推播！"
-        reply_line_message(reply_token, analysis_result)
+        log_debug(f"[*] 正在分析標的 【{stock_code} {stock_name}】並建構視覺化卡片...")
+        data = get_stock_analysis_data(user_text)
+        if data.get("success"):
+            flex_card = build_stock_diagnosis_card(data)
+            clean_text = format_clean_stock_diagnosis_text(data)
+            reply_line_message(reply_token, flex_card, target_id=target_dest, fallback_text=clean_text)
+        else:
+            err_msg = data.get("error", f"⚠️ 查無股票代碼 【{stock_code}】 之歷史交易數據。")
+            reply_line_message(reply_token, err_msg, target_id=target_dest)
         return
 
     # 若非指令或股名，回覆友善使用說明
@@ -664,13 +723,52 @@ async def get_weekly_report():
 
 @app.post("/api/analyze")
 async def analyze_endpoint(request: Request):
-    """個股即時操盤指引診斷 API"""
+    """個股即時操盤指引診斷 API (同時回傳結構化卡片數據 data 與純文字 result)"""
     body = await request.json()
     query = body.get("query", "").strip()
     if not query:
-        return {"result": "請輸入有效之台股代碼或股票名稱。"}
-    res = analyze_stock(query)
-    return {"result": res}
+        return {"success": False, "result": "請輸入有效之台股代碼或股票名稱。"}
+    from stock_analyzer import get_stock_analysis_data, analyze_stock
+    data = get_stock_analysis_data(query)
+    if data.get("success"):
+        return {
+            "success": True,
+            "data": data,
+            "result": analyze_stock(query)
+        }
+    else:
+        err = data.get("error", "分析失敗，查無資料。")
+        return {
+            "success": False,
+            "error": err,
+            "result": err
+        }
+
+
+@app.post("/api/radar/push_stock_to_line")
+async def push_stock_to_line_endpoint(request: Request):
+    """將指定個股之診斷字卡推播至 LINE 視窗"""
+    body = await request.json()
+    query = body.get("code") or body.get("query", "")
+    if not query:
+        return {"success": False, "message": "請指定股票代碼或名稱"}
+    from stock_analyzer import get_stock_analysis_data
+    from line_sender import build_stock_diagnosis_card, format_clean_stock_diagnosis_text, send_to_line
+    from radar_manager import get_radar_channel
+
+    data = get_stock_analysis_data(query)
+    if not data.get("success"):
+        return {"success": False, "message": data.get("error", "分析失敗")}
+
+    card = build_stock_diagnosis_card(data)
+    target = get_radar_channel() or os.environ.get("LINE_USER_ID", "")
+    success = send_to_line(card, target_id=target)
+    if not success:
+        clean_text = format_clean_stock_diagnosis_text(data)
+        success = send_to_line(clean_text, target_id=target)
+
+    return {"success": success, "message": f"已成功推播【{data['code']} {data['name']}】診斷字卡至 LINE 視窗！" if success else "推播失敗，請檢查 LINE Token。"}
+
 
 @app.get("/api/radar/watchlist")
 async def get_radar_watchlist_endpoint():

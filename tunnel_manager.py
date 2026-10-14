@@ -74,7 +74,9 @@ def sync_line_webhook(public_url: str) -> dict:
     解決手動複製貼上網址之痛點，達成啟動即全自動秒級對接。
     """
     import urllib.request
+    import urllib.error
     import json
+    import time
 
     token = ""
     env_file = ROOT_DIR / ".env"
@@ -228,8 +230,9 @@ def _monitor_tunnel(port: int, notify_line: bool = True):
                 print("=" * 70 + "\n", flush=True)
 
                 _write_shortcut(_tunnel_url)
-                # 自動對接與更新 LINE 官方帳號 Webhook 端點
+                # 自動對接與更新 LINE 官方帳號 Webhook 端點 (給予 Cloudflare 2 秒 DNS 傳播時間)
                 try:
+                    time.sleep(2.0)
                     sync_line_webhook(_tunnel_url)
                 except Exception as _e:
                     print(f"[!] 自動同步 LINE Webhook 例外: {_e}")

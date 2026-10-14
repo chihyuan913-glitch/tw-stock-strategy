@@ -1354,6 +1354,306 @@ def format_screener_markdown_cards(
     return "\n".join(md_lines)
 
 
+def build_stock_diagnosis_card(data: dict) -> dict:
+    """建構單檔個股即時量化診斷旗艦 Flex Message 卡片 (高對比大字體、零引線、四大防線一目了然)"""
+    code = str(data.get('code', ''))
+    name = str(data.get('name', ''))
+    current_price = float(data.get('current_price', 0.0))
+    chg_val = float(data.get('chg_val', 0.0))
+    chg_pct = float(data.get('chg_pct', 0.0))
+    chg_icon = str(data.get('chg_icon', '🔺' if chg_val > 0 else ('🔻' if chg_val < 0 else '▫️')))
+    stars = str(data.get('stars', '★★★★☆'))
+    int_score = data.get('int_score', 4)
+    eval_badge = str(data.get('eval_badge', '🟢【偏多優質・進場高勝率】'))
+    time_str = str(data.get('time', '即時報價'))
+
+    entry_price = float(data.get('entry_price', current_price))
+    addon_price = float(data.get('addon_price', current_price * 1.02))
+    tp1_price = float(data.get('tp1_price', current_price * 1.07))
+    tp2_price = float(data.get('tp2_price', current_price * 1.15))
+    stop_loss = float(data.get('stop_loss', current_price * 0.95))
+
+    vol_sheets = data.get('vol_sheets', 0)
+    vol_status = str(data.get('vol_status', '常態量能'))
+    ma5 = float(data.get('ma5', current_price))
+    ma20 = float(data.get('ma20', current_price))
+    bias20 = float(data.get('bias20', 0.0))
+    reward = float(data.get('reward', max(tp1_price - entry_price, 0.0)))
+    risk = float(data.get('risk', max(entry_price - stop_loss, 0.1)))
+    rr_ratio = float(data.get('rr_ratio', 2.0))
+
+    playbook_empty = str(data.get('playbook_empty', f'位階安全未追高，【{entry_price:.2f} 元以下】皆為合適建倉點。'))
+    playbook_hold = str(data.get('playbook_hold', f'持股者以【{stop_loss:.2f} 元】嚴守防守線；放量過【{addon_price:.2f} 元】可順勢加碼。'))
+
+    price_color = "#EF4444" if chg_val > 0 else ("#22C55E" if chg_val < 0 else "#94A3B8")
+
+    bubble = {
+        "type": "bubble",
+        "size": "giga",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "16px",
+            "backgroundColor": "#0F172A",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "alignItems": "center",
+                    "contents": [
+                        {"type": "text", "text": "🔍 個股即時量化診斷", "size": "xs", "color": "#38BDF8", "weight": "bold", "flex": 0},
+                        {"type": "text", "text": f"報價時間: {time_str}", "size": "xxs", "color": "#94A3B8", "align": "end"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "margin": "md",
+                    "alignItems": "center",
+                    "contents": [
+                        {"type": "text", "text": f"{code} {name}", "size": "xxl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
+                        {"type": "text", "text": f"{stars} ({int_score}星)", "size": "xs", "color": "#FBBF24", "align": "end"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "margin": "sm",
+                    "alignItems": "baseline",
+                    "contents": [
+                        {"type": "text", "text": "現價", "size": "sm", "color": "#94A3B8", "flex": 0},
+                        {"type": "text", "text": f" {current_price:.2f}", "size": "3xl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
+                        {"type": "text", "text": f"  {chg_icon} {chg_val:+.2f} ({chg_pct:+.2f}%)", "size": "sm", "weight": "bold", "color": price_color, "margin": "md"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "margin": "sm",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "backgroundColor": "#1E293B",
+                            "cornerRadius": "6px",
+                            "paddingStart": "8px",
+                            "paddingEnd": "8px",
+                            "paddingTop": "4px",
+                            "paddingBottom": "4px",
+                            "contents": [
+                                {"type": "text", "text": eval_badge, "size": "xs", "color": "#38BDF8", "weight": "bold"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "16px",
+            "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "🎯 操盤四大防線價位 (標準指引)", "size": "sm", "weight": "bold", "color": "#334155"},
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "md",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "backgroundColor": "#F0FDF4",
+                            "borderColor": "#86EFAC",
+                            "borderWidth": "1px",
+                            "cornerRadius": "8px",
+                            "paddingAll": "10px",
+                            "contents": [
+                                {"type": "text", "text": "🟢 建議進場", "size": "xs", "color": "#166534", "weight": "bold"},
+                                {"type": "text", "text": f"{entry_price:.2f}", "size": "xl", "weight": "bold", "color": "#15803D", "margin": "xs"},
+                                {"type": "text", "text": "買進上限 / 防追高", "size": "xxs", "color": "#16A34A", "margin": "xs"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "backgroundColor": "#EFF6FF",
+                            "borderColor": "#93C5FD",
+                            "borderWidth": "1px",
+                            "cornerRadius": "8px",
+                            "paddingAll": "10px",
+                            "contents": [
+                                {"type": "text", "text": "🔵 動能加碼", "size": "xs", "color": "#1E40AF", "weight": "bold"},
+                                {"type": "text", "text": f"{addon_price:.2f}", "size": "xl", "weight": "bold", "color": "#1D4ED8", "margin": "xs"},
+                                {"type": "text", "text": "放量過高右側確認", "size": "xxs", "color": "#2563EB", "margin": "xs"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "md",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "backgroundColor": "#FEF2F2",
+                            "borderColor": "#FCA5A5",
+                            "borderWidth": "1px",
+                            "cornerRadius": "8px",
+                            "paddingAll": "10px",
+                            "contents": [
+                                {"type": "text", "text": "🔴 目標停利", "size": "xs", "color": "#991B1B", "weight": "bold"},
+                                {"type": "text", "text": f"TP1 {tp1_price:.2f} / TP2 {tp2_price:.2f}", "size": "sm", "weight": "bold", "color": "#DC2626", "margin": "xs"},
+                                {"type": "text", "text": "前高反壓 / 1:1滿足", "size": "xxs", "color": "#DC2626", "margin": "xs"}
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "backgroundColor": "#FFF1F2",
+                            "borderColor": "#FDA4AF",
+                            "borderWidth": "1px",
+                            "cornerRadius": "8px",
+                            "paddingAll": "10px",
+                            "contents": [
+                                {"type": "text", "text": "🛑 嚴格停損", "size": "xs", "color": "#881337", "weight": "bold"},
+                                {"type": "text", "text": f"{stop_loss:.2f}", "size": "xl", "weight": "bold", "color": "#BE123C", "margin": "xs"},
+                                {"type": "text", "text": "跌破防守無條件退", "size": "xxs", "color": "#E11D48", "margin": "xs"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#F8FAFC",
+                    "cornerRadius": "8px",
+                    "paddingAll": "10px",
+                    "contents": [
+                        {"type": "text", "text": "⚖️ 量能與風控指標", "size": "xs", "weight": "bold", "color": "#475569"},
+                        {"type": "text", "text": f"• 成交量能：{vol_sheets:,} 張 ({vol_status})" if isinstance(vol_sheets, (int, float)) else f"• 成交量能：{vol_sheets} ({vol_status})", "size": "xxs", "color": "#64748B", "margin": "xs"},
+                        {"type": "text", "text": f"• 均線乖離：5MA {ma5:.2f} ｜ 20MA {ma20:.2f} (月線乖離 {bias20:+.1f}%)", "size": "xxs", "color": "#64748B", "margin": "xs"},
+                        {"type": "text", "text": f"• 盈虧試算：獲利 +{reward:.2f} ｜ 風險 -{risk:.2f} ｜ 盈虧比 {rr_ratio:.1f}:1", "size": "xxs", "color": "#64748B", "margin": "xs"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#F1F5F9",
+                    "cornerRadius": "8px",
+                    "paddingAll": "10px",
+                    "contents": [
+                        {"type": "text", "text": "💡 雙向操盤錦囊", "size": "xs", "weight": "bold", "color": "#334155"},
+                        {"type": "text", "text": f"【空手者】{playbook_empty}", "size": "xxs", "color": "#475569", "wrap": True, "margin": "xs"},
+                        {"type": "text", "text": f"【持股者】{playbook_hold}", "size": "xxs", "color": "#475569", "wrap": True, "margin": "xs"}
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "paddingAll": "12px",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#10B981",
+                    "height": "sm",
+                    "action": {
+                        "type": "message",
+                        "label": "➕ 掛入盤中雷達",
+                        "text": f"監控 {code}"
+                    }
+                },
+                {
+                    "type": "button",
+                    "style": "secondary",
+                    "height": "sm",
+                    "action": {
+                        "type": "message",
+                        "label": "🤖 同步選股",
+                        "text": "同步選股"
+                    }
+                }
+            ]
+        }
+    }
+
+    return {
+        "type": "flex",
+        "altText": f"📊【{code} {name}】個股量化診斷戰報",
+        "contents": bubble
+    }
+
+
+def format_clean_stock_diagnosis_text(data: dict) -> str:
+    """產出零引線、高對比的個股診斷純文字字卡 (備援與窄螢幕無縫適應)"""
+    code = str(data.get('code', ''))
+    name = str(data.get('name', ''))
+    current_price = float(data.get('current_price', 0.0))
+    chg_val = float(data.get('chg_val', 0.0))
+    chg_pct = float(data.get('chg_pct', 0.0))
+    chg_icon = str(data.get('chg_icon', '🔺' if chg_val > 0 else ('🔻' if chg_val < 0 else '▫️')))
+    stars = str(data.get('stars', '★★★★☆'))
+    int_score = data.get('int_score', 4)
+    eval_badge = str(data.get('eval_badge', '🟢【偏多優質・進場高勝率】'))
+    time_str = str(data.get('time', '即時報價'))
+
+    entry_price = float(data.get('entry_price', current_price))
+    addon_price = float(data.get('addon_price', current_price * 1.02))
+    tp1_price = float(data.get('tp1_price', current_price * 1.07))
+    tp2_price = float(data.get('tp2_price', current_price * 1.15))
+    stop_loss = float(data.get('stop_loss', current_price * 0.95))
+
+    vol_sheets = data.get('vol_sheets', 0)
+    vol_status = str(data.get('vol_status', '常態量能'))
+    ma5 = float(data.get('ma5', current_price))
+    ma20 = float(data.get('ma20', current_price))
+    bias20 = float(data.get('bias20', 0.0))
+    reward = float(data.get('reward', max(tp1_price - entry_price, 0.0)))
+    risk = float(data.get('risk', max(entry_price - stop_loss, 0.1)))
+    rr_ratio = float(data.get('rr_ratio', 2.0))
+
+    playbook_empty = str(data.get('playbook_empty', f'位階安全未追高，【{entry_price:.2f} 元以下】皆為合適建倉點。'))
+    playbook_hold = str(data.get('playbook_hold', f'持股者以【{stop_loss:.2f} 元】嚴守防守線；放量過【{addon_price:.2f} 元】可順勢加碼。'))
+
+    vol_str = f"{vol_sheets:,} 張" if isinstance(vol_sheets, (int, float)) else str(vol_sheets)
+
+    lines = [
+        f"🏷️ 診斷標的：{code} {name}",
+        f"💵 最新現價：{current_price:.2f} 元 ({chg_icon} {chg_val:+.2f} / {chg_pct:+.2f}%)",
+        f"⭐ 量化評等：{stars} ({int_score}星) {eval_badge}",
+        f"⏰ 報價時間：{time_str}",
+        "",
+        "🎯 實戰四大防線價位 (標準指引)：",
+        f"• 🟢 建議進場：{entry_price:.2f} 元 (買進上限 / 防追高)",
+        f"• 🔵 動能加碼：{addon_price:.2f} 元 (放量過高右側確認)",
+        f"• 🔴 第一停利：{tp1_price:.2f} 元 (前高反壓分批落袋)",
+        f"• 🔴 波段滿足：{tp2_price:.2f} 元 (1:1等幅滿足點)",
+        f"• 🛑 嚴格停損：{stop_loss:.2f} 元 (跌破防守無條件退)",
+        "",
+        "⚖️ 量能與風控指標：",
+        f"• 成交量能：{vol_str} ({vol_status})",
+        f"• 均線乖離：5MA {ma5:.2f} ｜ 20MA {ma20:.2f} (月線乖離 {bias20:+.1f}%)",
+        f"• 盈虧試算：預期 +{reward:.2f} ｜ 風險 -{risk:.2f} ｜ 盈虧比 {rr_ratio:.1f}:1",
+        "",
+        "💡 雙向操盤錦囊：",
+        f"【空手者】{playbook_empty}",
+        f"【持股者】{playbook_hold}",
+        "",
+        f"💡 盤中盯盤：輸入「監控 {code}」即刻掛入雷達，到價自動推播！"
+    ]
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LINE 推播測試工具")
     parser.add_argument("message", nargs="?", default="🔔 這是一則來自台股選股策略的 LINE 測試通知！", help="測試訊息文字")

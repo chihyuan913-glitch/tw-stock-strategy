@@ -190,13 +190,13 @@ def fetch_history_and_technicals(code: str) -> dict:
         'prev_day_high': float(prev_row['High'])
     }
 
-def analyze_stock(user_input: str) -> str:
+def get_stock_analysis_data(user_input: str) -> dict:
     """
-    綜合量化分析個股並產出旗艦版 LINE 戰報卡片
+    綜合量化分析個股並產出結構化數據字典 (供 Web 卡片與 LINE Flex Message 調用)
     """
     code, stock_name_cached = resolve_stock_input(user_input)
     if not code:
-        return "⚠️ 請輸入正確的台股 4 碼股票代碼或股票名稱（例如：3221、5328、台嘉碩、台積電）。"
+        return {"success": False, "error": "⚠️ 請輸入正確的台股 4 碼股票代碼或股票名稱（例如：3221、5328、台嘉碩、台積電）。"}
 
     # 1. 抓取即時報價
     realtime = fetch_realtime_mis(code)
@@ -205,7 +205,7 @@ def analyze_stock(user_input: str) -> str:
     # 2. 抓取歷史與量化指標
     tech = fetch_history_and_technicals(code)
     if not tech:
-        return f"⚠️ 查無股票代碼 【{code} {stock_name}】 之歷史交易數據，請確認代碼是否正確或已下市。"
+        return {"success": False, "error": f"⚠️ 查無股票代碼 【{code} {stock_name}】 之歷史交易數據，請確認代碼是否正確或已下市。"}
 
     # 3. 決定現價與漲跌幅
     if realtime['price'] and realtime['price'] > 0:
@@ -344,43 +344,71 @@ def analyze_stock(user_input: str) -> str:
         playbook_empty = f"目前處於整理箱型內，建議於【{entry_price:.2f} 元以下】分批低接，不追高。"
         playbook_hold = f"持股者以【{stop_loss:.2f} 元】嚴守防守線，待帶量突破【{addon_price:.2f} 元】再行加碼。"
 
-    # 6. 組裝頂級旗艦版 LINE 戰報卡片
-    msg = f"""📊【台股即時量化操盤指引】
-━━━━━━━━━━━━━━━
-標的：{code} {stock_name}
-現價：{current_price:.2f} 元 ({chg_icon} {chg_val:+.2f} / {chg_pct:+.2f}%)
-量能：{vol_sheets:,} 張 ({vol_status})
-評等：{stars} {int_score}星 {eval_badge}
-均線：5MA {ma5:.2f} | 20MA {ma20:.2f} (月線乖離 {bias20:+.1f}%)
+    data_payload = {
+        "success": True,
+        "code": code,
+        "name": stock_name,
+        "current_price": current_price,
+        "price": current_price,
+        "close": current_price,
+        "prev_close": prev_close,
+        "chg_val": chg_val,
+        "chg_pct": chg_pct,
+        "chg_icon": chg_icon,
+        "vol_sheets": vol_sheets,
+        "vol_status": vol_status,
+        "vol_ratio": vol_ratio,
+        "int_score": int_score,
+        "stars": stars,
+        "eval_badge": eval_badge,
+        "ma5": ma5,
+        "ma10": ma10,
+        "ma20": ma20,
+        "ma60": ma60,
+        "bb_up": bb_up,
+        "bb_dn": bb_dn,
+        "bias20": bias20,
+        "entry_price": entry_price,
+        "entry_strat": entry_strat,
+        "addon_price": addon_price,
+        "tp1_price": tp1_price,
+        "tp2_price": tp2_price,
+        "stop_loss": stop_loss,
+        "stop_loss_price": stop_loss,
+        "sl_price": stop_loss,
+        "reward": reward,
+        "risk": risk,
+        "rr_ratio": rr_ratio,
+        "playbook_empty": playbook_empty,
+        "playbook_hold": playbook_hold,
+        "time": realtime['time'] or '最新收盤價'
+    }
+    return data_payload
 
-🎯 操盤四大防線價位 (標準指引)：
-────────────────
-🟢 建議進場：{entry_price:.2f} 元 (買進上限)
-   ▶ 建倉策略：{entry_strat}
-🔵 動能加碼：{addon_price:.2f} 元
-   ▶ 加碼策略：帶量突破近高確認續強時，右側順勢加碼 1/3
-🔴 第一停利(TP1)：{tp1_price:.2f} 元
-   ▶ 獲利目標：抵達前高反壓區，建議分批獲利 1/2 入袋
-🔴 波段滿足(TP2)：{tp2_price:.2f} 元
-   ▶ 獲利目標：波段 1:1 等幅測量滿足點，持盈保泰
-🛑 嚴格停損：{stop_loss:.2f} 元
-   ▶ 風控防守：跌破關鍵防守線無條件出場，嚴守紀律
 
-⚖️ 盈虧風控試算：
-• 預期獲利空間：+{reward:.2f} 元 (+{(reward/entry_target_mid*100):.1f}%)
-• 承擔下檔風險：-{risk:.2f} 元 (-{(risk/entry_target_mid*100):.1f}%)
-• 風險報酬比 (R:R)：{rr_ratio:.1f} : 1
+def analyze_stock(user_input: str) -> str:
+    """
+    綜合量化分析個股並產出符合全域視覺規範之乾淨純文字字卡
+    """
+    res = get_stock_analysis_data(user_input)
+    if isinstance(res, dict) and res.get("success"):
+        try:
+            from line_sender import format_clean_stock_diagnosis_text
+            return format_clean_stock_diagnosis_text(res)
+        except Exception:
+            pass
 
-💡 雙向操盤錦囊：
-【空手者】{playbook_empty}
-【持股者】{playbook_hold}
-━━━━━━━━━━━━━━━
-⏰ 報價時間：{realtime['time'] or '最新收盤價'}
-（本資訊依據 4+1 維度量化精算，投資請獨立審慎評估風險）"""
+    if isinstance(res, dict) and not res.get("success"):
+        return res.get("error", "⚠️ 分析失敗，查無資料。")
 
-    return msg.strip()
+    if isinstance(res, str):
+        return res
+
+    return "⚠️ 分析失敗，請確認代碼是否正確。"
+
 
 if __name__ == '__main__':
     test_input = sys.argv[1] if len(sys.argv) > 1 else '5328'
     print(f"[*] 測試分析：{test_input}")
     print(analyze_stock(test_input))
+

@@ -9,11 +9,10 @@
     "addon_price": 59.55,
     "tp1_price": 62.17,
     "tp2_price": 66.81,
-    "sl_price": 55.01,
-    "target_id": "test",
-    "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-14"
+    "sl_price": 54.12,
+    "target_id": "U6493304a3c342ce4208d05996826ac73",
+    "added_at": "2026-10-14 22:06:52",
+    "alerted_today": {}
   },
   "2476": {
     "code": "2476",
