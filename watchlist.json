@@ -41,11 +41,10 @@
     "addon_price": 55.45,
     "tp1_price": 57.89,
     "tp2_price": 62.21,
-    "sl_price": 51.64,
-    "target_id": "test",
-    "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-14"
+    "sl_price": 51.34,
+    "target_id": "U6493304a3c342ce4208d05996826ac73",
+    "added_at": "2026-10-14 21:46:59",
+    "alerted_today": {}
   },
   "2603": {
     "code": "2603",

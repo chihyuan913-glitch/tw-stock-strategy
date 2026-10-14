@@ -306,13 +306,26 @@ def run_screener(date_str=None, export_path=None, send_line=False):
     print(df[display_cols].to_string(index=False))
     print("="*125)
 
-    # 匯出 CSV (UTF-8-SIG 防亂碼)
+    # 匯出 CSV (UTF-8-SIG 防亂碼) 與 Markdown 視覺化字卡戰報
     if export_path:
         out_file = export_path
         if not os.path.isabs(out_file):
             out_file = os.path.join(os.path.dirname(__file__), export_path)
         df.to_csv(out_file, index=False, encoding='utf-8-sig')
         print(f"[✓] 選股報表已成功匯出至：{out_file} (UTF-8-BOM 編碼，Excel 開啟不亂碼)")
+
+        # 同步產出視覺化字卡 Markdown 戰報
+        md_path = os.path.splitext(out_file)[0] + ".md"
+        try:
+            from line_sender import format_screener_markdown_cards
+            with open(md_path, 'w', encoding='utf-8') as f:
+                f.write(format_screener_markdown_cards(results, date_str, strategy_id="04", max_stocks=10))
+                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
+                f.write(df.to_markdown(index=False))
+                f.write("\n")
+            print(f"[✓] 已同步匯出視覺化字卡 Markdown 戰報至: {md_path}")
+        except Exception as _e:
+            print(f"[!] 匯出 Markdown 字卡戰報失敗: {_e}")
 
     # 發送 LINE 推播
     if send_line:

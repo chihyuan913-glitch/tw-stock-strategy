@@ -573,24 +573,29 @@ def main():
         if export_path.endswith('.csv'):
             df_res.to_csv(export_path, index=False, encoding='utf-8-sig')
             print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
-        elif export_path.endswith('.md'):
-            with open(export_path, 'w', encoding='utf-8') as f:
-                f.write(f"# 🎯 台股個股期貨法人強勢波段多方選股日報（⚡ 股票期貨價位優先 ＋ 結算週期提醒）\n\n")
-                f.write(f"- 產生時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"- 核心標準：期交所 252 檔股票期貨、外資/投信3日累計買超>1000張、法人買超佔比>=12%、站穩20MA且月線走揚、站上60MA季線、5日均量>1000張、正乖離[+1%~+6%]、納入期貨OI深度評估\n")
+            # 同步產出視覺化字卡 Markdown 戰報
+            md_path = export_path[:-4] + ".md"
+            from line_sender import format_screener_markdown_cards
+            with open(md_path, 'w', encoding='utf-8') as f:
+                target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
+                f.write(format_screener_markdown_cards(results, target_date, strategy_id="05", max_stocks=10))
                 if settle_banner:
                     f.write(f"\n> [!WARNING] **{settle_banner}**\n\n")
-                f.write(f"- 交易優勢：**保證金僅約 13.5%~20.25% (一口表彰2張現貨)、期交稅僅十萬分之二 (0.002%)、無借券費與券源限制**\n\n")
-                cols = list(df_res.columns)
-                header_line = "| " + " | ".join(cols) + " |\n"
-                separator_line = "| " + " | ".join(["---"] * len(cols)) + " |\n"
-                f.write(header_line)
-                f.write(separator_line)
-                for _, row in df_res.iterrows():
-                    row_line = "| " + " | ".join(str(row[c]) for c in cols) + " |\n"
-                    f.write(row_line)
+                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
+                f.write(df_res.to_markdown(index=False))
                 f.write("\n")
-            print(f"[✓] 已成功匯出 Markdown 報表至: {export_path}")
+            print(f"[✓] 已同步匯出視覺化字卡 Markdown 戰報至: {md_path}")
+        elif export_path.endswith('.md'):
+            from line_sender import format_screener_markdown_cards
+            with open(export_path, 'w', encoding='utf-8') as f:
+                target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
+                f.write(format_screener_markdown_cards(results, target_date, strategy_id="05", max_stocks=10))
+                if settle_banner:
+                    f.write(f"\n> [!WARNING] **{settle_banner}**\n\n")
+                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
+                f.write(df_res.to_markdown(index=False))
+                f.write("\n")
+            print(f"[✓] 已成功匯出視覺化字卡 Markdown 報表至: {export_path}")
 
     if args.line:
         try:

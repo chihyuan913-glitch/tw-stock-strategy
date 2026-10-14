@@ -454,14 +454,25 @@ def main():
         if export_path.endswith('.csv'):
             df_res.to_csv(export_path, index=False, encoding='utf-8-sig')
             print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
-        elif export_path.endswith('.md'):
-            with open(export_path, 'w', encoding='utf-8') as f:
-                f.write(f"# 台股選股清單 V2.0 旗艦版\n\n")
-                f.write(f"- 產生時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"- 核心條件：成交量 > {args.min_vol}張｜下軌區間 [{args.min_dist}% ~ +{args.max_dist}%]｜法人買超佔比 > {args.min_inst_ratio}%｜反彈空間 > {args.min_upside}%\n\n")
+            # 同步產出視覺化字卡 Markdown 戰報
+            md_path = export_path[:-4] + ".md"
+            from line_sender import format_screener_markdown_cards
+            with open(md_path, 'w', encoding='utf-8') as f:
+                target_date = args.date or get_latest_trading_date() or "今日"
+                f.write(format_screener_markdown_cards(results, target_date, strategy_id="01", max_stocks=10))
+                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
                 f.write(df_res.to_markdown(index=False))
                 f.write("\n")
-            print(f"[✓] 已成功匯出 Markdown 報表至: {export_path}")
+            print(f"[✓] 已同步匯出視覺化字卡 Markdown 戰報至: {md_path}")
+        elif export_path.endswith('.md'):
+            from line_sender import format_screener_markdown_cards
+            with open(export_path, 'w', encoding='utf-8') as f:
+                target_date = args.date or get_latest_trading_date() or "今日"
+                f.write(format_screener_markdown_cards(results, target_date, strategy_id="01", max_stocks=10))
+                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
+                f.write(df_res.to_markdown(index=False))
+                f.write("\n")
+            print(f"[✓] 已成功匯出視覺化字卡 Markdown 報表至: {export_path}")
 
     if args.line:
         try:

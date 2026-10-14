@@ -1250,6 +1250,110 @@ def format_clean_screener_text(
     return "\n".join(lines)
 
 
+def format_screener_markdown_cards(
+    results: list,
+    date_str: str,
+    strategy_id: str = "01",
+    max_stocks: int = 10
+) -> str:
+    """
+    將選股結果格式化為符合最高總指揮中心規範之 Markdown 視覺化字卡報表 (Visual Card Typography)
+    適用於 result.md、weekly_report.md 以及各策略盤後戰報輸出。
+    """
+    meta = resolve_strategy_meta(strategy_id)
+    sorted_res = sorted(results, key=lambda x: x.get('評分', x.get('score', 0)), reverse=True) if results else []
+
+    md_lines = [
+        f"# 📊【策略 {meta['id']}：{meta['name']}】盤後量化戰報",
+        "",
+        f"- **📅 交易日期**：`{date_str}` 盤後結算",
+        f"- **🔥 精選標的**：共 `{len(sorted_res)}` 檔（展示前 `{min(len(sorted_res), max_stocks)}` 檔核心精華字卡）",
+        f"- **🎯 操盤原則**：嚴守 4+1 維度量化濾網 ｜ 四大操盤防線價位 ｜ 移動停利紀律",
+        "",
+        "---",
+        ""
+    ]
+
+    if not sorted_res:
+        md_lines.extend([
+            "> [!NOTE]",
+            f"> 今日經多重 4+1 濾網嚴格檢核，全市場無符合【{meta['name']}】條件之標的。",
+            "> 建議維持資金充裕與零虧損，耐心靜待下一次高勝率反轉或起漲訊號！",
+            ""
+        ])
+        return "\n".join(md_lines)
+
+    for i, r in enumerate(sorted_res[:max_stocks], 1):
+        code = str(r.get('證券代號') or r.get('代號') or '')
+        name = str(r.get('證券名稱') or r.get('名稱') or '')
+        stars = str(r.get('星級推薦') or r.get('星級') or '★★★★☆')
+        score = r.get('評分') or r.get('score') or '--'
+        price = r.get('收盤價') or r.get('現價') or 0.0
+
+        entry_val = r.get('進場價位') or r.get('空單進場') or r.get('entry_price')
+        addon_val = r.get('加碼價位') or r.get('加空價位') or r.get('addon_price')
+        tp1_val = r.get('停利TP1') or r.get('tp1_price')
+        tp2_val = r.get('停利TP2') or r.get('tp2_price')
+        sl_val = r.get('停損價位') or r.get('停損回補') or r.get('sl_price')
+        og_risk = r.get('隔日沖風控') or r.get('og_risk') or ''
+        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or 0
+
+        fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
+        fut_month = r.get('期貨月份') or r.get('month') or ''
+        basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
+        margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
+
+        title_badge = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+
+        entry_str = format_price_val(entry_val)
+        addon_str = format_price_val(addon_val)
+        tp_str = f"TP1 `{format_price_val(tp1_val)}` 元 ｜ TP2 `{format_price_val(tp2_val)}` 元" if tp2_val else f"`{format_price_val(tp1_val)}` 元"
+        sl_str = format_price_val(sl_val)
+
+        status_tag = "🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05") else "🔴【弱勢破線・避險放空】"
+
+        md_lines.extend([
+            f"### 🏷️ 【{i:02d}】{title_badge} {stars} ({score}分) {status_tag}",
+            f"> 💵 **最新現價**：`{format_price_val(price)}` 元 ｜ **當日成交量**：`{vol:,}` 張" if isinstance(vol, (int, float)) else f"> 💵 **最新現價**：`{format_price_val(price)}` 元 ｜ **當日成交量**：`{vol}`",
+            "> ",
+            f"> 🎯 **操盤四大防線價位**：",
+            f"> - {meta['entry_label']}：`{entry_str}` 元 ({meta['entry_desc']})",
+            f"> - {meta['addon_label']}：`{addon_str}` 元 ({meta['addon_desc']})",
+            f"> - {meta['tp_label']}：{tp_str} ({meta['tp_desc']})",
+            f"> - {meta['sl_label']}：`{sl_str}` 元 ({meta['sl_desc']})",
+            "> ",
+            "> ⚖️ **量能與風控指標**：",
+            f"> - 隔日沖風控：{og_risk if og_risk else '🟢 主力籌碼沉澱 (低風險)'}",
+        ])
+
+        if fut_contract and fut_contract != '--':
+            fut_oi = r.get('期貨未平倉(OI)') or r.get('futures_oi') or 0
+            settle_tag = r.get('結算倒數') or r.get('settlement_tag') or ''
+            oi_str = f" ｜ 未平倉：`{int(fut_oi):,}` 口" if fut_oi else ""
+            settle_str = f" ｜ {settle_tag}" if settle_tag else ""
+            margin_str = f" ｜ 1口保證金約 `${int(margin_1lot):,}` 元" if margin_1lot else ""
+            md_lines.append(f"> - 股期規格：`{fut_contract} {fut_month}` ｜ 價差：`{basis_desc}`{oi_str}{margin_str}{settle_str}")
+
+        if meta['id'] == "03":
+            playbook_empty = f"反彈回測【{entry_str} 元】附近若承壓不破，為黃金空單切入點，嚴禁追低破線空。"
+            playbook_hold = f"空單部位以【{sl_str} 元】為停損回補點；摜破【{addon_str} 元】順勢加空，抵達【{format_price_val(tp1_val)} 元】分批回補 1/2。"
+        else:
+            playbook_empty = f"位階安全未追高，【{entry_str} 元以下】皆為合適建倉點，嚴守紀律不追高。"
+            playbook_hold = f"持股者以【{sl_str} 元】嚴守防守線；放量攻過【{addon_str} 元】順勢加碼，攻抵【{format_price_val(tp1_val)} 元】分批拔檔。"
+
+        md_lines.extend([
+            "> ",
+            "> 💡 **雙向操盤錦囊**：",
+            f"> - **【空手者】**：{playbook_empty}",
+            f"> - **【持股者】**：{playbook_hold}",
+            "",
+            "---",
+            ""
+        ])
+
+    return "\n".join(md_lines)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LINE 推播測試工具")
     parser.add_argument("message", nargs="?", default="🔔 這是一則來自台股選股策略的 LINE 測試通知！", help="測試訊息文字")
