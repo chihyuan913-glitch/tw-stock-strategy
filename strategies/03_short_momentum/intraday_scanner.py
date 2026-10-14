@@ -72,12 +72,19 @@ def load_targets():
                 ma20 = float(row.get('月線(20MA)', round(close_p * 1.02, 2)))
                 neg_bias = float(row.get('月線負乖離%', round((close_p - ma20) / ma20 * 100, 2)))
                 contract = str(row.get('期貨契約', '--')).strip()
-                margin = int(row.get('1口保證金(約)', int(round(close_p * 2000 * 0.135, -1))))
+                month = str(row.get('期貨月份', '')).strip()
+                fut_close = float(row.get('期貨收盤價', close_p))
+                basis_desc = str(row.get('價差(Basis)', '')).strip()
+                margin = int(row.get('1口保證金(約)', int(round(fut_close * 2000 * 0.135, -1))))
 
                 targets[code] = {
                     'code': code,
                     'name': str(row['證券名稱']).strip(),
                     'contract': contract,
+                    'contract_sym': contract,
+                    'month': month,
+                    'futures_close': fut_close,
+                    'basis_desc': basis_desc,
                     'margin_1lot': margin,
                     'entry_price': entry_p,
                     'addon_price': addon_p,
@@ -89,7 +96,8 @@ def load_targets():
                     'v5_avg': int(row.get('5日均量(張)', 1000)),
                     'inst_sell_ratio': float(row.get('法人賣超佔比%', 10.0)),
                     'f_3d': int(row.get('外資3日賣超(張)', 0)),
-                    't_3d': int(row.get('投信3日賣超(張)', 0))
+                    't_3d': int(row.get('投信3日賣超(張)', 0)),
+                    'stars': '★★★★★'
                 }
             if targets:
                 print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔做空避險精選標的。")

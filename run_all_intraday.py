@@ -55,6 +55,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "04_cb_pricing_ambush" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "04_cb_pricing_ambush"
     },
+    {
+        "id": "05_stock_futures_long",
+        "name": "策略 05：個股期貨法人強勢波段多方到價雷達",
+        "script": ROOT_DIR / "strategies" / "05_stock_futures_long" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "05_stock_futures_long"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):

@@ -46,6 +46,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "04_cb_pricing_ambush" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "05_stock_futures_long",
+        "name": "個股期貨法人強勢波段多方策略 (期貨價位優先)",
+        "script": ROOT_DIR / "strategies" / "05_stock_futures_long" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False):

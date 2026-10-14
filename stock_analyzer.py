@@ -52,23 +52,23 @@ def load_stock_dict():
 def resolve_stock_input(user_input: str) -> tuple:
     """
     解析使用者輸入，自動轉換為 (代碼, 股票名稱)
-    支援：純代碼 "5328"、股名 "華容"、混合 "分析 2330"、"想買台積電"
+    支援：純代碼 "5328"、股名 "華容"、混合 "分析 2330"、"想買台積電"、"2330買進"
     """
     text = str(user_input).strip()
     stock_dict = load_stock_dict()
 
-    # 1. 優先尋找 4 碼數字
-    m = re.search(r'\b(\d{4})\b', text)
+    # 1. 優先尋找 4~5 碼股票/ETF代碼 (支援中文字符相鄰，無須ASCII邊界)
+    m = re.search(r'(?<!\d)(\d{4,5})(?!\d)', text)
     if m:
         code = m.group(1)
         name = stock_dict.get(code, f"台股_{code}")
         return code, name
 
-    # 2. 搜尋股票中文名稱 (長度由長到短優先比對)
-    for key, val in stock_dict.items():
-        if not key.isdigit() and len(key) >= 2:
-            if key in text:
-                return val, key
+    # 2. 搜尋股票中文名稱 (長度由長到短優先比對，防範簡稱誤判，例如先比對「聯發科」再比對「聯發」)
+    chinese_candidates = sorted([k for k in stock_dict.keys() if not k.isdigit() and len(k) >= 2], key=len, reverse=True)
+    for name in chinese_candidates:
+        if name in text:
+            return stock_dict[name], name
 
     return None, None
 

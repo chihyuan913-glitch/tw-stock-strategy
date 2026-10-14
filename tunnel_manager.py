@@ -68,6 +68,92 @@ def _write_shortcut(url: str):
     except Exception as e:
         print(f"[!] 寫入外網捷徑檔失敗: {e}")
 
+def sync_line_webhook(public_url: str) -> dict:
+    """
+    自動將公開網址註冊為 LINE 官方帳號 (二號機) 的 Webhook Endpoint，並觸發測試驗證。
+    解決手動複製貼上網址之痛點，達成啟動即全自動秒級對接。
+    """
+    import urllib.request
+    import json
+
+    token = ""
+    env_file = ROOT_DIR / ".env"
+    if env_file.exists():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for l in f:
+                    l = l.strip()
+                    if l.startswith("LINE_CHANNEL_ACCESS_TOKEN="):
+                        token = l.split("=", 1)[1].strip().strip("'\"")
+                        break
+        except Exception:
+            pass
+    if not token:
+        token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
+
+    if not token:
+        print("[!] 找不到 LINE_CHANNEL_ACCESS_TOKEN，跳過 LINE Webhook 自動註冊。")
+        return {"success": False, "reason": "No token"}
+
+    webhook_url = public_url.rstrip("/")
+    if not webhook_url.endswith("/callback"):
+        webhook_url += "/callback"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. 呼叫 LINE PUT Webhook Endpoint (帶 3 次重試防 Cloudflare DNS 傳播延遲)
+    put_success = False
+    for attempt in range(1, 4):
+        try:
+            put_url = "https://api.line.me/v2/bot/channel/webhook/endpoint"
+            put_data = json.dumps({"endpoint": webhook_url}).encode("utf-8")
+            req = urllib.request.Request(put_url, data=put_data, headers=headers, method="PUT")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                put_success = True
+                break
+        except urllib.error.HTTPError as e:
+            if attempt < 3:
+                time.sleep(2.5)
+                continue
+            err_msg = e.read().decode("utf-8", errors="ignore")
+            print(f"[!] 設定 LINE Webhook Endpoint 失敗 (HTTP {e.code}): {err_msg}")
+            return {"success": False, "reason": err_msg}
+        except Exception as e:
+            if attempt < 3:
+                time.sleep(2.5)
+                continue
+            print(f"[!] 設定 LINE Webhook Endpoint 例外: {e}")
+            return {"success": False, "reason": str(e)}
+
+    # 2. 呼叫 LINE POST Webhook Test 驗證連通性
+    test_result = "未知"
+    try:
+        test_url = "https://api.line.me/v2/bot/channel/webhook/test"
+        test_data = json.dumps({"endpoint": webhook_url}).encode("utf-8")
+        req = urllib.request.Request(test_url, data=test_data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            t_res = json.loads(resp.read().decode("utf-8"))
+            if t_res.get("success"):
+                test_result = f"200 OK (連線成功, detail: {t_res.get('detail')})"
+            else:
+                test_result = f"連線警告: {t_res.get('reason')}"
+    except Exception as e:
+        test_result = f"測試例外: {e}"
+
+    print("-" * 70, flush=True)
+    print(" 🎉【LINE 官方帳號隨傳隨回 Webhook 已自動秒級對接完成！】", flush=True)
+    print(f" 🔗 即時 Webhook 端點: {webhook_url}", flush=True)
+    print(f" ⚡ LINE 官方伺服器連線測試: {test_result}", flush=True)
+    print(" 📱 您現在可在手機 LINE 直接輸入個股代碼或名稱：", flush=True)
+    print("    👉 例如輸入「2330」或「台積電」、「診斷 2476」", flush=True)
+    print("    👉 系統將在 1 秒內秒回四大防線價位與雙向錦囊！", flush=True)
+    print("-" * 70 + "\n", flush=True)
+
+    return {"success": True, "endpoint": webhook_url, "test_result": test_result}
+
 def _notify_line(url: str):
     """自動推播外網專屬網址至 LINE"""
     try:
@@ -83,7 +169,8 @@ def _notify_line(url: str):
 • 個股即時診斷與操盤錦囊
 • 跨日動態滾動校準 (移動停利)
 ━━━━━━━━━━━━━━━
-💡 只要主機啟動中，全世界任何裝置皆可連線存取！"""
+📱【手機隨傳隨回秒級診斷已同步啟動】
+在此視窗直接傳送股票代碼（如 2330、2476）或股票名稱（如 台積電），小助手秒回四大操盤防線與買賣錦囊！"""
         send_to_line(msg, strategy=None)
     except Exception as e:
         print(f"[!] 推送外網網址至 LINE 失敗: {e}")
@@ -141,6 +228,12 @@ def _monitor_tunnel(port: int, notify_line: bool = True):
                 print("=" * 70 + "\n", flush=True)
 
                 _write_shortcut(_tunnel_url)
+                # 自動對接與更新 LINE 官方帳號 Webhook 端點
+                try:
+                    sync_line_webhook(_tunnel_url)
+                except Exception as _e:
+                    print(f"[!] 自動同步 LINE Webhook 例外: {_e}")
+
                 if notify_line:
                     _notify_line(_tunnel_url)
                 break

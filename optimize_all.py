@@ -46,14 +46,7 @@ def sync_stock_dictionary():
     print("\n[*] 【任務一/五】正在同步證交所 (TWSE) 與櫃買中心 (TPEx) 官方個股清單...")
     dict_file = ROOT_DIR / "stock_dict.json"
     stock_dict = {}
-    if dict_file.exists():
-        try:
-            with open(dict_file, "r", encoding="utf-8") as f:
-                stock_dict = json.load(f)
-        except Exception:
-            stock_dict = {}
-
-    initial_count = len(stock_dict)
+    initial_count = 0
     added_count = 0
 
     sources = [
@@ -66,16 +59,26 @@ def sync_stock_dictionary():
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 html = resp.read().decode('big5', errors='ignore')
-                # 正則解析例如 "2330　台積電" 或 "3221　台嘉碩"
-                matches = re.findall(r'(\d{4})[\u3000\s]+([^\s<]+)', html)
-                for code, sname in matches:
-                    sname = sname.strip()
-                    if code not in stock_dict or stock_dict[code] != sname:
-                        stock_dict[code] = sname
-                        added_count += 1
-                    # 亦支援中文反查
-                    stock_dict[sname] = code
-            print(f"[✓] {name} 清單同步完成 (共擷取 {len(matches)} 筆資料)")
+                rows = re.findall(r'<tr>(.*?)</tr>', html, re.DOTALL)
+                current_sec = 'NONE'
+                section_count = 0
+                for r in rows:
+                    sec_m = re.search(r'<B>\s*([^\s<]+)\s*<B>', r)
+                    if sec_m:
+                        current_sec = sec_m.group(1).strip()
+                        continue
+                    if current_sec in ('股票', '臺灣存託憑證(TDR)', 'ETF'):
+                        cols = [re.sub(r'<[^>]+>', '', c).strip() for c in re.findall(r'<td[^>]*>(.*?)</td>', r, re.DOTALL)]
+                        if len(cols) >= 6:
+                            code_name = cols[0]
+                            m = re.match(r'^(\d{4,6})[\u3000\s]+([^\s]+)', code_name)
+                            if m:
+                                code, sname = m.group(1), m.group(2).strip()
+                                stock_dict[code] = sname
+                                stock_dict[sname] = code
+                                section_count += 1
+                                added_count += 1
+            print(f"[✓] {name} 清單同步完成 (共擷取 {section_count} 筆純股票與ETF標的)")
         except Exception as e:
             print(f"[!] 同步 {name} 失敗: {e}")
 

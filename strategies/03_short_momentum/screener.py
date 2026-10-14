@@ -45,6 +45,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from futures_helper import load_stock_futures_pool, fetch_taifex_futures_quotes, calculate_futures_pricing
 
 # 匯入 LINE 發送模組
 from line_sender import send_to_line
@@ -55,49 +56,6 @@ if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
-
-
-def load_stock_futures_pool():
-    """
-    載入臺灣期貨交易所 (TAIFEX) 股票期貨標的清單
-    優先連線期交所官網動態抓取最新標的，失敗時自動讀取本地 stock_futures_list.json 快取
-    回傳: dict: { stock_code: {'contract': str, 'name': str} }
-    """
-    json_path = os.path.join(os.path.dirname(__file__), 'stock_futures_list.json')
-    futures_map = {}
-    
-    # 嘗試聯網動態抓取最新期交所名單
-    try:
-        url = 'https://www.taifex.com.tw/cht/2/stockLists'
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=6) as r:
-            html = r.read().decode('utf-8', errors='ignore')
-            rows = re.findall(r'<tr>.*?<td[^>]*>([A-Za-z0-9]{2,3})</td>.*?<td[^>]*>([0-9]{4})</td>.*?<td[^>]*>(.*?)</td>.*?</tr>', html, re.DOTALL)
-            for contract, code, name in rows:
-                clean_name = re.sub(r'<.*?>', '', name).strip()
-                futures_map[code] = {
-                    'contract': contract.strip(),
-                    'name': clean_name
-                }
-            if len(futures_map) >= 150:
-                try:
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(futures_map, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
-                return futures_map
-    except Exception:
-        pass
-
-    # 聯網失敗時讀取本地快取
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                futures_map = json.load(f)
-        except Exception:
-            pass
-
-    return futures_map
 
 
 def get_recent_trading_dates(n_days=5, max_lookback=20):
@@ -252,9 +210,12 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
         return []
 
     futures_map = {}
+    taifex_quotes = {}
     if futures_only:
         futures_map = load_stock_futures_pool()
         print(f"[*] 【個股期貨優先模式】已載入期交所 {len(futures_map)} 檔股票期貨標的，完全排除無券源小型股！")
+        taifex_quotes = fetch_taifex_futures_quotes()
+        print(f"[*] 【期交所即時/盤後行情】已同步 {len(taifex_quotes)} 檔近月主力合約報價！")
 
     if date_str:
         all_dates = get_recent_trading_dates(n_days=10)
@@ -431,12 +392,24 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
             sl_cover = round(max(ma20_curr * 1.01, high_ref * 1.01, curr_close * 1.03), 2)
 
             # -------------------------------------------------------------
-            # 個股期貨合約資訊與保證金試算 (一口 = 2,000 股現貨 = 2 張)
+            # 股票期貨價位優先計算與四大防線換算 (Futures Pricing Priority)
             # -------------------------------------------------------------
             f_info = futures_map.get(code, {'contract': '--', 'name': q['name']})
-            contract_code = f_info.get('contract', '--')
-            # 以標準級距 13.5% 估算一口放空保證金
-            margin_1lot = int(round(curr_close * 2000 * 0.135, -1))
+            contract_base = f_info.get('contract', '--')
+            fut_q = taifex_quotes.get(contract_base)
+
+            # 調用共用期貨定價引擎，計算以期貨為優先的報價與四防線
+            fut_pricing = calculate_futures_pricing(
+                spot_close=curr_close,
+                futures_quote=fut_q,
+                entry_spot=short_entry,
+                addon_spot=add_short,
+                tp1_spot=tp1_cover,
+                tp2_spot=tp2_cover,
+                sl_spot=sl_cover,
+                contract_base=contract_base,
+                is_long=False
+            )
 
             og_risk = evaluate_overnight_broker_risk(
                 code,
@@ -451,18 +424,27 @@ def screen_short_stocks(date_str=None, min_vol_lots=1000,
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
-                '期貨契約': contract_code,
+                '期貨契約': fut_pricing['contract_sym'],
+                '期貨月份': fut_pricing['month'],
                 '收盤價': round(curr_close, 2),
-                '進場價位': short_entry,
-                '空單進場': short_entry,
-                '加碼價位': add_short,
-                '加空價位': add_short,
-                '停利TP1': tp1_cover,
-                '停利TP2': tp2_cover,
-                '停損價位': sl_cover,
-                '停損回補': sl_cover,
+                '期貨收盤價': fut_pricing['futures_close'],
+                '價差(Basis)': fut_pricing['basis_desc'],
+                '進場價位': fut_pricing['futures_entry'],
+                '空單進場': fut_pricing['futures_entry'],
+                '加碼價位': fut_pricing['futures_addon'],
+                '加空價位': fut_pricing['futures_addon'],
+                '停利TP1': fut_pricing['futures_tp1'],
+                '停利TP2': fut_pricing['futures_tp2'],
+                '停損價位': fut_pricing['futures_sl'],
+                '停損回補': fut_pricing['futures_sl'],
+                '現貨進場': short_entry,
+                '現貨加空': add_short,
+                '現貨TP1': tp1_cover,
+                '現貨TP2': tp2_cover,
+                '現貨停損': sl_cover,
                 '隔日沖風控': og_risk['tag'],
-                '1口保證金(約)': margin_1lot,
+                '1口保證金(約)': fut_pricing['margin_1lot'],
+                '期貨成交量': fut_pricing['futures_vol'],
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線負乖離%': round(bias_ma20_pct, 2),
                 '當日成交量(張)': q['volume'] // 1000,
@@ -515,8 +497,8 @@ def main():
     df_res = df_res.sort_values(by=["法人賣超佔比%", "當日法人賣超(張)"], ascending=[False, True]).reset_index(drop=True)
 
     print("\n" + "="*115)
-    print(f"🎯【台股法人出貨破線做空】選股結果清單（共 {len(df_res)} 檔）- ⚡ 全數具備股票期貨，免借券、無券源限制！")
-    print("條件符合：具備股票期貨 | 外資/投信3日賣超>1000張 | 法人佔比>=12% | 跌破20MA且斜率向下 | 5日均量>1000張 | 負乖離[-5%~0%]")
+    print(f"🎯【台股法人出貨破線做空】選股結果清單（共 {len(df_res)} 檔）- ⚡ 全面升級【股票期貨價位優先報價】（免借券、一口表彰2張）！")
+    print("四大防線價位已自動對齊期交所近月主力期貨合約；現貨點位同步於 CSV 完整保存以供對照")
     print("="*115)
     print(df_res.to_string(index=False))
     print("="*115)

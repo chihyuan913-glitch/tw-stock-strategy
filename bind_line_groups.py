@@ -159,6 +159,9 @@ def check_webhook_events(token, seen_req_ids, bound_groups):
                     elif any(k in text_to_check for k in ["04", "4", "可轉債", "cb", "定價", "伏擊", "閉鎖"]):
                         assigned_strat = "LINE_TARGET_STRATEGY_04"
                         strat_title = "策略 04：可轉債定價伏擊與區間博弈"
+                    elif any(k in text_to_check for k in ["05", "5", "波段", "多方", "股期多", "強勢"]):
+                        assigned_strat = "LINE_TARGET_STRATEGY_05"
+                        strat_title = "策略 05：個股期貨法人強勢波段多方"
                     else:
                         # 依照尚未綁定的順序自動配對
                         env = load_env()
@@ -174,6 +177,9 @@ def check_webhook_events(token, seen_req_ids, bound_groups):
                         elif not env.get("LINE_TARGET_STRATEGY_04"):
                             assigned_strat = "LINE_TARGET_STRATEGY_04"
                             strat_title = "策略 04：可轉債定價伏擊與區間博弈"
+                        elif not env.get("LINE_TARGET_STRATEGY_05"):
+                            assigned_strat = "LINE_TARGET_STRATEGY_05"
+                            strat_title = "策略 05：個股期貨法人強勢波段多方"
 
                     if assigned_strat:
                         save_env_var(assigned_strat, gid)
@@ -195,17 +201,19 @@ def main():
     print(" 🎯 台股量化策略 - LINE 獨立群組自動綁定小幫手")
     print("=" * 65)
     print("【機器人資訊】：")
-    print(" • 名稱：選股日報小幫手")
-    print(" • LINE ID：@899zzwux")
+    print(" • 名稱：選股日報小幫手 / 台股雷達二號機")
+    print(" • LINE ID：@899zzwux / @761awmcp")
     print("\n【目前綁定狀態】：")
     print(f" • 策略 01 (布林超跌): {env.get('LINE_TARGET_STRATEGY_01', '尚未綁定')}")
     print(f" • 策略 02 (法人起漲): {env.get('LINE_TARGET_STRATEGY_02', '尚未綁定')}")
     print(f" • 策略 03 (股期做空): {env.get('LINE_TARGET_STRATEGY_03', '尚未綁定')}")
+    print(f" • 策略 04 (CB伏擊):  {env.get('LINE_TARGET_STRATEGY_04', '尚未綁定')}")
+    print(f" • 策略 05 (股期多方): {env.get('LINE_TARGET_STRATEGY_05', '尚未綁定')}")
     print("=" * 65)
     print("\n💡【請總指揮執行以下動作】：")
-    print("1. 打開手機 LINE，建立 3 個群組（建議名稱含 01 / 02 / 03 或 超跌 / 起漲 / 做空）。")
-    print("2. 將機器人【選股日報小幫手 (@899zzwux)】邀請加入這 3 個群組。")
-    print("3. 在每個群組內傳送任意一句話 (例如打 '01', '02', '03')。")
+    print("1. 打開手機 LINE，建立群組（建議名稱含 01~05 策略編號）。")
+    print("2. 將機器人邀請加入群組。")
+    print("3. 在群組內傳送對應代號 (例如打 '01' ~ '05')。")
     print("   本程式將即時接收並自動完成寫入！(按 Ctrl+C 可隨時退出)\n")
 
     seen_req_ids = set()
@@ -217,9 +225,11 @@ def main():
             env_cur = load_env()
             if (env_cur.get("LINE_TARGET_STRATEGY_01") and 
                 env_cur.get("LINE_TARGET_STRATEGY_02") and 
-                env_cur.get("LINE_TARGET_STRATEGY_03")):
+                env_cur.get("LINE_TARGET_STRATEGY_03") and
+                env_cur.get("LINE_TARGET_STRATEGY_04") and
+                env_cur.get("LINE_TARGET_STRATEGY_05")):
                 print("\n" + "★" * 65)
-                print("🎊 報告總指揮！所有 3 項策略專屬群組已全數綁定完畢！")
+                print("🎊 報告總指揮！所有 5 項策略專屬群組已全數綁定完畢！")
                 print("★" * 65)
                 break
             time.sleep(2)

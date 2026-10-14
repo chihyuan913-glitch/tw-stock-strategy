@@ -313,6 +313,20 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "sl_desc": "跌破防守線",
             "color_theme": "#7C3AED"
         }
+    elif sid == "05":
+        return {
+            "id": "05",
+            "name": "個股期貨波段多方",
+            "entry_label": "🟢 多單進場",
+            "addon_label": "🔵 突破加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 停損防守",
+            "entry_desc": "期貨起漲建倉",
+            "addon_desc": "突破日高續強",
+            "tp_desc": "TP1 +10% / TP2 +16%",
+            "sl_desc": "破20MA或-3.5%",
+            "color_theme": "#0D9488"
+        }
     elif sid == "RADAR":
         return {
             "id": "RADAR",
@@ -379,6 +393,14 @@ def build_price_alert_card(
     sl_val = target.get('sl_price') or target.get('停損價位') or target.get('停損回補')
     og_risk = target.get('隔日沖風控') or target.get('og_risk') or ''
 
+    fut_contract = target.get('期貨契約') or target.get('contract_sym') or target.get('contract') or ''
+    fut_month = target.get('期貨月份') or target.get('month') or ''
+    fut_price = target.get('期貨收盤價') or target.get('futures_close') or ''
+    basis_desc = target.get('價差(Basis)') or target.get('basis_desc') or target.get('basis_tag') or ''
+    margin_1lot = target.get('1口保證金(約)') or target.get('margin_1lot')
+
+    title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+
     entry_str = format_price_val(entry_val)
     addon_str = format_price_val(addon_val)
     tp_str = f"TP1 {format_price_val(tp1_val)} / TP2 {format_price_val(tp2_val)}" if tp2_val else format_price_val(tp1_val)
@@ -428,7 +450,7 @@ def build_price_alert_card(
                     "margin": "md",
                     "alignItems": "center",
                     "contents": [
-                        {"type": "text", "text": f"{code} {name}", "size": "xxl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
+                        {"type": "text", "text": title_name, "size": "xxl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
                         {"type": "text", "text": stars, "size": "xs", "color": "#FBBF24", "align": "end"}
                     ]
                 },
@@ -559,7 +581,52 @@ def build_price_alert_card(
                                 {"type": "text", "text": og_risk if og_risk else "🟢 主力籌碼沉澱 (低風險)", "size": "xs", "weight": "bold", "color": "#15803D" if "沉澱" in str(og_risk) or not og_risk else "#DC2626", "flex": 7}
                             ]
                         }
-                    ]
+                    ] + ([
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "期貨合約", "size": "xs", "color": "#64748B", "flex": 3},
+                                {"type": "text", "text": f"{fut_contract} {fut_month} ｜ {basis_desc}" if basis_desc else f"{fut_contract} {fut_month}", "size": "xs", "weight": "bold", "color": "#0284C7", "flex": 7}
+                            ]
+                        }
+                    ] + ([
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "期貨未平倉", "size": "xs", "color": "#64748B", "flex": 3},
+                                {"type": "text", "text": f"{int(target.get('futures_oi') or target.get('期貨未平倉(OI)') or 0):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
+                            ]
+                        }
+                    ] if (target.get('futures_oi') or target.get('期貨未平倉(OI)')) else []) + ([
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "結算提醒", "size": "xs", "color": "#64748B", "flex": 3},
+                                {"type": "text", "text": str(target.get('settlement_tag') or target.get('結算倒數') or ''), "size": "xs", "weight": "bold", "color": "#D97706" if "⚠️" in str(target.get('settlement_tag') or target.get('結算倒數') or '') else "#0F766E", "flex": 7}
+                            ]
+                        }
+                    ] if (target.get('settlement_tag') or target.get('結算倒數')) else []) + ([
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "次月新倉參考", "size": "xs", "color": "#64748B", "flex": 3},
+                                {"type": "text", "text": f"{target.get('next_month') or target.get('次月合約')}月 ｜ 進場約 ${format_price_val(target.get('next_entry') or target.get('次月進場參考'))}", "size": "xs", "weight": "bold", "color": "#2563EB", "flex": 7}
+                            ]
+                        }
+                    ] if (target.get('next_month') or target.get('次月合約')) and (target.get('next_entry') or target.get('次月進場參考')) else []) + [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": "1口保證金", "size": "xs", "color": "#64748B", "flex": 3},
+                                {"type": "text", "text": f"約 ${int(margin_1lot):,} 元 (一口=2張現貨)" if margin_1lot else "依期交所標準級距", "size": "xs", "weight": "bold", "color": "#1E293B", "flex": 7}
+                            ]
+                        }
+                    ] if fut_contract and fut_contract != '--' else [])
                 },
                 {
                     "type": "box",
@@ -640,6 +707,14 @@ def format_clean_price_alert_text(
     ]
     if og_risk:
         lines.append(f"• 隔日沖風控：{og_risk}")
+    
+    fut_contract = target.get('期貨契約') or target.get('contract_sym') or target.get('contract') or ''
+    fut_month = target.get('期貨月份') or target.get('month') or ''
+    basis_desc = target.get('價差(Basis)') or target.get('basis_desc') or target.get('basis_tag') or ''
+    margin_1lot = target.get('1口保證金(約)') or target.get('margin_1lot')
+    if fut_contract and fut_contract != '--':
+        lines.append(f"• 期貨合約：{fut_contract} {fut_month} ｜ 價差：{basis_desc} ｜ 1口保證金約 ${int(margin_1lot):,} 元")
+
     lines.extend([
         "",
         f"💡【實戰指引】{event_desc}",
@@ -869,6 +944,14 @@ def build_screener_carousel(
         og_risk = r.get('隔日沖風控') or r.get('og_risk') or ''
         vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or 0
 
+        fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
+        fut_month = r.get('期貨月份') or r.get('month') or ''
+        fut_price = r.get('期貨收盤價') or r.get('futures_close') or ''
+        basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
+        margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
+
+        title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+
         entry_str = format_price_val(entry_val)
         addon_str = format_price_val(addon_val)
         tp_str = f"TP1 {format_price_val(tp1_val)} / TP2 {format_price_val(tp2_val)}" if tp2_val else format_price_val(tp1_val)
@@ -901,7 +984,7 @@ def build_screener_carousel(
                         "margin": "md",
                         "alignItems": "center",
                         "contents": [
-                            {"type": "text", "text": f"{code} {name}", "size": "xxl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
+                            {"type": "text", "text": title_name, "size": "xxl", "weight": "bold", "color": "#F8FAFC", "flex": 0},
                             {"type": "text", "text": f"{stars} ({score}分)" if score != '--' else stars, "size": "xs", "color": "#FBBF24", "align": "end"}
                         ]
                     },
@@ -1020,7 +1103,52 @@ def build_screener_carousel(
                                     {"type": "text", "text": og_risk if og_risk else "🟢 主力籌碼沉澱 (低風險)", "size": "xs", "weight": "bold", "color": "#15803D" if "沉澱" in str(og_risk) or not og_risk else "#DC2626", "flex": 7}
                                 ]
                             }
-                        ]
+                        ] + ([
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "期貨合約", "size": "xs", "color": "#64748B", "flex": 3},
+                                    {"type": "text", "text": f"{fut_contract} {fut_month} ｜ {basis_desc}" if basis_desc else f"{fut_contract} {fut_month}", "size": "xs", "weight": "bold", "color": "#0284C7", "flex": 7}
+                                ]
+                            }
+                        ] + ([
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "期貨未平倉", "size": "xs", "color": "#64748B", "flex": 3},
+                                    {"type": "text", "text": f"{int(r.get('futures_oi') or r.get('期貨未平倉(OI)') or 0):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
+                                ]
+                            }
+                        ] if (r.get('futures_oi') or r.get('期貨未平倉(OI)')) else []) + ([
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "結算提醒", "size": "xs", "color": "#64748B", "flex": 3},
+                                    {"type": "text", "text": str(r.get('settlement_tag') or r.get('結算倒數') or ''), "size": "xs", "weight": "bold", "color": "#D97706" if "⚠️" in str(r.get('settlement_tag') or r.get('結算倒數') or '') else "#0F766E", "flex": 7}
+                                ]
+                            }
+                        ] if (r.get('settlement_tag') or r.get('結算倒數')) else []) + ([
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "次月新倉參考", "size": "xs", "color": "#64748B", "flex": 3},
+                                    {"type": "text", "text": f"{r.get('next_month') or r.get('次月合約')}月 ｜ 進場約 ${format_price_val(r.get('next_entry') or r.get('次月進場參考'))}", "size": "xs", "weight": "bold", "color": "#2563EB", "flex": 7}
+                                ]
+                            }
+                        ] if (r.get('next_month') or r.get('次月合約')) and (r.get('next_entry') or r.get('次月進場參考')) else []) + [
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "contents": [
+                                    {"type": "text", "text": "1口保證金", "size": "xs", "color": "#64748B", "flex": 3},
+                                    {"type": "text", "text": f"約 ${int(margin_1lot):,} 元 (一口=2張現貨)" if margin_1lot else "依期交所標準級距", "size": "xs", "weight": "bold", "color": "#1E293B", "flex": 7}
+                                ]
+                            }
+                        ] if fut_contract and fut_contract != '--' else [])
                     },
                     {
                         "type": "text",
@@ -1101,6 +1229,18 @@ def format_clean_screener_text(
         ])
         if og_risk:
             lines.append(f"• 隔日沖風控：{og_risk}")
+        
+        fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
+        fut_month = r.get('期貨月份') or r.get('month') or ''
+        basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
+        margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
+        if fut_contract and fut_contract != '--':
+            fut_oi = r.get('期貨未平倉(OI)') or r.get('futures_oi') or 0
+            settle_tag = r.get('結算倒數') or r.get('settlement_tag') or ''
+            oi_str = f" ｜ 未平倉：{int(fut_oi):,}口" if fut_oi else ""
+            settle_str = f"\n  {settle_tag}" if settle_tag else ""
+            lines.append(f"• 期貨契約：{fut_contract} {fut_month} ｜ 價差：{basis_desc}{oi_str} ｜ 1口保證金約 ${int(margin_1lot):,} 元{settle_str}")
+
         lines.append("")
 
     if len(sorted_res) > max_stocks:
