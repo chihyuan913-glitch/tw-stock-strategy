@@ -190,20 +190,35 @@ THEMES = {
     "绿能": ["6806", "1519", "1503", "1513", "1514"],
 }
 
+import math
+
+def sanitize_floats(obj):
+    """遞迴清理所有 float('nan'), float('inf') 為安全數值 (0.0)，徹底杜絕 JSON 序列化崩潰"""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0
+        return obj
+    elif isinstance(obj, dict):
+        return {k: sanitize_floats(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_floats(v) for v in obj]
+    return obj
+
 def load_watchlist() -> dict:
     """載入自選監控清單"""
     if WATCHLIST_FILE.exists():
         try:
             with open(WATCHLIST_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return sanitize_floats(json.load(f))
         except Exception:
             pass
     return {}
 
 def save_watchlist(data: dict):
     """儲存自選監控清單"""
+    clean_data = sanitize_floats(data)
     with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(clean_data, f, ensure_ascii=False, indent=2)
 
 def calculate_stock_defense(code: str) -> dict:
     """為單一股票計算四大操盤防線"""
@@ -392,7 +407,9 @@ def sync_screener_to_radar(target_id: str = "") -> str:
         "01_bollinger_reversal": "布林超跌",
         "02_institutional_momentum": "法人起漲",
         "03_short_momentum": "弱勢破線",
-        "04_cb_pricing_ambush": "可轉債伏擊"
+        "04_cb_pricing_ambush": "可轉債伏擊",
+        "05_stock_futures_long": "股期多方",
+        "06_volume_surge": "爆量動能"
     }
 
     for path in csv_files:

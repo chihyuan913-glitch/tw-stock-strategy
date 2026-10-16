@@ -640,7 +640,8 @@ async def get_overview():
         "02_institutional_momentum",
         "03_short_momentum",
         "04_cb_pricing_ambush",
-        "05_stock_futures_long"
+        "05_stock_futures_long",
+        "06_volume_surge"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -687,6 +688,10 @@ async def get_strategy_data(strat_id: str):
         "05_stock_futures_long": {
             "name": "策略 05：台股個股期貨法人強勢波段多方策略",
             "desc": "鎖定期交所 252 檔活躍個股期、外資投信重金吃貨、剛脫離月線起漲之強勢波段股，優先呈現期貨報價與未平倉量 (OI) 深度評估。"
+        },
+        "06_volume_surge": {
+            "name": "策略 06：盤中成交量異常爆量起漲動能策略",
+            "desc": "捕捉主力資金強勢點火、動態量能布林突破 (+3σ)、且符合實體紅K高勝率型態之起漲飆股，階梯式防洗版到價告警。"
         }
     }
 
@@ -935,11 +940,12 @@ async def get_radar_watchlist_endpoint():
         key=lambda x: max(str(x.get('last_push_at', '')), str(x.get('added_at', ''))),
         reverse=True
     )
-    return {
+    from radar_manager import sanitize_floats
+    return sanitize_floats({
         "status": "ok",
         "count": len(items),
         "items": items
-    }
+    })
 
 @app.post("/api/radar/add")
 async def add_to_radar_endpoint(request: Request):
