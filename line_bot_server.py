@@ -704,6 +704,54 @@ async def get_strategy_data(strat_id: str):
         df = df.fillna('')
         cols = list(df.columns)
         rows = df.to_dict(orient='records')
+
+        # 批次查詢即時行情並計算與進場價之差異
+        from radar_manager import fetch_batch_realtime_quotes
+        codes = []
+        for r in rows:
+            c = str(r.get('證券代號') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
+            if c:
+                codes.append(c)
+        quotes = fetch_batch_realtime_quotes(codes) if codes else {}
+        for r in rows:
+            c = str(r.get('證券代號') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
+            q = quotes.get(c, {})
+            curr_p = q.get('price')
+            if curr_p is not None:
+                r['realtime_price'] = curr_p
+                r['prev_close'] = q.get('prev_close', curr_p)
+                r['realtime_change'] = q.get('change', 0.0)
+                r['realtime_change_pct'] = q.get('change_pct', 0.0)
+                r['quote_time'] = q.get('time', '')
+
+            # 建議進場價評估
+            entry_raw = str(r.get('進場價位') or r.get('多單進場') or r.get('空單進場') or r.get('現貨進場') or '').replace(',', '').strip()
+            try:
+                ep = float(entry_raw)
+            except Exception:
+                ep = 0.0
+
+            eval_p = curr_p if curr_p is not None else 0.0
+            if not eval_p:
+                try:
+                    eval_p = float(str(r.get('收盤價') or r.get('現價') or r.get('期貨收盤價') or 0).replace(',', ''))
+                except Exception:
+                    eval_p = 0.0
+
+            if ep > 0 and eval_p > 0:
+                diff = round(eval_p - ep, 2)
+                diff_pct = round((diff / ep) * 100, 2)
+                r['diff_from_entry'] = diff
+                r['diff_pct_from_entry'] = diff_pct
+                if diff <= 0:
+                    r['position_status'] = 'discount'
+                    r['position_badge'] = '🟢 甜蜜進場區'
+                    r['position_desc'] = f'折價 {abs(diff):.2f} 元 ({diff_pct:.2f}%)'
+                else:
+                    r['position_status'] = 'premium'
+                    r['position_badge'] = '⚠️ 高於進場價'
+                    r['position_desc'] = f'溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)'
+
         return {
             "name": meta["name"],
             "desc": meta["desc"],
@@ -782,10 +830,78 @@ async def push_stock_to_line_endpoint(request: Request):
 
 @app.get("/api/radar/watchlist")
 async def get_radar_watchlist_endpoint():
-    """取得盤中雷達即時自選監控清單"""
-    from radar_manager import load_watchlist
+    """取得盤中雷達即時自選監控清單 (含即時價格與進場價差比對)"""
+    from radar_manager import load_watchlist, fetch_batch_realtime_quotes
     watchlist = load_watchlist()
     items = list(watchlist.values())
+
+    # 批次向證交所 API 查詢最新即時行情
+    codes = [it.get('code') for it in items if it.get('code')]
+    quotes = fetch_batch_realtime_quotes(codes) if codes else {}
+
+    for it in items:
+        code = it.get('code', '')
+        q = quotes.get(code, {})
+        curr_p = q.get('price')
+        prev_p = q.get('prev_close')
+
+        # 建議進場價 (優先取 entry_price, entry_high, base_price)
+        ep = float(it.get('entry_price') or it.get('entry_high') or it.get('base_price') or 0)
+        it['entry_price_used'] = ep
+
+        if curr_p is not None:
+            it['realtime_price'] = curr_p
+            it['prev_close'] = prev_p or curr_p
+            it['realtime_change'] = q.get('change', 0.0)
+            it['realtime_change_pct'] = q.get('change_pct', 0.0)
+            it['quote_time'] = q.get('time', '')
+        else:
+            bp = float(it.get('base_price') or 0)
+            it['realtime_price'] = bp
+            it['prev_close'] = bp
+            it['realtime_change'] = 0.0
+            it['realtime_change_pct'] = 0.0
+            it['quote_time'] = ''
+
+        # 計算與建議進場價之差異
+        eval_p = it['realtime_price']
+        if ep > 0 and eval_p > 0:
+            diff = round(eval_p - ep, 2)
+            diff_pct = round((diff / ep) * 100, 2)
+            it['diff_from_entry'] = diff
+            it['diff_pct_from_entry'] = diff_pct
+
+            sl_p = float(it.get('sl_price') or 0)
+            ad_p = float(it.get('addon_price') or 0)
+            tp1_p = float(it.get('tp1_price') or 0)
+
+            if sl_p > 0 and eval_p <= sl_p:
+                it['position_status'] = 'stop_loss'
+                it['position_badge'] = '🛑 觸及停損防線'
+                it['position_desc'] = f'現價已跌破停損線 {sl_p:.2f} 元'
+            elif tp1_p > 0 and eval_p >= tp1_p:
+                it['position_status'] = 'take_profit'
+                it['position_badge'] = '🔴 攻抵目標停利'
+                it['position_desc'] = f'現價已達 TP1 目標 {tp1_p:.2f} 元'
+            elif ad_p > 0 and eval_p >= ad_p:
+                it['position_status'] = 'addon'
+                it['position_badge'] = '🔵 突破動能加碼'
+                it['position_desc'] = f'現價高於進場 +{diff:.2f} 元 (+{diff_pct:.2f}%)，突破加碼'
+            elif diff <= 0:
+                it['position_status'] = 'discount'
+                it['position_badge'] = '🟢 甜蜜進場區'
+                it['position_desc'] = f'現價折價 {abs(diff):.2f} 元 ({diff_pct:.2f}%)，低於買進上限'
+            else:
+                it['position_status'] = 'premium'
+                it['position_badge'] = '⚠️ 高於進場上限'
+                it['position_desc'] = f'現價溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)，高於建議進場'
+        else:
+            it['diff_from_entry'] = 0.0
+            it['diff_pct_from_entry'] = 0.0
+            it['position_status'] = 'normal'
+            it['position_badge'] = '⚪ 觀望評估'
+            it['position_desc'] = '無進場價數據'
+
     # 依最近推送時間（無推送紀錄則採掛入時間）由近至遠排序
     items.sort(
         key=lambda x: max(str(x.get('last_push_at', '')), str(x.get('added_at', ''))),

@@ -350,6 +350,10 @@
             <i data-lucide="download-cloud" class="w-4 h-4 text-cyan-400"></i>
             <span>🤖 同步今日選股日報</span>
           </button>
+          <button onclick="manualRefreshRadarQuotes()" id="btnRefreshRadarQuotes" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="立即重新獲取證交所即時報價與進場價差">
+            <i data-lucide="refresh-cw" class="w-4 h-4 text-cyan-400" id="iconRefreshRadarQuotes"></i>
+            <span>⚡ 刷新行情</span>
+          </button>
           <button onclick="rolloverRadarDefense()" id="btnRolloverRadar" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="以最新收盤價重新計算四大防線並自動墊高移動停損">
             <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
             <span>📈 動態校準 (移動停利)</span>
@@ -378,13 +382,14 @@
               <tr>
                 <th class="py-3 px-4">證券代號</th>
                 <th class="py-3 px-4">證券名稱</th>
-                <th class="py-3 px-4">基準現價</th>
-                <th class="py-3 px-4">🟢 建議進場(買進上限)</th>
-                <th class="py-3 px-4">🔵 動能加碼價位</th>
+                <th class="py-3 px-4">即時現價</th>
+                <th class="py-3 px-4">現價 vs 進場差異</th>
+                <th class="py-3 px-4">🟢 建議進場(上限)</th>
+                <th class="py-3 px-4">位階狀態</th>
+                <th class="py-3 px-4">🔵 動能加碼</th>
                 <th class="py-3 px-4">🔴 第一停利(TP1)</th>
-                <th class="py-3 px-4">🔴 波段滿足(TP2)</th>
-                <th class="py-3 px-4">🛑 嚴格停損防線</th>
-                <th class="py-3 px-4">掛入時間</th>
+                <th class="py-3 px-4">🛑 嚴格停損</th>
+                <th class="py-3 px-4">更新時間</th>
                 <th class="py-3 px-4 text-center">操作</th>
               </tr>
             </thead>
@@ -838,9 +843,34 @@
       } catch (e) {
         console.error("載入雷達清單失敗:", e);
         if (cardGrid) cardGrid.innerHTML = `<div class="col-span-full p-8 text-center text-rose-400">載入失敗: ${e}</div>`;
-        if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-rose-400">載入失敗: ${e}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-rose-400">載入失敗: ${e}</td></tr>`;
       }
     }
+
+    // 手動與定時刷新雷達行情
+    async function manualRefreshRadarQuotes() {
+      const btn = document.getElementById('btnRefreshRadarQuotes');
+      const icon = document.getElementById('iconRefreshRadarQuotes');
+      if (icon) icon.classList.add('animate-spin');
+      if (btn) btn.disabled = true;
+      try {
+        await loadRadarWatchlist();
+        showToast('已更新盤中雷達即時行情與進場價差！');
+      } catch (e) {
+        showToast('更新行情失敗: ' + e, 'error');
+      } finally {
+        if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // 盤中定時自動輪詢即時行情 (每 20 秒，若在雷達分頁)
+    setInterval(() => {
+      const viewRadar = document.getElementById('view-radar');
+      if (viewRadar && !viewRadar.classList.contains('hidden')) {
+        loadRadarWatchlist();
+      }
+    }, 20000);
 
     // 渲染雷達卡片矩陣 (預設模式)
     function renderRadarCards(items) {
@@ -874,45 +904,165 @@
         const pushAt = (it.last_push_at || '').substring(5, 16);
         const timeLabel = pushAt && pushAt >= addedAt ? `推送: ${pushAt}` : `掛入: ${addedAt}`;
 
+        // 即時現價與漲跌幅
+        const rtPrice = (it.realtime_price !== undefined && it.realtime_price !== null && Number(it.realtime_price) > 0)
+          ? Number(it.realtime_price)
+          : Number(it.base_price || 0);
+        const rtPriceFormatted = rtPrice > 0 ? rtPrice.toFixed(2) : bp;
+        const rtChange = Number(it.realtime_change || 0);
+        const rtChangePct = Number(it.realtime_change_pct || 0);
+        const quoteTime = it.quote_time ? String(it.quote_time).substring(0, 5) : '';
+
+        // 漲跌幅顏色與符號 (台股慣用紅漲綠跌)
+        let priceColor = "text-white";
+        let changeHtml = "";
+        if (rtChange > 0) {
+          priceColor = "text-rose-400";
+          changeHtml = `<span class="text-rose-400 font-mono font-bold">▲+${rtChange.toFixed(2)} (+${rtChangePct.toFixed(2)}%)</span>`;
+        } else if (rtChange < 0) {
+          priceColor = "text-emerald-400";
+          changeHtml = `<span class="text-emerald-400 font-mono font-bold">▼${rtChange.toFixed(2)} (${rtChangePct.toFixed(2)}%)</span>`;
+        } else {
+          priceColor = "text-slate-200";
+          changeHtml = `<span class="text-slate-400 font-mono">0.00 (0.00%)</span>`;
+        }
+
+        // 現價 vs 進場價之精準差異計算
+        const epNum = Number(ep);
+        const diffFromEntry = it.diff_from_entry !== undefined ? Number(it.diff_from_entry) : (epNum > 0 ? (rtPrice - epNum) : 0);
+        const diffPctFromEntry = it.diff_pct_from_entry !== undefined ? Number(it.diff_pct_from_entry) : (epNum > 0 ? (diffFromEntry / epNum * 100) : 0);
+        const positionStatus = it.position_status || (diffFromEntry <= 0 ? 'discount' : 'premium');
+
+        let gapBgClass = "bg-slate-800/60 border-slate-700/60";
+        let gapBadge = "⚪ 評價中";
+        let gapBadgeTable = "⚪ 評價中";
+        let gapBadgeTableClass = "bg-slate-800 text-slate-300 border-slate-700";
+        let gapDesc = `現價 ${rtPriceFormatted} 元 ｜ 進場上限 ${ep} 元`;
+        let gapDiffColor = "text-slate-300";
+
+        const slNum = Number(sl);
+        const tp1Num = Number(tp1);
+        const adNum = Number(ad);
+
+        if (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum)) {
+          gapBgClass = "bg-rose-950/40 border-rose-500/40";
+          gapBadge = "🛑【跌破停損線】觸發風控";
+          gapBadgeTable = "🛑 破線停損";
+          gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+          gapDesc = `現價已摜破嚴格停損防線 ${sl} 元，請嚴守紀律停損！`;
+          gapDiffColor = "text-rose-400";
+        } else if (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num)) {
+          gapBgClass = "bg-rose-950/30 border-rose-500/30";
+          gapBadge = "🔴【攻抵停利區】TP1 目標達標";
+          gapBadgeTable = "🔴 攻抵停利";
+          gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+          gapDesc = `現價已達反壓目標區 ${tp1} 元，建議分批獲利入袋！`;
+          gapDiffColor = "text-rose-400";
+        } else if (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum)) {
+          gapBgClass = "bg-blue-950/40 border-blue-500/40";
+          gapBadge = "🔵【突破加碼區】右側動能確認";
+          gapBadgeTable = "🔵 突破加碼";
+          gapBadgeTableClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
+          gapDesc = `突破加碼價位 ${ad} 元，多方續強可逢回加碼！`;
+          gapDiffColor = "text-blue-400";
+        } else if (diffFromEntry <= 0) {
+          gapBgClass = "bg-emerald-950/30 border-emerald-500/30";
+          gapBadge = "🟢【進場甜蜜區】低於買進上限";
+          gapBadgeTable = "🟢 甜蜜進場";
+          gapBadgeTableClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+          gapDesc = `現價折價 ${Math.abs(diffFromEntry).toFixed(2)} 元，在建議進場上限 (${ep}) 之內，盈虧比極佳！`;
+          gapDiffColor = "text-emerald-400";
+        } else {
+          gapBgClass = "bg-amber-950/30 border-amber-500/30";
+          gapBadge = "⚠️【高於進場價】留意追高風險";
+          gapBadgeTable = "⚠️ 高於進場";
+          gapBadgeTableClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+          gapDesc = `現價溢價 +${diffFromEntry.toFixed(2)} 元，已高於買進上限 (${ep})，建議等待回測！`;
+          gapDiffColor = "text-amber-400";
+        }
+
+        const diffDisplay = diffFromEntry <= 0
+          ? `折價 -${Math.abs(diffFromEntry).toFixed(2)} 元`
+          : `溢價 +${diffFromEntry.toFixed(2)} 元`;
+        const diffPctDisplay = `${diffPctFromEntry >= 0 ? '+' : ''}${diffPctFromEntry.toFixed(2)}%`;
+
+        // 判斷哪個四價方塊需要強調高亮
+        const isEntryBoxActive = (diffFromEntry <= 0 && positionStatus !== 'stop_loss');
+        const isAddonBoxActive = (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum));
+        const isTpBoxActive = (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num));
+        const isSlBoxActive = (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum));
+
         const card = document.createElement('div');
-        card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-4 relative group";
+        card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-3.5 relative group";
         card.innerHTML = `
-          <div class="flex items-start justify-between">
+          <!-- 頂部：標的代號股名 與 即時現價 -->
+          <div class="flex items-start justify-between gap-2">
             <div>
-              <div class="flex items-center gap-2">
-                <span class="text-lg font-black font-mono text-white">${code}</span>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xl font-black font-mono text-white tracking-wide">${code}</span>
                 <span class="text-base font-bold text-slate-100">${name}</span>
               </div>
-              <div class="text-[11px] text-slate-400 mt-0.5 font-mono flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div class="text-[11px] text-slate-400 mt-1 font-mono flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
                 <span>${timeLabel}</span>
+                ${quoteTime ? `<span class="text-slate-500 font-sans">(${quoteTime})</span>` : ''}
               </div>
             </div>
             <div class="text-right">
-              <div class="text-[10px] text-slate-400">基準現價</div>
-              <div class="text-xl font-black font-mono text-emerald-400">${bp}</div>
+              <div class="text-[10px] text-slate-400 font-sans flex items-center justify-end gap-1">
+                <span>即時現價</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              </div>
+              <div class="text-2xl font-black font-mono ${priceColor}">${rtPriceFormatted}</div>
+              <div class="text-[11px] font-mono">${changeHtml}</div>
             </div>
           </div>
 
+          <!-- 即時現價 vs 建議進場價 差異診斷條 -->
+          <div class="p-2.5 rounded-xl border ${gapBgClass} flex items-center justify-between text-xs transition">
+            <div class="space-y-0.5 pr-2">
+              <div class="font-bold ${gapDiffColor} text-[11px]">${gapBadge}</div>
+              <div class="text-[10px] text-slate-400 font-sans leading-tight">${gapDesc}</div>
+            </div>
+            <div class="text-right font-mono flex-shrink-0">
+              <div class="text-xs font-black ${gapDiffColor}">${diffDisplay}</div>
+              <div class="text-[10px] font-bold text-slate-400">${diffPctDisplay}</div>
+            </div>
+          </div>
+
+          <!-- 四大防線價位 (2x2 矩陣) -->
           <div class="grid grid-cols-2 gap-2 text-xs">
-            <div class="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
-              <div class="text-[10px] font-bold text-emerald-400">🟢 進場上限</div>
+            <div class="p-2.5 rounded-xl bg-emerald-950/20 border ${isEntryBoxActive ? 'border-emerald-400/80 shadow-md shadow-emerald-950/50 ring-1 ring-emerald-500/30' : 'border-emerald-500/20'}">
+              <div class="text-[10px] font-bold text-emerald-400 flex items-center justify-between">
+                <span>🟢 進場上限</span>
+                ${isEntryBoxActive ? '<span class="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-normal">甜蜜中</span>' : ''}
+              </div>
               <div class="text-base font-black font-mono text-emerald-400 mt-0.5">${ep}</div>
             </div>
-            <div class="p-2.5 rounded-xl bg-blue-950/20 border border-blue-500/20">
-              <div class="text-[10px] font-bold text-blue-400">🔵 動能加碼</div>
+            <div class="p-2.5 rounded-xl bg-blue-950/20 border ${isAddonBoxActive ? 'border-blue-400/80 shadow-md shadow-blue-950/50 ring-1 ring-blue-500/30' : 'border-blue-500/20'}">
+              <div class="text-[10px] font-bold text-blue-400 flex items-center justify-between">
+                <span>🔵 動能加碼</span>
+                ${isAddonBoxActive ? '<span class="text-[9px] px-1 rounded bg-blue-500/20 text-blue-300 font-normal">已突破</span>' : ''}
+              </div>
               <div class="text-base font-black font-mono text-blue-400 mt-0.5">${ad}</div>
             </div>
-            <div class="p-2.5 rounded-xl bg-rose-950/20 border border-rose-500/20">
-              <div class="text-[10px] font-bold text-rose-400">🔴 目標停利</div>
+            <div class="p-2.5 rounded-xl bg-rose-950/20 border ${isTpBoxActive ? 'border-rose-400/80 shadow-md shadow-rose-950/50 ring-1 ring-rose-500/30' : 'border-rose-500/20'}">
+              <div class="text-[10px] font-bold text-rose-400 flex items-center justify-between">
+                <span>🔴 目標停利</span>
+                ${isTpBoxActive ? '<span class="text-[9px] px-1 rounded bg-rose-500/20 text-rose-300 font-normal">達標</span>' : ''}
+              </div>
               <div class="text-xs font-black font-mono text-rose-400 mt-1 truncate">TP1 ${tp1} / ${tp2}</div>
             </div>
-            <div class="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20">
-              <div class="text-[10px] font-bold text-amber-400">🛑 嚴格停損</div>
-              <div class="text-base font-black font-mono text-amber-400 mt-0.5">${sl}</div>
+            <div class="p-2.5 rounded-xl bg-amber-950/20 border ${isSlBoxActive ? 'border-rose-500 shadow-md shadow-rose-950/60 ring-1 ring-rose-500 animate-pulse' : 'border-amber-500/20'}">
+              <div class="text-[10px] font-bold ${isSlBoxActive ? 'text-rose-400' : 'text-amber-400'} flex items-center justify-between">
+                <span>🛑 嚴格停損</span>
+                ${isSlBoxActive ? '<span class="text-[9px] px-1 rounded bg-rose-500/30 text-rose-300 font-bold">已跌破</span>' : ''}
+              </div>
+              <div class="text-base font-black font-mono ${isSlBoxActive ? 'text-rose-400' : 'text-amber-400'} mt-0.5">${sl}</div>
             </div>
           </div>
 
+          <!-- 操作按鈕 -->
           <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
             <button onclick="submitRadarDiagnose('${code}')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold transition flex items-center gap-1">
               <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400"></i>
@@ -942,7 +1092,7 @@
       if (!items || items.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
+            <td colspan="11" class="p-8 text-center text-slate-500 font-sans">
               目前盤中雷達監控池為空。點擊上方「➕ 手動加入監控」或「🤖 同步今日選股日報」立即開始自動盯盤！
             </td>
           </tr>
@@ -960,19 +1110,66 @@
         const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
         const ad = Number(it.addon_price || 0).toFixed(2);
         const tp1 = Number(it.tp1_price || 0).toFixed(2);
-        const tp2 = Number(it.tp2_price || 0).toFixed(2);
         const sl = Number(it.sl_price || 0).toFixed(2);
         const addedAt = (it.added_at || '').substring(5, 16);
+
+        // 即時現價與漲跌
+        const rtPrice = (it.realtime_price !== undefined && it.realtime_price !== null && Number(it.realtime_price) > 0)
+          ? Number(it.realtime_price)
+          : Number(it.base_price || 0);
+        const rtPriceFormatted = rtPrice > 0 ? rtPrice.toFixed(2) : bp;
+        const rtChange = Number(it.realtime_change || 0);
+        const rtChangePct = Number(it.realtime_change_pct || 0);
+
+        let priceColor = "text-white";
+        let changeChip = "";
+        if (rtChange > 0) {
+          priceColor = "text-rose-400";
+          changeChip = `<span class="text-[10px] text-rose-400 ml-1">▲+${rtChangePct.toFixed(1)}%</span>`;
+        } else if (rtChange < 0) {
+          priceColor = "text-emerald-400";
+          changeChip = `<span class="text-[10px] text-emerald-400 ml-1">▼${rtChangePct.toFixed(1)}%</span>`;
+        }
+
+        // 價差計算
+        const epNum = Number(ep);
+        const diffFromEntry = it.diff_from_entry !== undefined ? Number(it.diff_from_entry) : (epNum > 0 ? (rtPrice - epNum) : 0);
+        const diffPctFromEntry = it.diff_pct_from_entry !== undefined ? Number(it.diff_pct_from_entry) : (epNum > 0 ? (diffFromEntry / epNum * 100) : 0);
+        const isDiscount = diffFromEntry <= 0;
+        const diffColor = isDiscount ? "text-emerald-400" : "text-amber-400";
+        const diffLabel = isDiscount
+          ? `折價 -${Math.abs(diffFromEntry).toFixed(2)} (${diffPctFromEntry.toFixed(1)}%)`
+          : `溢價 +${diffFromEntry.toFixed(2)} (+${diffPctFromEntry.toFixed(1)}%)`;
+
+        const positionStatus = it.position_status || (diffFromEntry <= 0 ? 'discount' : 'premium');
+        let badgeHtml = '';
+        if (positionStatus === 'stop_loss') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🛑 破線停損</span>';
+        } else if (positionStatus === 'take_profit') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🔴 攻抵停利</span>';
+        } else if (positionStatus === 'addon') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 text-[10px]">🔵 突破加碼</span>';
+        } else if (isDiscount) {
+          badgeHtml = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">🟢 甜蜜進場</span>';
+        } else {
+          badgeHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">⚠️ 高於進場</span>';
+        }
 
         tr.innerHTML = `
           <td class="py-3 px-4 font-bold text-white">${code}</td>
           <td class="py-3 px-4 text-slate-200 font-sans font-medium">${name}</td>
-          <td class="py-3 px-4 text-slate-100 font-bold">${bp}</td>
+          <td class="py-3 px-4 font-black ${priceColor}">
+            ${rtPriceFormatted} ${changeChip}
+          </td>
+          <td class="py-3 px-4 font-mono font-bold ${diffColor}">
+            ${diffLabel}
+          </td>
           <td class="py-3 px-4">
             <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 whitespace-nowrap">
-              🟢 ${ep} (上限)
+              🟢 ${ep}
             </span>
           </td>
+          <td class="py-3 px-4">${badgeHtml}</td>
           <td class="py-3 px-4">
             <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20">
               🔵 ${ad}
@@ -981,11 +1178,6 @@
           <td class="py-3 px-4">
             <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20">
               🔴 ${tp1}
-            </span>
-          </td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20">
-              🔴 ${tp2}
             </span>
           </td>
           <td class="py-3 px-4">
@@ -1566,9 +1758,56 @@
           riskHtml = `<div class="text-[10px] text-rose-400 bg-rose-950/30 border border-rose-500/20 rounded-lg px-2 py-1">${ogRisk}</div>`;
         }
 
+        // 即時現價與漲跌
+        const rtPrice = (r.realtime_price !== undefined && r.realtime_price !== null && Number(r.realtime_price) > 0)
+          ? Number(r.realtime_price)
+          : 0;
+        const rtChange = Number(r.realtime_change || 0);
+        const rtChangePct = Number(r.realtime_change_pct || 0);
+
+        let priceColor = "text-white";
+        let changeHtml = "";
+        if (rtChange > 0) {
+          priceColor = "text-rose-400";
+          changeHtml = `<span class="text-rose-400 font-mono font-bold text-xs">▲+${rtChange.toFixed(2)} (+${rtChangePct.toFixed(2)}%)</span>`;
+        } else if (rtChange < 0) {
+          priceColor = "text-emerald-400";
+          changeHtml = `<span class="text-emerald-400 font-mono font-bold text-xs">▼${rtChange.toFixed(2)} (${rtChangePct.toFixed(2)}%)</span>`;
+        } else if (rtPrice > 0) {
+          priceColor = "text-slate-200";
+          changeHtml = `<span class="text-slate-400 font-mono text-xs">0.00 (0.00%)</span>`;
+        }
+
+        const displayPrice = rtPrice > 0 ? rtPrice.toFixed(2) : (futPrice || price);
+
+        // 即時進場價差比對條
+        let diffStripHtml = '';
+        if (r.diff_from_entry !== undefined && r.diff_pct_from_entry !== undefined) {
+          const diff = Number(r.diff_from_entry);
+          const diffPct = Number(r.diff_pct_from_entry);
+          const isDiscount = diff <= 0;
+          const bgClass = isDiscount ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' : 'bg-amber-950/30 border-amber-500/30 text-amber-300';
+          const badgeText = isDiscount ? '🟢 甜蜜進場區・低於買進上限' : '⚠️ 高於進場價・注意追高風險';
+          const diffLabel = isDiscount ? `折價 -${Math.abs(diff).toFixed(2)} 元` : `溢價 +${diff.toFixed(2)} 元`;
+          const diffPctLabel = `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(2)}%`;
+
+          diffStripHtml = `
+            <div class="p-2.5 rounded-xl border ${bgClass} flex items-center justify-between text-xs transition">
+              <div class="space-y-0.5 pr-2">
+                <div class="font-bold text-[11px]">${badgeText}</div>
+                <div class="text-[10px] text-slate-400 font-sans leading-tight">現價 ${displayPrice} 元 ｜ 建議進場上限 ${entry} 元</div>
+              </div>
+              <div class="text-right font-mono flex-shrink-0">
+                <div class="text-xs font-black">${diffLabel}</div>
+                <div class="text-[10px] font-bold text-slate-400">${diffPctLabel}</div>
+              </div>
+            </div>
+          `;
+        }
+
         card.innerHTML = `
           <div class="space-y-3">
-            <div class="flex items-start justify-between">
+            <div class="flex items-start justify-between gap-2">
               <div>
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-lg font-black font-mono text-white">${code}</span>
@@ -1583,11 +1822,17 @@
                 </div>
               </div>
               <div class="text-right">
-                <div class="text-[10px] text-slate-400">${futPrice ? '期貨收盤' : '現價'}</div>
-                <div class="text-xl font-black font-mono text-emerald-400">${futPrice || price}</div>
-                ${futPrice && price ? `<div class="text-[10px] text-slate-400 font-mono">現貨 ${price}</div>` : ''}
+                <div class="text-[10px] text-slate-400 font-sans flex items-center justify-end gap-1">
+                  <span>${futPrice ? '期貨現價' : (rtPrice > 0 ? '即時現價' : '收盤現價')}</span>
+                  ${rtPrice > 0 ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>' : ''}
+                </div>
+                <div class="text-2xl font-black font-mono ${priceColor}">${displayPrice}</div>
+                ${changeHtml ? `<div class="text-[11px] font-mono">${changeHtml}</div>` : ''}
+                ${futPrice && price ? `<div class="text-[10px] text-slate-400 font-mono">現貨收盤 ${price}</div>` : ''}
               </div>
             </div>
+
+            ${diffStripHtml}
 
             <!-- 四大防線 -->
             <div class="grid grid-cols-2 gap-2 text-xs">

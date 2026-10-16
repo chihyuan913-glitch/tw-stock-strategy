@@ -532,6 +532,91 @@ def get_themes_summary() -> str:
     lines.append("💡 在 LINE 輸入「監控 矽光子」即可將整組族群一次掛入雷達！")
     return "\n".join(lines)
 
+# 全域即時行情快取 (TTL 防頻繁重複請求)
+_QUOTE_CACHE = {}
+_QUOTE_CACHE_TIME = 0.0
+
+def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict:
+    """
+    向證交所/櫃買中心 mis.twse API 批次查詢即時行情
+    支援 trade.z / z / y / a / b 自動解析
+    具備 3 秒 TTL 短暫記憶體快取防高頻請求
+    """
+    global _QUOTE_CACHE, _QUOTE_CACHE_TIME
+    import time
+    now_t = time.time()
+
+    clean_codes = [str(c).strip() for c in codes if str(c).strip()]
+    if not clean_codes:
+        return {}
+
+    # 如果快取在有效期內且已包含所有代碼，直接返回快取
+    if (now_t - _QUOTE_CACHE_TIME) < max_cache_sec:
+        if all(c in _QUOTE_CACHE for c in clean_codes):
+            return {c: _QUOTE_CACHE[c] for c in clean_codes}
+
+    now_tw = datetime.datetime.now(TZ_TW)
+    time_str = now_tw.strftime('%H:%M:%S')
+
+    quotes = {}
+    chunk_size = 15  # 每 15 檔一包，杜絕 mis.twse URL 逾時與截斷問題
+    for i in range(0, len(clean_codes), chunk_size):
+        chunk = clean_codes[i:i + chunk_size]
+        channel_str = "|".join([f"tse_{c}.tw|otc_{c}.tw" for c in chunk])
+        url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={channel_str}&json=1&delay=0"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                for item in data.get('msgArray', []):
+                    c = item.get('c', '')
+                    if not c or c not in clean_codes:
+                        continue
+                    z_val = item.get('z', '-')
+                    trade_z = item.get('trade', {}).get('z', '-') if isinstance(item.get('trade'), dict) else '-'
+                    y_val = item.get('y', '-')
+                    o_val = item.get('o', '-')
+                    h_val = item.get('h', '-')
+                    l_val = item.get('l', '-')
+                    v_val = item.get('v', '-')
+
+                    price = None
+                    if z_val and z_val != '-':
+                        price = float(z_val)
+                    elif trade_z and trade_z != '-':
+                        price = float(trade_z)
+                    elif y_val and y_val != '-':
+                        price = float(y_val)
+
+                    prev_close = float(y_val) if (y_val and y_val != '-') else price
+                    chg = round(price - prev_close, 2) if (price is not None and prev_close is not None) else 0.0
+                    pct = round((chg / prev_close * 100), 2) if (prev_close and prev_close > 0) else 0.0
+
+                    quote_obj = {
+                        'code': c,
+                        'name': item.get('n', '').strip(),
+                        'price': price,
+                        'prev_close': prev_close,
+                        'change': chg,
+                        'change_pct': pct,
+                        'open': float(o_val) if (o_val and o_val != '-') else None,
+                        'high': float(h_val) if (h_val and h_val != '-') else None,
+                        'low': float(l_val) if (l_val and l_val != '-') else None,
+                        'volume': int(v_val) if (v_val and v_val != '-') else None,
+                        'time': item.get('t', time_str)
+                    }
+                    quotes[c] = quote_obj
+                    _QUOTE_CACHE[c] = quote_obj
+        except Exception as e:
+            print(f"[!] 批次查詢現價失敗 ({chunk}): {e}")
+
+    _QUOTE_CACHE_TIME = now_t
+    for c in clean_codes:
+        if c not in quotes and c in _QUOTE_CACHE:
+            quotes[c] = _QUOTE_CACHE[c]
+
+    return quotes
+
 def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
     """
     執行單次盤中到價巡邏，偵測觸發事件並自動推送 LINE
@@ -546,31 +631,7 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
     time_str = now_tw.strftime('%H:%M:%S')
 
     codes = list(watchlist.keys())
-    # 批次向 mis.twse 查詢現價 (每 50 檔一包)
-    quotes = {}
-    chunk_size = 50
-    for i in range(0, len(codes), chunk_size):
-        chunk = codes[i:i + chunk_size]
-        channel_str = "|".join([f"tse_{c}.tw|otc_{c}.tw" for c in chunk])
-        url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={channel_str}&json=1&delay=0"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                for item in data.get('msgArray', []):
-                    c = item.get('c', '')
-                    if c in watchlist:
-                        z = item.get('z', '-')
-                        y = item.get('y', '-')
-                        p = float(z) if (z and z != '-') else (float(y) if (y and y != '-') else None)
-                        if p:
-                            quotes[c] = {
-                                'price': p,
-                                'name': item.get('n', watchlist[c].get('name', c)),
-                                'time': item.get('t', time_str)
-                            }
-        except Exception as e:
-            print(f"[!] 批次查詢現價失敗: {e}")
+    quotes = fetch_batch_realtime_quotes(codes)
 
     triggered_alerts = []
     watchlist_updated = False
@@ -580,9 +641,11 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
             continue
 
         q = quotes[code]
-        curr_p = q['price']
+        curr_p = q.get('price')
+        if not curr_p:
+            continue
         prev_p = q.get('prev_close', curr_p)
-        name = item.get('name', q['name'])
+        name = item.get('name', q.get('name') or code)
         entry_price = item.get('entry_price', item.get('entry_high', item.get('base_price', 0)))
         addon_p = item.get('addon_price', 0)
         tp1_p = item.get('tp1_price', 0)
