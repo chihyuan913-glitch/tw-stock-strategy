@@ -19,6 +19,7 @@ import sys
 import re
 import json
 import time
+import datetime
 import urllib.request
 from pathlib import Path
 import threading
@@ -902,6 +903,33 @@ async def get_radar_watchlist_endpoint():
             it['position_badge'] = '⚪ 觀望評估'
             it['position_desc'] = '無進場價數據'
 
+        # 計算掛入至今之交易日數與進場狀態
+        from radar_manager import count_trading_days, TZ_TW
+        now_tw = datetime.datetime.now(TZ_TW)
+        today = now_tw.date()
+        added_str = it.get('added_at', '')
+        if added_str:
+            try:
+                added_d = datetime.datetime.strptime(added_str[:10], '%Y-%m-%d').date()
+                it['trading_days_waiting'] = count_trading_days(added_d, today)
+            except Exception:
+                it['trading_days_waiting'] = 0
+        else:
+            it['trading_days_waiting'] = 0
+
+        # 判定是否已曾進場
+        has_entered = it.get('has_entered', False)
+        if not has_entered and ep > 0 and eval_p <= ep:
+            has_entered = True
+            it['has_entered'] = True
+        if not has_entered and it.get('alerted_today'):
+            for evs in it['alerted_today'].values():
+                if any(x in ('ENTRY', 'ADDON', 'TP1', 'TP2') for x in evs):
+                    has_entered = True
+                    it['has_entered'] = True
+                    break
+        it['has_entered'] = has_entered
+
     # 依最近推送時間（無推送紀錄則採掛入時間）由近至遠排序
     items.sort(
         key=lambda x: max(str(x.get('last_push_at', '')), str(x.get('added_at', ''))),
@@ -967,14 +995,34 @@ async def sync_radar_endpoint():
     watchlist = load_watchlist()
     return {"success": True, "message": res, "count": len(watchlist)}
 
+@app.post("/api/radar/prune_unentered")
+async def prune_unentered_endpoint():
+    """手動或排程釋放超過 5 個交易日未觸及進場價之監控席位"""
+    from radar_manager import prune_unentered_radar_stocks, load_watchlist
+    pruned = prune_unentered_radar_stocks(max_trading_days=5, verbose=False)
+    wl = load_watchlist()
+    return {
+        "success": True,
+        "pruned_count": len(pruned),
+        "pruned_items": pruned,
+        "remaining_count": len(wl),
+        "message": f"已自動釋放 {len(pruned)} 檔超過 5 個交易日未觸及進場價之標的。" if pruned else "目前無超過 5 個交易日未進場之逾期標的。"
+    }
+
 @app.post("/api/radar/rollover")
 async def rollover_radar_endpoint():
-    """執行雷達監控池跨日動態滾動校準與自動移動停利"""
+    """執行雷達監控池跨日動態滾動校準與自動移動停利 (含自動釋放超過 5 日未進場席位)"""
     from radar_manager import rollover_watchlist_defense, load_watchlist
     res = rollover_watchlist_defense(verbose=False)
     watchlist = load_watchlist()
-    msg = f"已完成動態校準！共更新 {res['updated']}/{res['total']} 檔標的，其中 {res['trailed']} 檔成功墊高移動停利！"
-    return {"success": True, "message": msg, "data": res, "count": len(watchlist)}
+    return {
+        "success": True,
+        "result": res,
+        "pruned_count": res.get("pruned", 0),
+        "pruned_items": res.get("pruned_items", []),
+        "message": f"動態校準完成！共更新 {res['updated']}/{res['total']} 檔，移動停利墊高 {res['trailed']} 檔" + (f"，已自動釋放 {res['pruned']} 檔逾 5 日未進場標的。" if res.get('pruned') else "。"),
+        "count": len(watchlist)
+    }
 
 
 

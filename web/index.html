@@ -992,6 +992,17 @@
         const isTpBoxActive = (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num));
         const isSlBoxActive = (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum));
 
+        // 5 個交易日進場監控計時徽章
+        const waitingDays = Number(it.trading_days_waiting || 0);
+        let waitingBadgeHtml = '';
+        if (it.has_entered) {
+          waitingBadgeHtml = '<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">🟢 已進場</span>';
+        } else if (waitingDays >= 4) {
+          waitingBadgeHtml = `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30" title="超過 5 個交易日未觸及進場價將自動釋放席位">⏳ 待進場 ${waitingDays}/5天</span>`;
+        } else {
+          waitingBadgeHtml = `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium text-[10px] border border-slate-700" title="超過 5 個交易日未觸及進場價將自動釋放席位">⏳ 待進場 ${waitingDays}/5天</span>`;
+        }
+
         const card = document.createElement('div');
         card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-3.5 relative group";
         card.innerHTML = `
@@ -1001,6 +1012,7 @@
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xl font-black font-mono text-white tracking-wide">${code}</span>
                 <span class="text-base font-bold text-slate-100">${name}</span>
+                ${waitingBadgeHtml}
               </div>
               <div class="text-[11px] text-slate-400 mt-1 font-mono flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
@@ -1155,6 +1167,16 @@
           badgeHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">⚠️ 高於進場</span>';
         }
 
+        const waitingDays = Number(it.trading_days_waiting || 0);
+        let waitingBadgeHtml = '';
+        if (it.has_entered) {
+          waitingBadgeHtml = '<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px] border border-emerald-500/30 whitespace-nowrap">🟢 已進場</span>';
+        } else if (waitingDays >= 4) {
+          waitingBadgeHtml = `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30 whitespace-nowrap" title="超過 5 個交易日未觸及進場價將自動釋放席位">⏳ 待 ${waitingDays}/5天</span>`;
+        } else {
+          waitingBadgeHtml = `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium text-[10px] border border-slate-700 whitespace-nowrap" title="超過 5 個交易日未觸及進場價將自動釋放席位">⏳ 待 ${waitingDays}/5天</span>`;
+        }
+
         tr.innerHTML = `
           <td class="py-3 px-4 font-bold text-white">${code}</td>
           <td class="py-3 px-4 text-slate-200 font-sans font-medium">${name}</td>
@@ -1185,7 +1207,10 @@
               🛑 ${sl}
             </span>
           </td>
-          <td class="py-3 px-4 text-slate-400 text-[11px]">${addedAt}</td>
+          <td class="py-3 px-4 text-slate-400 text-[11px] font-mono">
+            <div>${addedAt}</div>
+            <div class="mt-0.5">${waitingBadgeHtml}</div>
+          </td>
           <td class="py-3 px-4 text-center">
             <div class="flex items-center justify-center gap-1.5 font-sans">
               <button onclick="submitRadarDiagnose('${code}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs transition" title="個股即時診斷">

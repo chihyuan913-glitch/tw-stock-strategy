@@ -17,7 +17,10 @@
         "ENTRY"
       ]
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "2476": {
     "code": "2476",
@@ -37,7 +40,8 @@
         "STOP_LOSS"
       ]
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4
   },
   "3221": {
     "code": "3221",
@@ -57,7 +61,8 @@
         "STOP_LOSS"
       ]
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "2603": {
     "code": "2603",
@@ -78,7 +83,9 @@
       ]
     },
     "entry_price": 257.0,
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 5,
+    "has_entered": true
   },
   "3034": {
     "code": "3034",
@@ -93,7 +100,8 @@
     "sl_price": 538.35,
     "target_id": "test",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "1102": {
     "code": "1102",
@@ -113,7 +121,9 @@
       ]
     },
     "entry_price": 37.85,
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 5,
+    "has_entered": true
   },
   "2855": {
     "code": "2855",
@@ -133,7 +143,10 @@
       ]
     },
     "entry_price": 59.1,
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 5,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "1319": {
     "code": "1319",
@@ -153,7 +166,9 @@
       ]
     },
     "entry_price": 83.3,
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 5,
+    "has_entered": true
   },
   "2317": {
     "code": "2317",
@@ -173,7 +188,9 @@
         "ENTRY"
       ]
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2,
+    "has_entered": true
   },
   "2352": {
     "code": "2352",
@@ -193,7 +210,9 @@
       ]
     },
     "entry_price": 29.0,
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 5,
+    "has_entered": true
   },
   "4916": {
     "code": "4916",
@@ -213,7 +232,9 @@
         "ENTRY"
       ]
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2,
+    "has_entered": true
   },
   "2344": {
     "code": "2344",
@@ -228,7 +249,8 @@
     "sl_price": 147.25,
     "target_id": "test",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "8103": {
     "code": "8103",
@@ -246,7 +268,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4
   },
   "6588": {
     "code": "6588",
@@ -264,7 +287,10 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "4961": {
     "code": "4961",
@@ -282,7 +308,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4
   },
   "2382": {
     "code": "2382",
@@ -300,7 +327,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4
   },
   "3717": {
     "code": "3717",
@@ -318,7 +346,10 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "3630": {
     "code": "3630",
@@ -336,7 +367,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 4
   },
   "2002": {
     "code": "2002",
@@ -354,7 +386,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "1229": {
     "code": "1229",
@@ -372,7 +405,10 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "1216": {
     "code": "1216",
@@ -390,7 +426,10 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "2308": {
     "code": "2308",
@@ -408,7 +447,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "2408": {
     "code": "2408",
@@ -426,7 +466,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "8996": {
     "code": "8996",
@@ -441,7 +482,8 @@
     "sl_price": 1444.0,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "3706": {
     "code": "3706",
@@ -456,7 +498,10 @@
     "sl_price": 77.83,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "2379": {
     "code": "2379",
@@ -474,7 +519,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "6116": {
     "code": "6116",
@@ -492,7 +538,8 @@
     "alerted_today": {
       "2026-10-16": []
     },
-    "last_rollover": "2026-10-15"
+    "last_rollover": "2026-10-15",
+    "trading_days_waiting": 2
   },
   "2903": {
     "code": "2903",
@@ -507,7 +554,8 @@
     "sl_price": 21.39,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "2912": {
     "code": "2912",
@@ -522,7 +570,10 @@
     "sl_price": 211.7,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:06:26"
   },
   "5880": {
     "code": "5880",
@@ -537,7 +588,8 @@
     "sl_price": 26.26,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "1536": {
     "code": "1536",
@@ -552,7 +604,8 @@
     "sl_price": 42.08,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0
   },
   "2890": {
     "code": "2890",
@@ -567,6 +620,9 @@
     "sl_price": 43.55,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {}
+    "alerted_today": {},
+    "trading_days_waiting": 0,
+    "has_entered": true,
+    "first_entered_at": "2026-10-16 13:10:17"
   }
 }

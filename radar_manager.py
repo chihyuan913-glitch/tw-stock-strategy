@@ -751,6 +751,10 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
                 alerted.append(event_info['type'])
                 item['last_push_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 item['last_push_event'] = event_info['type']
+                if event_info['type'] in ('ENTRY', 'ADDON', 'TP1', 'TP2'):
+                    item['has_entered'] = True
+                    if 'first_entered_at' not in item:
+                        item['first_entered_at'] = today_str
                 watchlist_updated = True
                 triggered_alerts.append(f"{code} {name} ({event_info['type']})")
 
@@ -759,10 +763,120 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 
     return triggered_alerts
 
+def count_trading_days(start_date, end_date) -> int:
+    """計算兩個日期之間的台股實際交易日數 (排除週六與週日)"""
+    if isinstance(start_date, str):
+        try:
+            start_date = datetime.datetime.strptime(start_date[:10], '%Y-%m-%d').date()
+        except Exception:
+            return 0
+    elif isinstance(start_date, datetime.datetime):
+        start_date = start_date.date()
+
+    if isinstance(end_date, str):
+        try:
+            end_date = datetime.datetime.strptime(end_date[:10], '%Y-%m-%d').date()
+        except Exception:
+            return 0
+    elif isinstance(end_date, datetime.datetime):
+        end_date = end_date.date()
+
+    if start_date >= end_date:
+        return 0
+
+    cur = start_date
+    trading_days = 0
+    while cur < end_date:
+        cur += datetime.timedelta(days=1)
+        if cur.weekday() < 5:  # 0~4 為週一至週五
+            trading_days += 1
+    return trading_days
+
+def prune_unentered_radar_stocks(max_trading_days: int = 5, verbose: bool = True) -> list:
+    """
+    【超過 5 個交易日未觸及進場價，自動釋放監控席位】
+    --------------------------------------------------------------------------
+    規則：
+    1. 計算自掛入日期 (added_at) 至今所經過的台股實際交易日數 (排除週末)。
+    2. 檢查是否曾觸及進場價 (has_entered / 曾觸發 ENTRY 事件 / 當前現價低於進場上限)。
+    3. 若交易日數 >= max_trading_days (預設 5 個交易日) 且「未曾觸及進場價」且「現價仍高於進場上限」：
+       -> 自動將該標的自 watchlist.json 剔除，釋放雷達監控席位！
+    4. 回傳被自動釋放的個股清單與原因。
+    """
+    watchlist = load_watchlist()
+    if not watchlist:
+        return []
+
+    now_tw = datetime.datetime.now(TZ_TW)
+    today = now_tw.date()
+
+    codes = list(watchlist.keys())
+    quotes = fetch_batch_realtime_quotes(codes)
+
+    pruned = []
+    watchlist_updated = False
+
+    for code, item in list(watchlist.items()):
+        added_str = item.get('added_at', '')
+        if not added_str:
+            continue
+        try:
+            added_d = datetime.datetime.strptime(added_str[:10], '%Y-%m-%d').date()
+        except Exception:
+            continue
+
+        trading_days = count_trading_days(added_d, today)
+        item['trading_days_waiting'] = trading_days
+
+        entry_p = float(item.get('entry_price') or item.get('entry_high') or item.get('base_price') or 0)
+        curr_p = quotes.get(code, {}).get('price') or float(item.get('base_price', 0))
+
+        # 若目前現價 <= 進場價，自動標記為已觸及進場
+        if entry_p > 0 and curr_p <= entry_p:
+            if not item.get('has_entered'):
+                item['has_entered'] = True
+                item['first_entered_at'] = now_tw.strftime('%Y-%m-%d %H:%M:%S')
+                watchlist_updated = True
+
+        # 檢查歷史 alert 紀錄
+        has_entered = item.get('has_entered', False)
+        if not has_entered and item.get('alerted_today'):
+            for evs in item['alerted_today'].values():
+                if any(x in ('ENTRY', 'ADDON', 'TP1', 'TP2') for x in evs):
+                    has_entered = True
+                    item['has_entered'] = True
+                    watchlist_updated = True
+                    break
+
+        # 判定剔除條件：超過 5 個交易日未曾觸及進場價，且現價仍在進場上限之上
+        if trading_days >= max_trading_days and not has_entered and curr_p > entry_p:
+            del watchlist[code]
+            watchlist_updated = True
+            prune_info = {
+                'code': code,
+                'name': item.get('name', code),
+                'added_at': added_str,
+                'trading_days': trading_days,
+                'entry_price': entry_p,
+                'curr_price': curr_p,
+                'reason': f"掛入已滿 {trading_days} 個交易日未曾觸及進場價 ({curr_p:.2f} > {entry_p:.2f})，自動釋放席位"
+            }
+            pruned.append(prune_info)
+            if verbose:
+                print(f"  [🗑️ 自動釋放席位] {code} {item.get('name')}: {prune_info['reason']}")
+
+    if watchlist_updated:
+        save_watchlist(watchlist)
+        if verbose and pruned:
+            print(f"[✓] 已自動釋放 {len(pruned)} 檔超過 {max_trading_days} 個交易日未觸及進場價之標的。")
+
+    return pruned
+
 def rollover_watchlist_defense(verbose: bool = True) -> dict:
     """
     盤後/跨日自動動態滾動校準與移動停利機制 (Auto Trailing & Defense Rollover)
     --------------------------------------------------------------------------
+    0. 自動執行「超過 5 個交易日未觸及進場價，自動釋放監控席位」清理。
     1. 遍歷 watchlist.json 所有監控標的。
     2. 以最新收盤行情與日 K 均線結構，全面重新計算四大防線。
     3. 落實「移動停損 (Trailing Stop) 棘輪法則 (Ratchet Principle)」：
@@ -771,11 +885,14 @@ def rollover_watchlist_defense(verbose: bool = True) -> dict:
     4. 更新基準價、進場上限、加碼點與停利點至最新結構。
     5. 重置今日觸發紀錄 (alerted_today)，備妥次日交易日全新盯盤。
     """
+    # 步驟 0：超期未進場席位自動釋放
+    pruned_list = prune_unentered_radar_stocks(max_trading_days=5, verbose=verbose)
+
     watchlist = load_watchlist()
     if not watchlist:
         if verbose:
             print("[*] 監控池為空，無需執行滾動校準。")
-        return {"total": 0, "updated": 0, "trailed": 0}
+        return {"total": 0, "updated": 0, "trailed": 0, "pruned": len(pruned_list), "pruned_items": pruned_list}
 
     today_str = datetime.datetime.now(TZ_TW).strftime('%Y-%m-%d')
     updated_count = 0
@@ -825,12 +942,17 @@ def rollover_watchlist_defense(verbose: bool = True) -> dict:
 
     save_watchlist(watchlist)
     if verbose:
-        print(f"[✓] 滾動校準完畢：成功更新 {updated_count}/{len(watchlist)} 檔標的，其中 {trailed_count} 檔觸發移動停利向上墊高！\n")
+        msg = f"[✓] 滾動校準完畢：成功更新 {updated_count}/{len(watchlist)} 檔標的，其中 {trailed_count} 檔觸發移動停利向上墊高！"
+        if pruned_list:
+            msg += f" (已自動釋放 {len(pruned_list)} 檔超期未進場標的)"
+        print(msg + "\n")
 
     return {
         "total": len(watchlist),
         "updated": updated_count,
-        "trailed": trailed_count
+        "trailed": trailed_count,
+        "pruned": len(pruned_list),
+        "pruned_items": pruned_list
     }
 
 if __name__ == '__main__':
