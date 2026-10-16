@@ -204,19 +204,55 @@ def _on_tunnel_url_ready(url: str, notify_line: bool):
     if notify_line:
         _notify_line(url)
 
+def get_named_tunnel_config() -> tuple:
+    """檢查是否配置了 Cloudflare Zero Trust 具名通道 (Token 模式與自訂網域)"""
+    token = os.environ.get("CLOUDFLARE_TUNNEL_TOKEN", "").strip()
+    domain = os.environ.get("CLOUDFLARE_TUNNEL_DOMAIN", "").strip()
+    env_file = ROOT_DIR / ".env"
+    if env_file.exists():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for l in f:
+                    l = l.strip()
+                    if l.startswith("CLOUDFLARE_TUNNEL_TOKEN="):
+                        t_val = l.split("=", 1)[1].strip().strip("'\"")
+                        if t_val:
+                            token = t_val
+                    elif l.startswith("CLOUDFLARE_TUNNEL_DOMAIN="):
+                        d_val = l.split("=", 1)[1].strip().strip("'\"")
+                        if d_val:
+                            domain = d_val
+        except Exception:
+            pass
+    return token, domain
+
 def _monitor_tunnel(port: int, notify_line: bool = True):
-    """背景執行緒：啟動 cloudflared 並擷取隨機專屬 HTTPS 網址（支援斷線自動重連與防 Pipe 阻塞）"""
+    """背景執行緒：啟動 cloudflared（支援 Zero Trust 具名通道 Token 模式與免費隨機通道，具備斷線自動重連）"""
     global _cf_process, _tunnel_url, _is_stopping
 
     if not ensure_cloudflared_installed():
         return
 
-    cmd = [
-        str(CLOUDFLARED_EXE),
-        "tunnel",
-        "--url",
-        f"http://127.0.0.1:{port}"
-    ]
+    named_token, named_domain = get_named_tunnel_config()
+    is_named = bool(named_token)
+
+    if is_named:
+        cmd = [
+            str(CLOUDFLARED_EXE),
+            "tunnel",
+            "run",
+            "--token",
+            named_token
+        ]
+        fixed_url = f"https://{named_domain}" if named_domain else ""
+    else:
+        cmd = [
+            str(CLOUDFLARED_EXE),
+            "tunnel",
+            "--url",
+            f"http://127.0.0.1:{port}"
+        ]
+        fixed_url = ""
 
     creationflags = 0x08000000 if os.name == "nt" else 0
 
@@ -233,10 +269,27 @@ def _monitor_tunnel(port: int, notify_line: bool = True):
             )
 
             url_captured_this_run = False
+
+            # 若為具名通道模式且有配置網域，啟動後直接確認固定網址
+            if is_named and fixed_url and not url_captured_this_run:
+                url_captured_this_run = True
+                _tunnel_url = fixed_url
+                print("\n" + "=" * 70, flush=True)
+                print(f" 🌐【Cloudflare Zero Trust 具名專屬固定網址已啟動！】", flush=True)
+                print(f" 🔗 永久固定外網網址: {_tunnel_url} (重開機永不更換)", flush=True)
+                print(f" 📁 已自動產出捷徑: 【外網看盤直達.url】(別台電腦雙擊即可直達)", flush=True)
+                print("=" * 70 + "\n", flush=True)
+
+                threading.Thread(
+                    target=_on_tunnel_url_ready,
+                    args=(_tunnel_url, notify_line),
+                    daemon=True
+                ).start()
+
             for line in iter(_cf_process.stdout.readline, ""):
                 if _is_stopping:
                     break
-                if not url_captured_this_run:
+                if not is_named and not url_captured_this_run:
                     m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
                     if m:
                         url_captured_this_run = True
