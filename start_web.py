@@ -155,7 +155,8 @@ def main():
     print(f"    💡 提示：同 Wi-Fi 內的別台電腦或手機，直接在瀏覽器輸入 {lan_url} 即可即時看盤！\n", flush=True)
     try:
         os.environ["PORT"] = str(port)
-        os.environ["LOCAL_WEB_MODE"] = "1"
+        # 保持背景伺服器、外網穿透通道與 LINE 隨傳隨回機器人常駐不中斷
+        os.environ["LOCAL_WEB_MODE"] = "0"
         uvicorn.run(
             "line_bot_server:app",
             host="0.0.0.0",

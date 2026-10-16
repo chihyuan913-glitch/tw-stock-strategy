@@ -21,23 +21,31 @@ import urllib.request
 import subprocess
 from pathlib import Path
 
-# Windows 命令列編碼保護
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
-if hasattr(sys.stderr, 'reconfigure'):
-    try:
-        sys.stderr.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
-
+# 確保在無控制台視窗 (Silent VBS / WScript) 環境下安全記錄日誌
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from tunnel_manager import start_tunnel_async, stop_tunnel, get_current_tunnel_url, sync_line_webhook
+if sys.stdout is None or sys.stderr is None:
+    try:
+        _bot_log = open(ROOT_DIR / "run_line_bot.log", "w", encoding="utf-8", buffering=1)
+        sys.stdout = _bot_log
+        sys.stderr = _bot_log
+    except Exception:
+        pass
+else:
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+    if hasattr(sys.stderr, 'reconfigure'):
+        try:
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
+from tunnel_manager import start_tunnel_async, stop_tunnel, get_current_tunnel_url
 
 PORT = 8989
 
@@ -58,6 +66,27 @@ def is_port_in_use(port: int) -> bool:
         s.settimeout(0.5)
         return s.connect_ex(("127.0.0.1", port)) == 0
 
+def _spawn_uvicorn_server(port: int):
+    """啟動後端 Uvicorn 伺服器，將日誌寫入檔案避免 Pipe Buffer 阻塞"""
+    server_cmd = [
+        sys.executable, "-u", "-m", "uvicorn",
+        "line_bot_server:app",
+        "--host", "0.0.0.0",
+        "--port", str(port),
+        "--log-level", "warning"
+    ]
+    creationflags = 0x08000000 if os.name == "nt" else 0
+    log_path = ROOT_DIR / "start_web.log"
+    log_fp = open(log_path, "a", encoding="utf-8", buffering=1)
+    proc = subprocess.Popen(
+        server_cmd,
+        cwd=str(ROOT_DIR),
+        stdout=log_fp,
+        stderr=subprocess.STDOUT,
+        creationflags=creationflags
+    )
+    return proc
+
 def main():
     print("=" * 72, flush=True)
     print("  🚀 台股量化最高總指揮中心 - LINE 盤中隨傳隨回操盤機器人", flush=True)
@@ -75,39 +104,21 @@ def main():
         sys.exit(1)
     else:
         print(f"[*] [1/3] 正在啟動後端量化分析與 Webhook 伺服器 (連接埠 {PORT})...", flush=True)
-        server_cmd = [
-            sys.executable, "-u", "-m", "uvicorn",
-            "line_bot_server:app",
-            "--host", "0.0.0.0",
-            "--port", str(PORT),
-            "--log-level", "warning"
-        ]
-        server_proc = subprocess.Popen(
-            server_cmd,
-            cwd=str(ROOT_DIR),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding='utf-8',
-            errors='ignore'
-        )
+        server_proc = _spawn_uvicorn_server(PORT)
 
         # 等待伺服器就緒
         ready = False
         start_wait = time.time()
-        while time.time() - start_wait < 15:
+        while time.time() - start_wait < 20:
             if is_our_service(PORT):
                 ready = True
                 break
             time.sleep(0.5)
 
         if not ready:
-            print("[!] 伺服器未能及時啟動，請檢查相關日誌。", flush=True)
-            if server_proc and server_proc.poll() is not None:
-                out, _ = server_proc.communicate()
-                print(out, flush=True)
+            print("[!] 伺服器未能及時啟動，請檢查 start_web.log 日誌。", flush=True)
             sys.exit(1)
-        print(f"[✓] 後端伺服器已順利就緒！", flush=True)
+        print(f"[✓] 後端伺服器已順利就緒！ (本機網址: http://127.0.0.1:{PORT})", flush=True)
 
     # 啟動 Cloudflare Tunnel (若尚未啟動)
     print(f"[*] [2/3] 正在建立 Cloudflare 免費全球 HTTPS 穿透通道...", flush=True)
@@ -126,24 +137,26 @@ def main():
         print("[!] 尚未獲取到 Cloudflare 公開網址，請手動確認網路環境。", flush=True)
     else:
         print(f"[✓] Cloudflare 外網專屬網址已就緒: {tunnel_url}", flush=True)
-        print(f"[*] [3/3] 正在全自動對接 LINE 官方帳號 Webhook 端點...", flush=True)
-        sync_res = sync_line_webhook(tunnel_url)
+        print(f"[✓] [3/3] LINE 官方帳號 Webhook 與外網捷徑已由背景執行緒自動同步！", flush=True)
 
     print("\n" + "=" * 72, flush=True)
-    print("  🎉【LINE 隨傳隨回操盤助手已進入常駐監控狀態！】", flush=True)
+    print("  🎉【LINE 隨傳隨回操盤助手＆戰情室已進入 24H 常駐監控狀態！】", flush=True)
+    print(f"  🖥️ 本機看盤網址：http://127.0.0.1:{PORT}", flush=True)
+    if tunnel_url:
+        print(f"  🌐 外網看盤網址：{tunnel_url}", flush=True)
     print("  👉 現在拿起手機打開 LINE（台股雷達二號機 @761awmcp）：", flush=True)
     print("     • 傳送「2330」或「台積電」：秒回四大防線價位與雙向錦囊", flush=True)
     print("     • 傳送「監控 2330」：即刻加入盤中到價即時雷達", flush=True)
     print("     • 傳送「同步選股」：一鍵載入今日策略黑馬名單", flush=True)
-    print("  💡 保持本視窗開啟即可隨傳隨回。若要結束服務，請按 Ctrl+C。", flush=True)
     print("=" * 72 + "\n", flush=True)
 
     try:
         while True:
             if server_proc and server_proc.poll() is not None:
-                print("[!] 後端伺服器已異常停止。", flush=True)
-                break
-            time.sleep(2)
+                if not is_our_service(PORT):
+                    print("[!] 偵測到後端伺服器停止，正在自動重啟修復...", flush=True)
+                    server_proc = _spawn_uvicorn_server(PORT)
+            time.sleep(3)
     except KeyboardInterrupt:
         print("\n[*] 正在安全關閉 LINE 操盤服務與外網通道...", flush=True)
     finally:

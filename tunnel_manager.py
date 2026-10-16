@@ -192,8 +192,20 @@ def ensure_cloudflared_installed() -> bool:
         print(f"[!] 自動下載 cloudflared.exe 失敗: {e}")
         return False
 
+def _on_tunnel_url_ready(url: str, notify_line: bool):
+    """當獲取到新 Tunnel URL 時，於獨立執行緒完成寫入捷徑、LINE Webhook 同步與推播通知"""
+    _write_shortcut(url)
+    try:
+        time.sleep(2.5)
+        sync_line_webhook(url)
+    except Exception as _e:
+        print(f"[!] 自動同步 LINE Webhook 例外: {_e}")
+
+    if notify_line:
+        _notify_line(url)
+
 def _monitor_tunnel(port: int, notify_line: bool = True):
-    """背景執行緒：啟動 cloudflared 並擷取隨機專屬 HTTPS 網址"""
+    """背景執行緒：啟動 cloudflared 並擷取隨機專屬 HTTPS 網址（支援斷線自動重連與防 Pipe 阻塞）"""
     global _cf_process, _tunnel_url, _is_stopping
 
     if not ensure_cloudflared_installed():
@@ -206,44 +218,55 @@ def _monitor_tunnel(port: int, notify_line: bool = True):
         f"http://127.0.0.1:{port}"
     ]
 
-    try:
-        _cf_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="ignore"
-        )
+    creationflags = 0x08000000 if os.name == "nt" else 0
 
-        for line in iter(_cf_process.stdout.readline, ""):
-            if _is_stopping:
-                break
-            # 尋找分配到的 https://xxx.trycloudflare.com
-            m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
-            if m:
-                _tunnel_url = m.group(0)
-                print("\n" + "=" * 70, flush=True)
-                print(f" 🌐【外網專屬連線通道建立成功！】", flush=True)
-                print(f" 🔗 外網專屬網址: {_tunnel_url}", flush=True)
-                print(f" 📁 已自動產出捷徑: 【外網看盤直達.url】(別台電腦雙擊即可直達)", flush=True)
-                print("=" * 70 + "\n", flush=True)
+    while not _is_stopping:
+        try:
+            _cf_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                creationflags=creationflags
+            )
 
-                _write_shortcut(_tunnel_url)
-                # 自動對接與更新 LINE 官方帳號 Webhook 端點 (給予 Cloudflare 2 秒 DNS 傳播時間)
+            url_captured_this_run = False
+            for line in iter(_cf_process.stdout.readline, ""):
+                if _is_stopping:
+                    break
+                if not url_captured_this_run:
+                    m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
+                    if m:
+                        url_captured_this_run = True
+                        _tunnel_url = m.group(0)
+                        print("\n" + "=" * 70, flush=True)
+                        print(f" 🌐【外網專屬連線通道建立成功！】", flush=True)
+                        print(f" 🔗 外網專屬網址: {_tunnel_url}", flush=True)
+                        print(f" 📁 已自動產出捷徑: 【外網看盤直達.url】(別台電腦雙擊即可直達)", flush=True)
+                        print("=" * 70 + "\n", flush=True)
+
+                        threading.Thread(
+                            target=_on_tunnel_url_ready,
+                            args=(_tunnel_url, notify_line),
+                            daemon=True
+                        ).start()
+                # 持續讀取 stdout 直到行程結束，徹底防止 Windows Pipe Buffer 滿載死鎖
+
+            if _cf_process:
                 try:
-                    time.sleep(2.0)
-                    sync_line_webhook(_tunnel_url)
-                except Exception as _e:
-                    print(f"[!] 自動同步 LINE Webhook 例外: {_e}")
+                    _cf_process.wait(timeout=2)
+                except Exception:
+                    pass
 
-                if notify_line:
-                    _notify_line(_tunnel_url)
-                break
+        except Exception as e:
+            if not _is_stopping:
+                print(f"[!] Cloudflare Tunnel 啟動異常: {e}", flush=True)
 
-    except Exception as e:
         if not _is_stopping:
-            print(f"[!] Cloudflare Tunnel 啟動異常: {e}")
+            print("[*] Cloudflare Tunnel 連線中斷，將於 5 秒後自動重新建立新通道...", flush=True)
+            time.sleep(5.0)
 
 def start_tunnel_async(port: int = 8989, notify_line: bool = True):
     """非同步啟動外網穿透隧道"""
