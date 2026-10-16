@@ -129,7 +129,7 @@ def main():
     start_wait = time.time()
     while time.time() - start_wait < 25:
         tunnel_url = get_current_tunnel_url()
-        if tunnel_url and "trycloudflare.com" in tunnel_url:
+        if tunnel_url and (tunnel_url.startswith("http://") or tunnel_url.startswith("https://")):
             break
         time.sleep(1.0)
 

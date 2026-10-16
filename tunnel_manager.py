@@ -44,9 +44,15 @@ _is_stopping = False
 
 def get_current_tunnel_url() -> str:
     """取得目前活躍之外網連線網址"""
-    global _tunnel_url
-    if _tunnel_url:
-        return _tunnel_url
+    # 優先檢查是否配置了具名通道自訂網域
+    try:
+        _, _, named_domain = get_named_tunnel_config()
+        if named_domain:
+            return f"https://{named_domain}"
+    except Exception:
+        pass
+
+    # 其次讀取本機即時記錄檔
     if URL_TXT_FILE.exists():
         try:
             with open(URL_TXT_FILE, "r", encoding="utf-8") as f:
@@ -55,6 +61,10 @@ def get_current_tunnel_url() -> str:
                     return url
         except Exception:
             pass
+
+    global _tunnel_url
+    if _tunnel_url:
+        return _tunnel_url
     return ""
 
 def _write_shortcut(url: str):
@@ -205,9 +215,11 @@ def _on_tunnel_url_ready(url: str, notify_line: bool):
         _notify_line(url)
 
 def get_named_tunnel_config() -> tuple:
-    """檢查是否配置了 Cloudflare Zero Trust 具名通道 (Token 模式與自訂網域)"""
+    """檢查是否配置了 Cloudflare 具名通道 (Token 模式、Name/Cert 模式與自訂網域)"""
     token = os.environ.get("CLOUDFLARE_TUNNEL_TOKEN", "").strip()
+    name = os.environ.get("CLOUDFLARE_TUNNEL_NAME", "").strip()
     domain = os.environ.get("CLOUDFLARE_TUNNEL_DOMAIN", "").strip()
+
     env_file = ROOT_DIR / ".env"
     if env_file.exists():
         try:
@@ -218,31 +230,52 @@ def get_named_tunnel_config() -> tuple:
                         t_val = l.split("=", 1)[1].strip().strip("'\"")
                         if t_val:
                             token = t_val
+                    elif l.startswith("CLOUDFLARE_TUNNEL_NAME="):
+                        n_val = l.split("=", 1)[1].strip().strip("'\"")
+                        if n_val:
+                            name = n_val
                     elif l.startswith("CLOUDFLARE_TUNNEL_DOMAIN="):
                         d_val = l.split("=", 1)[1].strip().strip("'\"")
                         if d_val:
                             domain = d_val
         except Exception:
             pass
-    return token, domain
+
+    # 若未指定 name 但本機 .cloudflared/config.yml 存在且配置了 tunnel，自動套用
+    home_cf_config = Path.home() / ".cloudflared" / "config.yml"
+    proj_cf_config = ROOT_DIR / "cloudflared_config.yml"
+    if not name and not token and (home_cf_config.exists() or proj_cf_config.exists()):
+        name = "chihyuan-tunnel"
+        if not domain:
+            domain = "stock.chihyuan.date"
+
+    return token, name, domain
 
 def _monitor_tunnel(port: int, notify_line: bool = True):
-    """背景執行緒：啟動 cloudflared（支援 Zero Trust 具名通道 Token 模式與免費隨機通道，具備斷線自動重連）"""
+    """背景執行緒：啟動 cloudflared（支援具名通道 Name/Token 模式與免費隨機通道，具備斷線自動重連）"""
     global _cf_process, _tunnel_url, _is_stopping
 
     if not ensure_cloudflared_installed():
         return
 
-    named_token, named_domain = get_named_tunnel_config()
-    is_named = bool(named_token)
+    named_token, named_name, named_domain = get_named_tunnel_config()
+    is_named = bool(named_token or named_name)
 
-    if is_named:
+    if named_token:
         cmd = [
             str(CLOUDFLARED_EXE),
             "tunnel",
             "run",
             "--token",
             named_token
+        ]
+        fixed_url = f"https://{named_domain}" if named_domain else ""
+    elif named_name:
+        cmd = [
+            str(CLOUDFLARED_EXE),
+            "tunnel",
+            "run",
+            named_name
         ]
         fixed_url = f"https://{named_domain}" if named_domain else ""
     else:
