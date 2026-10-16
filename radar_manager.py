@@ -686,6 +686,8 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
             if success:
                 print(f"[✓] 成功推送到價警訊至 [{target_dest[:8]}...]: {code} {event_info['type']}", flush=True)
                 alerted.append(event_info['type'])
+                item['last_push_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                item['last_push_event'] = event_info['type']
                 watchlist_updated = True
                 triggered_alerts.append(f"{code} {name} ({event_info['type']})")
 

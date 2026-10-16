@@ -786,8 +786,11 @@ async def get_radar_watchlist_endpoint():
     from radar_manager import load_watchlist
     watchlist = load_watchlist()
     items = list(watchlist.values())
-    # 按照加入時間由新到舊排序
-    items.sort(key=lambda x: str(x.get('added_at', '')), reverse=True)
+    # 依最近推送時間（無推送紀錄則採掛入時間）由近至遠排序
+    items.sort(
+        key=lambda x: max(str(x.get('last_push_at', '')), str(x.get('added_at', ''))),
+        reverse=True
+    )
     return {
         "status": "ok",
         "count": len(items),

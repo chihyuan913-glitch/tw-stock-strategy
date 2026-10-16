@@ -871,6 +871,8 @@
         const tp2 = Number(it.tp2_price || 0).toFixed(2);
         const sl = Number(it.sl_price || 0).toFixed(2);
         const addedAt = (it.added_at || '').substring(5, 16);
+        const pushAt = (it.last_push_at || '').substring(5, 16);
+        const timeLabel = pushAt && pushAt >= addedAt ? `推送: ${pushAt}` : `掛入: ${addedAt}`;
 
         const card = document.createElement('div');
         card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-4 relative group";
@@ -883,7 +885,7 @@
               </div>
               <div class="text-[11px] text-slate-400 mt-0.5 font-mono flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>掛入: ${addedAt}</span>
+                <span>${timeLabel}</span>
               </div>
             </div>
             <div class="text-right">
