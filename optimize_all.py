@@ -210,7 +210,10 @@ def collect_latest_candidates():
         ("01_bollinger_reversal", "策略 01：布林下軌超跌反轉"),
         ("02_institutional_momentum", "策略 02：法人籌碼集中起漲"),
         ("03_short_momentum", "策略 03：弱勢破線做空避險"),
-        ("04_cb_pricing_ambush", "策略 04：可轉債定價伏擊")
+        ("04_cb_pricing_ambush", "策略 04：可轉債定價伏擊"),
+        ("05_stock_futures_long", "策略 05：個股期法人強勢波段"),
+        ("06_volume_surge", "策略 06：盤中爆量起漲動能"),
+        ("07_margin_call_ambush", "策略 07：高融資斷頭與浮額清洗")
     ]
     summary = {}
     for folder, name in strategies:

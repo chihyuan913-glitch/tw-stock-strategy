@@ -112,7 +112,7 @@ if ROOT_DIR not in sys.path:
      * 每週一至週五台灣時間 08:58 自動喚醒執行 `run_all_intraday.py --interval 60`。
      * 常駐監控全策略標的之四大防線（🟢進場、🔵加碼、🔴停利、🛑停損），到價即刻推播，至 13:35 收盤自動安全結束。
 3. **雲端金鑰安全管理**：
-   - 包含 LINE Token 與策略分流群組 ID（`LINE_TARGET_STRATEGY_01~04`）一律由 GitHub Repository Secrets 加密保護，不外洩。
+   - 包含 LINE Token 與策略分流群組 ID（`LINE_TARGET_STRATEGY_01~07`）一律由 GitHub Repository Secrets 加密保護，不外洩。
 4. **未來新增策略繼承機制**：
    - 新增策略只需依標準於 `strategies/` 建置好 `screener.py` 與 `intraday_scanner.py`，並於根目錄之 `run_all.py` 與 `run_all_intraday.py` 登記清單，**即自動全面納入雲端盤後選股與盤中雷達託管，完全不需額外編寫雲端工作流**。
 
@@ -138,7 +138,7 @@ if ROOT_DIR not in sys.path:
 ---
 
 ## 九、程式交易反制與風控雙核心規範 (Algo Trading Defense Standard)
-為反制當前台股程式交易熱絡環境下的量化造市、隔日沖演算法與高頻毛刺陷阱，全策略（現有策略 01~04 及未來新增之所有策略）一律強制遵循並繼承根目錄共用模組 [`algo_guards.py`](file:///algo_guards.py)：
+為反制當前台股程式交易熱絡環境下的量化造市、隔日沖演算法與高頻毛刺陷阱，全策略（現有策略 01~06 及未來新增之所有策略）一律強制遵循並繼承根目錄共用模組 [`algo_guards.py`](file:///algo_guards.py)：
 1. **隔日沖分點集中度評估 (`evaluate_overnight_broker_risk`)**：
    - 盤後選股器 (`screener.py`) 於第二階段軟評分中，強制比對著名隔日沖券商特徵（凱基台北、富邦虎尾、美商高盛、美林等）或證交所自營商避險爆量指標。
    - 若偵測到隔日沖高度扎堆，自動予以軟評分扣分（扣 5~15 分），並於選股報表與 LINE 戰報標註警示（如 `⚠️隔日沖高度集中`），提醒「次日開盤嚴禁追高、防開高倒貨」。
@@ -150,7 +150,7 @@ if ROOT_DIR not in sys.path:
 ---
 
 ## 十、LINE 推播視覺化大字體、零引線與四大價位一目了然規範 (Flex Message Typography Standard)
-為解決手機螢幕閱讀時 ASCII 符號折行與價位辨識不易之痛點，全策略（現有策略 01~04 及未來新增之所有策略）一律強制套用根目錄 [`line_sender.py`](file:///line_sender.py) 之旗艦視覺化引擎：
+為解決手機螢幕閱讀時 ASCII 符號折行與價位辨識不易之痛點，全策略（現有策略 01~06 及未來新增之所有策略）一律強制套用根目錄 [`line_sender.py`](file:///line_sender.py) 之旗艦視覺化引擎：
 1. **全面淘汰 ASCII 繁複符號**：徹底移除 `╔═╗`、長橫線 `━━━━━━━━━━`、細橫線 `──────────` 與樹狀引線 `├`、`└`、`↳`，改以自然留白與乾淨縮排呈現。
 2. **盤中雷達大字體高對比卡片 (`build_price_alert_card`)**：
    - 現價以 `3xl` 粗體高亮居中展示。
@@ -208,7 +208,19 @@ if ROOT_DIR not in sys.path:
    - **Markdown 戰報 (`result.md`)**：以 `format_screener_markdown_cards` 產出高對比區塊引用（`>`）字卡，並附帶完整量化數據表備查。
    - **Web 戰情儀表板**：深色科技風高對比卡片展示，動態滾動校準。
 4. **未來新增策略無條件強制繼承機制**：
-   - 未來所有新增策略（策略 06、07...）無須重複編寫排版邏輯，直接調用根目錄共用之 `line_sender.py` 標準字卡引擎（`build_screener_carousel`、`format_screener_markdown_cards`、`format_clean_screener_text`、`build_price_alert_card`），即自動全面繼承全套視覺化字卡排版。
+   - 未來所有新增策略（策略 07、08...）無須重複編寫排版邏輯，直接調用根目錄共用之 `line_sender.py` 標準字卡引擎（`build_screener_carousel`、`format_screener_markdown_cards`、`format_clean_screener_text`、`build_price_alert_card`），即自動全面繼承全套視覺化字卡排版。
+
+---
+
+## 十四、高融資斷頭伏擊與浮額清洗雙向狀態機規範 (Strategy 07 Margin Call Ambush Standard)
+針對鎖定市場融資脆弱籌碼之量化策略（策略 07），強制遵循以下架構：
+1. **官方流水帳動態成本遞推引擎**：透過 TWSE `MI_MARGN` 逐日買賣現償數據遞推融資均價 $\bar{C}$ 與真實維持率 $MR$，嚴防 ZeroDivisionError。
+2. **雙向狀態機分流**：
+   - 🔴【斷頭助跌・放空獵殺 (SHORT_BREAKDOWN)】：破月線且法人出貨且融資死抱未退者，順勢放空，四防線嚴守回補停損。
+   - 🟢【浮額清洗・逆勢抄底 (LONG_REVERSAL)】：融資連續大減（斷頭清洗完畢）且法人逆勢吃貨且收長下影線止跌者，右側抄底。
+3. **雙層門檻動態降級容錯**：
+   - Tier-1 絕對斷頭高危（使用率 $\ge 25\%$、維持率 $\le 142\%$、餘額 $\ge 3,000$ 張）。
+   - 若 Tier-1 為 0 檔，自動降級啟動 Tier-2 相對高危候補（使用率 $\ge 18\%$、維持率 $\le 165\%$、餘額 $\ge 1,500$ 張，取維持率最低前 6 檔），保證每日戰報品質穩定。
 
 
 

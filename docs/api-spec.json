@@ -1,0 +1,155 @@
+{
+  "contract_version": "1.0.0",
+  "strategy_id": "07_margin_call_ambush",
+  "strategy_short_id": "07",
+  "strategy_name": "高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
+  "decisions_locked": {
+    "1": "1-C: 雙向狀態機分流 (SHORT_BREAKDOWN: 🔴【斷頭助跌・放空獵殺】 / LONG_REVERSAL: 🟢【浮額清洗・逆勢抄底】)",
+    "2": "2-A: 官方融資流水帳動態成本推算引擎 (TWSE MI_MARGN / TPEx 融資融券 + Yahoo 股價序列遞推融資均價 C_bar)",
+    "3": "3-A: 4+1 五維度硬性濾網 (上限5個) + 二階段 100分制軟評分 (含 algo_guards 隔日沖扣分與 futures_helper OI 加分)",
+    "4": "4-A: 雙層門檻動態降級容錯 (Tier-1: 使用率>=25% & 維持率<=142%; Tier-2 Fallback: 使用率>=18% & 維持率<=158% Bottom 5%)",
+    "5": "5-C: 全系統雲端排程、盤中雷達、LINE 獨立群組 (LINE_TARGET_STRATEGY_07)、Web 戰情室與 pytest 閉環整合"
+  },
+  "scope_boundaries": {
+    "backend-refactor-agent": [
+      "strategies/07_margin_call_ambush/screener.py",
+      "strategies/07_margin_call_ambush/intraday_scanner.py",
+      "strategies/07_margin_call_ambush/run_daily.bat",
+      "strategies/07_margin_call_ambush/start_intraday.bat",
+      "strategies/07_margin_call_ambush/README.md",
+      "run_all.py",
+      "run_all_intraday.py",
+      "optimize_all.py",
+      "radar_manager.py",
+      "line_sender.py",
+      "line_bot_server.py",
+      ".env.example",
+      "GEMINI.md",
+      "AGENTS.md"
+    ],
+    "frontend-adapt-agent": [
+      "web/index.html"
+    ],
+    "test-validator-agent": [
+      "tests/test_strategy_07_margin_call.py"
+    ]
+  },
+  "module_contracts": {
+    "screener_module": {
+      "path": "strategies/07_margin_call_ambush/screener.py",
+      "required_functions": {
+        "calculate_margin_cost_and_maintenance(margin_history: list, close_price: float, initial_vwap: float = 0.0) -> dict": {
+          "description": "根據融資買賣現償流水帳遞推平均融資持倉成本 C_bar 與融資維持率 MR (%)",
+          "input_margin_history_item": {
+            "buy_lots": "int (當日融資買進張數)",
+            "sell_lots": "int (當日融資賣出張數)",
+            "cash_repay_lots": "int (當日現金償還張數)",
+            "prev_balance_lots": "int (前日融資餘額張數)",
+            "balance_lots": "int (今日融資餘額張數)",
+            "quota_lots": "int (融資限額張數)",
+            "typical_price": "float (當日典型價格或收盤價)"
+          },
+          "returns": {
+            "avg_cost": "float (平均融資成本 C_bar, 取小數點後2位)",
+            "maintenance_ratio": "float (融資維持率 %, 公式: close_price / (avg_cost * 0.6) * 100, 若分母<=0則回傳 0.0)",
+            "usage_ratio": "float (融資使用率 %, 公式: balance_lots / quota_lots * 100, 若 quota_lots<=0 則回傳 0.0)",
+            "balance_lots": "int",
+            "margin_change_1d_pct": "float (單日融資餘額增減百分比 %)",
+            "margin_change_3d_pct": "float (近3日融資餘額增減百分比 %)"
+          }
+        },
+        "classify_dual_state_and_pricing(stock_info: dict) -> dict": {
+          "description": "雙向狀態機分流與四大防線定價",
+          "states": {
+            "SHORT_BREAKDOWN": {
+              "badge": "🔴【斷頭助跌・放空獵殺】",
+              "condition": "收盤價 < MA20 且 三大法人近5日合計 <= 0 (或當日賣超 < 0) 且 融資未大幅退場 (margin_change_3d_pct >= -3.0)",
+              "pricing_rules": {
+                "entry_price": "round(close, 2) (空單建倉基準)",
+                "addon_price": "round(min(low * 0.995, close * 0.975), 2) (破底加空價)",
+                "tp1_price": "round(close * 0.92, 2) (第一回補目標 -8%)",
+                "tp2_price": "round(close * 0.85, 2) (波段斷頭滿足 -15%)",
+                "sl_price": "round(max(min(ma20 * 1.01, close * 1.035), close * 1.025), 2) (空單嚴格停損回補價，必 > entry_price)"
+              }
+            },
+            "LONG_REVERSAL": {
+              "badge": "🟢【浮額清洗・逆勢抄底】",
+              "condition": "融資出現斷頭清洗 (margin_change_1d_pct <= -2.0 或 margin_change_3d_pct <= -4.5) 且 三大法人當日或近3日買超 > 0 且 具備止跌型態 (close >= open 或 下影線佔振幅 >= 30%)",
+              "pricing_rules": {
+                "entry_price": "round(close, 2) (多單建倉上限)",
+                "addon_price": "round(max(high * 1.01, close * 1.025), 2) (突破轉強加碼價)",
+                "tp1_price": "round(max(ma20, close * 1.07), 2) (第一停利目標)",
+                "tp2_price": "round(close * 1.14, 2) (第二停利目標)",
+                "sl_price": "round(min(low * 0.985, close * 0.96), 2) (多單嚴格停損價，必 < entry_price)"
+              }
+            }
+          }
+        },
+        "apply_screening_with_fallback(candidates_raw: list) -> tuple": {
+          "description": "執行 4+1 五維度硬性濾網，若 Tier-1 (使用率>=25%, 維持率<=142%, 餘額>=3000張) 為 0 檔，自動降級啟動 Tier-2 (使用率>=18%, 維持率<=158%, 餘額>=1500張，取維持率最低前 6 檔)",
+          "returns": "(filtered_list: list, tier_mode: str) 其中 tier_mode 為 'TIER1_ABSOLUTE' 或 'TIER2_RELATIVE_WARNING'"
+        }
+      },
+      "csv_columns": [
+        "證券代號",
+        "證券名稱",
+        "收盤價",
+        "多空狀態",
+        "狀態代碼",
+        "門檻層級",
+        "融資使用率%",
+        "融資維持率%",
+        "預估融資均價",
+        "融資餘額(張)",
+        "融資1日增減%",
+        "融資3日增減%",
+        "法人當日買賣超(張)",
+        "法人5日買賣超(張)",
+        "當日成交量(張)",
+        "5日均量(張)",
+        "20MA",
+        "月線乖離%",
+        "進場價位",
+        "加碼價位",
+        "停利TP1",
+        "停利TP2",
+        "停損價位",
+        "現貨進場",
+        "現貨加碼",
+        "現貨TP1",
+        "現貨TP2",
+        "現貨停損",
+        "期貨契約",
+        "期貨月份",
+        "期貨收盤價",
+        "價差(Basis)",
+        "期貨未平倉(OI)",
+        "1口保證金(約)",
+        "結算倒數",
+        "次月合約",
+        "次月進場參考",
+        "隔日沖風控",
+        "評分",
+        "星級推薦"
+      ]
+    },
+    "intraday_scanner_module": {
+      "path": "strategies/07_margin_call_ambush/intraday_scanner.py",
+      "required_functions": {
+        "evaluate_intraday_alert(target: dict, rt: dict, alerted_set: set, use_tick_guard: bool = True) -> tuple": {
+          "description": "根據 target['state_code'] ('SHORT_BREAKDOWN' 或 'LONG_REVERSAL') 雙向判定 STOP_LOSS, TP2, TP1, ADDON, ENTRY 五大到價事件，並通過 GLOBAL_TICK_GUARD 防毛刺檢核。",
+          "returns": "(event_type: str | None, event_title: str, event_desc: str)"
+        }
+      }
+    },
+    "web_api_contract": {
+      "endpoint": "GET /api/strategy/07_margin_call_ambush",
+      "response": {
+        "name": "策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
+        "desc": "鎖定高融資使用率與逼近 130% 追繳斷頭線之個股，透過「融資增減 × 法人動向」雙向狀態機自動分流【🔴斷頭助跌・放空獵殺】與【🟢浮額清洗・逆勢抄底】。",
+        "columns": "list of string",
+        "rows": "list of dict"
+      }
+    }
+  }
+}

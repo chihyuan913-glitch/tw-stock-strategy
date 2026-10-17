@@ -170,7 +170,7 @@
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-6">
       <div class="flex space-x-2" id="tabButtons">
         <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
-          📊 六大選股策略戰報
+          📊 七大選股策略戰報
         </button>
         <button onclick="switchTab('radar')" id="btn-tab-radar" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
           🎯 個股診斷與盤中雷達
@@ -193,7 +193,7 @@
       </div>
     </div>
 
-    <!-- 視圖 1：六大選股策略戰報 -->
+    <!-- 視圖 1：七大選股策略戰報 -->
     <div id="view-strategies" class="space-y-6">
       <!-- 策略子標籤 -->
       <div class="flex flex-wrap gap-2 border-b border-slate-800/60 pb-2">
@@ -214,6 +214,9 @@
         </button>
         <button onclick="loadStrategyData('06_volume_surge')" id="subbtn-06" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
           策略 06：盤中爆量起漲動能
+        </button>
+        <button onclick="loadStrategyData('07_margin_call_ambush')" id="subbtn-07" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 07：高融資斷頭伏擊
         </button>
       </div>
 
@@ -528,7 +531,7 @@
           <div class="grid grid-cols-2 gap-3 pt-2">
             <button onclick="triggerAction('run_screener')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-emerald-400 mb-1">🚀 重新全選股</div>
-              <div class="text-xs text-slate-400">立即執行六大策略選股器</div>
+              <div class="text-xs text-slate-400">立即執行七大策略選股器</div>
             </button>
             <button onclick="triggerAction('run_radar')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-cyan-400 mb-1">🚨 盤中到價掃描</div>
@@ -540,7 +543,7 @@
             </button>
             <button onclick="triggerAction('test_line')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition">
               <div class="text-sm font-bold text-purple-400 mb-1">💬 LINE 連線測試</div>
-              <div class="text-xs text-slate-400">發送六大策略推播測試</div>
+              <div class="text-xs text-slate-400">發送七大策略推播測試</div>
             </button>
           </div>
 
@@ -1674,7 +1677,7 @@
 
     async function loadStrategyData(stratId) {
       currentStrategy = stratId;
-      const subbtns = ['01', '02', '03', '04', '05', '06'];
+      const subbtns = ['01', '02', '03', '04', '05', '06', '07'];
       subbtns.forEach(idx => {
         const b = document.getElementById(`subbtn-${idx}`);
         if (!b) return;
@@ -1749,6 +1752,13 @@
         // 可轉債特徵 (策略 04)
         const cbStage = r['進度狀態'] || '';
 
+        // 策略 07 專屬欄位
+        const marginState = r['多空狀態'] || '';
+        const marginUsage = r['融資使用率%'] !== undefined ? r['融資使用率%'] : '';
+        const marginMaint = r['融資維持率%'] !== undefined ? r['融資維持率%'] : '';
+        const marginAvgCost = r['預估融資均價'] !== undefined ? r['預估融資均價'] : '';
+        const tierLevel = r['門檻層級'] || '';
+
         // 隔日沖與風控
         const ogRisk = r['隔日沖警示'] || r['隔日沖風控'] || '';
         const vol = r['當日成交量(張)'] || r['日成交量(張)'] || r['成交量(張)'] || r['成交量'] || '';
@@ -1758,6 +1768,15 @@
         card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-4 relative group flex flex-col justify-between";
 
         let badgesHtml = '';
+        if (marginState) {
+          let stateClass = "bg-slate-700/30 text-slate-300 border-slate-600/30";
+          if (marginState.includes('斷頭助跌') || marginState.includes('🔴')) {
+            stateClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+          } else if (marginState.includes('浮額清洗') || marginState.includes('🟢')) {
+            stateClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+          }
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded ${stateClass} font-bold text-[10px] border">${marginState}</span> `;
+        }
         if (rvol) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold text-[10px] border border-orange-500/30">🔥 量比 ${rvol}x</span> `;
         }
@@ -1788,6 +1807,36 @@
               <div class="text-[10px] text-amber-400 font-medium">${settlement}</div>` : ''}
               ${nextMonth && nextEntry ? `
               <div class="text-[10px] text-sky-400 font-medium">次月 ${nextMonth} 參考進場: ${nextEntry} 元</div>` : ''}
+            </div>
+          `;
+        }
+
+        let marginInfoHtml = '';
+        if (marginUsage !== '' || marginMaint !== '') {
+          marginInfoHtml = `
+            <div class="p-2.5 rounded-xl bg-purple-950/25 border border-purple-500/30 text-[11px] space-y-1.5 shadow-sm">
+              <div class="flex items-center justify-between font-bold text-purple-200 border-b border-purple-500/20 pb-1">
+                <span class="flex items-center gap-1">⚖️ 融資籌碼雙高危指標</span>
+                ${tierLevel ? `<span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] border border-purple-500/30 font-mono">${tierLevel}</span>` : ''}
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-slate-300 font-mono">
+                <div>
+                  <span class="text-slate-400 font-sans">融資使用率:</span>
+                  <span class="font-bold text-amber-300">${marginUsage}%</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 font-sans">融資維持率:</span>
+                  <span class="font-bold text-rose-300">${marginMaint}%</span>
+                </div>
+                <div class="col-span-2 flex items-center justify-between">
+                  <span class="text-slate-400 font-sans">預估融資均價:</span>
+                  <span class="font-bold text-cyan-300">${marginAvgCost} 元</span>
+                </div>
+                <div class="col-span-2 flex items-center justify-between text-[10px]">
+                  <span class="text-slate-400 font-sans">門檻層級:</span>
+                  <span class="font-semibold text-purple-300 font-mono">${tierLevel}</span>
+                </div>
+              </div>
             </div>
           `;
         }
@@ -1894,6 +1943,7 @@
             </div>
 
             ${futInfoHtml}
+            ${marginInfoHtml}
             ${riskHtml}
           </div>
 

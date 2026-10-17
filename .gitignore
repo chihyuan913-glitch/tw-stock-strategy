@@ -13,5 +13,6 @@ tools/
 
 # 穿透二進位檔與動態產出網址
 cloudflared.exe
+cloudflared_config.yml
 web_url.txt
 外網看盤直達.url

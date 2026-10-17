@@ -641,7 +641,8 @@ async def get_overview():
         "03_short_momentum",
         "04_cb_pricing_ambush",
         "05_stock_futures_long",
-        "06_volume_surge"
+        "06_volume_surge",
+        "07_margin_call_ambush"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -692,6 +693,10 @@ async def get_strategy_data(strat_id: str):
         "06_volume_surge": {
             "name": "策略 06：盤中成交量異常爆量起漲動能策略",
             "desc": "捕捉主力資金強勢點火、動態量能布林突破 (+3σ)、且符合實體紅K高勝率型態之起漲飆股，階梯式防洗版到價告警。"
+        },
+        "07_margin_call_ambush": {
+            "name": "策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
+            "desc": "鎖定高融資使用率與逼近 130% 追繳斷頭線之個股，透過「融資增減 × 法人動向」雙向狀態機自動分流【🔴斷頭助跌・放空獵殺】與【🟢浮額清洗・逆勢抄底】。"
         }
     }
 

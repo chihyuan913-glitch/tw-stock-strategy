@@ -52,6 +52,18 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "05_stock_futures_long" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "06_volume_surge",
+        "name": "盤中成交量異常爆量起漲動能策略",
+        "script": ROOT_DIR / "strategies" / "06_volume_surge" / "screener.py",
+        "export": "result.csv",
+    },
+    {
+        "id": "07_margin_call_ambush",
+        "name": "高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
+        "script": ROOT_DIR / "strategies" / "07_margin_call_ambush" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False):

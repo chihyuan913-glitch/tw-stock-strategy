@@ -103,6 +103,11 @@ def resolve_tokens(strategy: str = None, env: dict = None) -> list:
         "LINE_CHANNEL_ACCESS_TOKEN_BACKUP",
         "LINE_CHANNEL_ACCESS_TOKEN_02",
         "LINE_CHANNEL_ACCESS_TOKEN_01",
+        "LINE_CHANNEL_ACCESS_TOKEN_03",
+        "LINE_CHANNEL_ACCESS_TOKEN_04",
+        "LINE_CHANNEL_ACCESS_TOKEN_05",
+        "LINE_CHANNEL_ACCESS_TOKEN_06",
+        "LINE_CHANNEL_ACCESS_TOKEN_07",
     ]
     for bc in backup_candidates:
         bt = os.environ.get(bc) or env.get(bc)
@@ -326,6 +331,34 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "tp_desc": "TP1 +10% / TP2 +16%",
             "sl_desc": "破20MA或-3.5%",
             "color_theme": "#0D9488"
+        }
+    elif sid == "06":
+        return {
+            "id": "06",
+            "name": "盤中爆量起漲動能",
+            "entry_label": "🟢 爆量進場",
+            "addon_label": "🔵 動能加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 嚴格停損",
+            "entry_desc": "爆量起漲買點",
+            "addon_desc": "突破日高加碼",
+            "tp_desc": "TP1 +8% / TP2 +15%",
+            "sl_desc": "跌破爆量低點或-3.5%",
+            "color_theme": "#EA580C"
+        }
+    elif sid == "07":
+        return {
+            "id": "07",
+            "name": "高融資斷頭與浮額清洗",
+            "entry_label": "🟢 伏擊/放空進場",
+            "addon_label": "🔵 突破/破底加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 嚴格防守",
+            "entry_desc": "雙向狀態建倉價",
+            "addon_desc": "動能確認加碼",
+            "tp_desc": "TP1初段 / TP2滿足",
+            "sl_desc": "嚴格停損風控線",
+            "color_theme": "#B91C1C"
         }
     elif sid == "RADAR":
         return {

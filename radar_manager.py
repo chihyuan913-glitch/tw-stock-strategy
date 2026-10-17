@@ -409,7 +409,8 @@ def sync_screener_to_radar(target_id: str = "") -> str:
         "03_short_momentum": "弱勢破線",
         "04_cb_pricing_ambush": "可轉債伏擊",
         "05_stock_futures_long": "股期多方",
-        "06_volume_surge": "爆量動能"
+        "06_volume_surge": "爆量動能",
+        "07_margin_call_ambush": "融資斷頭"
     }
 
     for path in csv_files:

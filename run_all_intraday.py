@@ -61,6 +61,18 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "05_stock_futures_long" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "05_stock_futures_long"
     },
+    {
+        "id": "06_volume_surge",
+        "name": "策略 06：盤中成交量異常爆量起漲動能雷達",
+        "script": ROOT_DIR / "strategies" / "06_volume_surge" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "06_volume_surge"
+    },
+    {
+        "id": "07_margin_call_ambush",
+        "name": "策略 07：高融資斷頭伏擊與浮額清洗到價雷達",
+        "script": ROOT_DIR / "strategies" / "07_margin_call_ambush" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "07_margin_call_ambush"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):
