@@ -1738,16 +1738,18 @@
         const rvol = r['量比倍數(Rvol)'] || r['量比'] || '';
         const v5 = r['5日均量(張)'] || '';
 
-        // 股期特徵 (策略 03 & 05)
-        const futContract = r['期貨契約'] || '';
-        const futMonth = r['期貨月份'] || '';
-        const futPrice = r['期貨收盤價'] || '';
-        const basis = r['價差(Basis)'] || '';
-        const oi = r['期貨未平倉(OI)'] || '';
-        const margin = r['1口保證金(約)'] || '';
-        const settlement = r['結算倒數'] || '';
-        const nextMonth = r['次月合約'] || '';
-        const nextEntry = r['次月進場參考'] || '';
+        // 股期特徵 (策略 03 & 05 & 07)
+        const rawContract = String(r['期貨契約'] || '').trim();
+        const hasFutures = Boolean(rawContract && rawContract !== '--' && rawContract !== '--F' && rawContract !== 'None');
+        const futContract = hasFutures ? rawContract : '';
+        const futMonth = (hasFutures && r['期貨月份'] && r['期貨月份'] !== '--') ? r['期貨月份'] : '';
+        const futPrice = (hasFutures && r['期貨收盤價'] && String(r['期貨收盤價']).trim() !== '' && String(r['期貨收盤價']).trim() !== '--') ? r['期貨收盤價'] : '';
+        const basis = hasFutures ? (r['價差(Basis)'] || '') : '';
+        const oi = hasFutures ? (r['期貨未平倉(OI)'] || '') : '';
+        const margin = hasFutures ? (r['1口保證金(約)'] || '') : '';
+        const settlement = hasFutures ? (r['結算倒數'] || '') : '';
+        const nextMonth = hasFutures ? (r['次月合約'] || '') : '';
+        const nextEntry = hasFutures ? (r['次月進場參考'] || '') : '';
 
         // 可轉債特徵 (策略 04)
         const cbStage = r['進度狀態'] || '';
@@ -1780,18 +1782,18 @@
         if (rvol) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold text-[10px] border border-orange-500/30">🔥 量比 ${rvol}x</span> `;
         }
-        if (futContract) {
+        if (hasFutures && futContract) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 font-bold text-[10px] border border-sky-500/30">股期 ${futContract} ${futMonth}</span> `;
         }
         if (cbStage) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold text-[10px] border border-purple-500/30">${cbStage}</span> `;
         }
-        if (settlement && settlement.includes('⚠️')) {
+        if (hasFutures && settlement && settlement.includes('⚠️')) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">次月新倉</span> `;
         }
 
         let futInfoHtml = '';
-        if (futContract) {
+        if (hasFutures && futContract) {
           futInfoHtml = `
             <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-[11px] space-y-1">
               <div class="flex items-center justify-between text-slate-300">
@@ -1866,7 +1868,7 @@
           changeHtml = `<span class="text-slate-400 font-mono text-xs">0.00 (0.00%)</span>`;
         }
 
-        const displayPrice = rtPrice > 0 ? rtPrice.toFixed(2) : (futPrice || price);
+        const displayPrice = rtPrice > 0 ? rtPrice.toFixed(2) : ((hasFutures && futPrice) ? futPrice : price);
 
         // 即時進場價差比對條
         let diffStripHtml = '';
@@ -1911,12 +1913,12 @@
               </div>
               <div class="text-right">
                 <div class="text-[10px] text-slate-400 font-sans flex items-center justify-end gap-1">
-                  <span>${futPrice ? '期貨現價' : (rtPrice > 0 ? '即時現價' : '收盤現價')}</span>
+                  <span>${(hasFutures && futPrice) ? '期貨現價' : (rtPrice > 0 ? '即時現價' : '收盤現價')}</span>
                   ${rtPrice > 0 ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>' : ''}
                 </div>
                 <div class="text-2xl font-black font-mono ${priceColor}">${displayPrice}</div>
                 ${changeHtml ? `<div class="text-[11px] font-mono">${changeHtml}</div>` : ''}
-                ${futPrice && price ? `<div class="text-[10px] text-slate-400 font-mono">現貨收盤 ${price}</div>` : ''}
+                ${hasFutures && futPrice && price ? `<div class="text-[10px] text-slate-400 font-mono">現貨收盤 ${price}</div>` : ''}
               </div>
             </div>
 

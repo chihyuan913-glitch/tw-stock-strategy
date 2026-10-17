@@ -432,7 +432,7 @@ def build_price_alert_card(
     basis_desc = target.get('價差(Basis)') or target.get('basis_desc') or target.get('basis_tag') or ''
     margin_1lot = target.get('1口保證金(約)') or target.get('margin_1lot')
 
-    title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+    title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract not in ('--', '--F', 'None') else f"{code} {name}"
 
     entry_str = format_price_val(entry_val)
     addon_str = format_price_val(addon_val)
@@ -659,7 +659,7 @@ def build_price_alert_card(
                                 {"type": "text", "text": f"約 ${int(margin_1lot):,} 元 (一口=2張現貨)" if margin_1lot else "依期交所標準級距", "size": "xs", "weight": "bold", "color": "#1E293B", "flex": 7}
                             ]
                         }
-                    ] if fut_contract and fut_contract != '--' else [])
+                    ] if fut_contract and fut_contract not in ('--', '--F', 'None') else [])
                 },
                 {
                     "type": "box",
@@ -745,7 +745,7 @@ def format_clean_price_alert_text(
     fut_month = target.get('期貨月份') or target.get('month') or ''
     basis_desc = target.get('價差(Basis)') or target.get('basis_desc') or target.get('basis_tag') or ''
     margin_1lot = target.get('1口保證金(約)') or target.get('margin_1lot')
-    if fut_contract and fut_contract != '--':
+    if fut_contract and fut_contract not in ('--', '--F', 'None'):
         lines.append(f"• 期貨合約：{fut_contract} {fut_month} ｜ 價差：{basis_desc} ｜ 1口保證金約 ${int(margin_1lot):,} 元")
 
     lines.extend([
@@ -983,7 +983,7 @@ def build_screener_carousel(
         basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
         margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
 
-        title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+        title_name = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract not in ('--', '--F', 'None') else f"{code} {name}"
 
         entry_str = format_price_val(entry_val)
         addon_str = format_price_val(addon_val)
@@ -1181,7 +1181,7 @@ def build_screener_carousel(
                                     {"type": "text", "text": f"約 ${int(margin_1lot):,} 元 (一口=2張現貨)" if margin_1lot else "依期交所標準級距", "size": "xs", "weight": "bold", "color": "#1E293B", "flex": 7}
                                 ]
                             }
-                        ] if fut_contract and fut_contract != '--' else [])
+                        ] if fut_contract and fut_contract not in ('--', '--F', 'None') else [])
                     },
                     {
                         "type": "text",
@@ -1267,7 +1267,7 @@ def format_clean_screener_text(
         fut_month = r.get('期貨月份') or r.get('month') or ''
         basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
         margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
-        if fut_contract and fut_contract != '--':
+        if fut_contract and fut_contract not in ('--', '--F', 'None'):
             fut_oi = r.get('期貨未平倉(OI)') or r.get('futures_oi') or 0
             settle_tag = r.get('結算倒數') or r.get('settlement_tag') or ''
             oi_str = f" ｜ 未平倉：{int(fut_oi):,}口" if fut_oi else ""
@@ -1336,7 +1336,7 @@ def format_screener_markdown_cards(
         basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
         margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
 
-        title_badge = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract != '--' else f"{code} {name}"
+        title_badge = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract not in ('--', '--F', 'None') else f"{code} {name}"
 
         entry_str = format_price_val(entry_val)
         addon_str = format_price_val(addon_val)
@@ -1359,7 +1359,7 @@ def format_screener_markdown_cards(
             f"> - 隔日沖風控：{og_risk if og_risk else '🟢 主力籌碼沉澱 (低風險)'}",
         ])
 
-        if fut_contract and fut_contract != '--':
+        if fut_contract and fut_contract not in ('--', '--F', 'None'):
             fut_oi = r.get('期貨未平倉(OI)') or r.get('futures_oi') or 0
             settle_tag = r.get('結算倒數') or r.get('settlement_tag') or ''
             oi_str = f" ｜ 未平倉：`{int(fut_oi):,}` 口" if fut_oi else ""

@@ -827,6 +827,8 @@ def run_screening(date_str: str = None) -> list:
         tp2_final = fut_pricing['futures_tp2'] if has_fut else item['tp2_price']
         sl_final = fut_pricing['futures_sl'] if has_fut else item['sl_price']
 
+        has_contract = fut_pricing.get('has_contract', False)
+
         results.append({
             "證券代號": code,
             "證券名稱": item['證券名稱'],
@@ -856,15 +858,15 @@ def run_screening(date_str: str = None) -> list:
             "現貨TP1": item['tp1_price'],
             "現貨TP2": item['tp2_price'],
             "現貨停損": item['sl_price'],
-            "期貨契約": fut_pricing.get('contract_sym', '--'),
-            "期貨月份": fut_pricing.get('month', '--'),
-            "期貨收盤價": fut_pricing.get('futures_close', close_p),
-            "價差(Basis)": fut_pricing.get('basis_desc', '0.00 (0.00%)'),
-            "期貨未平倉(OI)": fut_pricing.get('futures_oi', 0),
-            "1口保證金(約)": fut_pricing.get('margin_1lot', 0),
-            "結算倒數": fut_pricing.get('badge_text', '--'),
-            "次月合約": fut_pricing.get('next_month', '--'),
-            "次月進場參考": fut_pricing.get('next_entry', entry_final),
+            "期貨契約": fut_pricing.get('contract_sym', '--') if has_contract else '--',
+            "期貨月份": fut_pricing.get('month', '--') if has_contract else '--',
+            "期貨收盤價": fut_pricing.get('futures_close', '') if (has_contract and fut_pricing.get('futures_close') is not None) else '',
+            "價差(Basis)": fut_pricing.get('basis_desc', '') if has_contract else '',
+            "期貨未平倉(OI)": fut_pricing.get('futures_oi', '') if has_contract else '',
+            "1口保證金(約)": fut_pricing.get('margin_1lot', '') if has_contract else '',
+            "結算倒數": fut_pricing.get('settlement_tag', '') if has_contract else '',
+            "次月合約": fut_pricing.get('next_month', '') if has_contract else '',
+            "次月進場參考": fut_pricing.get('next_entry', '') if (has_contract and fut_pricing.get('next_entry') is not None) else '',
             "隔日沖風控": broker_guard.get('tag', '安全・主力沉澱'),
             "評分": score,
             "星級推薦": stars

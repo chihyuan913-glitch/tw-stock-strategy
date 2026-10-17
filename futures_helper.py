@@ -329,7 +329,47 @@ def calculate_futures_pricing(
     包含近月主力合約、未平倉口數 (OI)、結算日前五日倒數與次月新倉參考價位矩陣
     """
     settle_info = get_futures_settlement_info()
-    has_real_quote = futures_quote is not None and futures_quote.get('price', 0) > 0
+    has_contract = bool(contract_base and contract_base not in ('', '--', 'None', None))
+    has_real_quote = has_contract and futures_quote is not None and futures_quote.get('price', 0) > 0
+
+    if not has_contract:
+        # 標的並無發行股票期貨契約
+        return {
+            'has_real_quote': False,
+            'has_contract': False,
+            'contract_sym': '--',
+            'month': '--',
+            'futures_close': None,
+            'basis': 0.0,
+            'basis_pct': 0.0,
+            'basis_desc': '--',
+            'basis_tag': '--',
+            'futures_vol': 0,
+            'futures_oi': 0,
+            'futures_entry': round(entry_spot, 2),
+            'futures_addon': round(addon_spot, 2),
+            'futures_tp1': round(tp1_spot, 2),
+            'futures_tp2': round(tp2_spot, 2),
+            'futures_sl': round(sl_spot, 2),
+            'margin_1lot': 0,
+            'shares_per_lot': 2000,
+            # 次月合約矩陣
+            'next_contract_sym': '--',
+            'next_month': '--',
+            'next_close': None,
+            'next_basis': 0.0,
+            'next_basis_desc': '--',
+            'next_vol': 0,
+            'next_oi': 0,
+            'next_entry': None,
+            'next_addon': None,
+            'next_tp1': None,
+            'next_tp2': None,
+            'next_sl': None,
+            'next_margin_1lot': 0,
+            'settlement_tag': '',
+            'settlement_banner': ''
+        }
 
     if has_real_quote:
         fut_close = float(futures_quote['price'])
@@ -349,9 +389,9 @@ def calculate_futures_pricing(
         next_vol = futures_quote.get('next_volume', 0)
         next_oi = futures_quote.get('next_open_interest', 0)
     else:
-        # 無真實期貨報價時，以現貨價為基準擬合 (價差為 0)
+        # 有契約但無真實盤中成交報價時，以現貨價為基準擬合 (價差為 0)
         fut_close = round(spot_close, 2)
-        fut_contract = f"{contract_base}F" if contract_base else "--"
+        fut_contract = f"{contract_base}F" if (contract_base and contract_base != '--') else "--"
         fut_month = settle_info['front_month']
         basis = 0.0
         basis_pct = 0.0
@@ -397,6 +437,7 @@ def calculate_futures_pricing(
 
     return {
         'has_real_quote': has_real_quote,
+        'has_contract': has_contract,
         'contract_sym': fut_contract,
         'month': fut_month,
         'futures_close': fut_close,
