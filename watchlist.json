@@ -12,11 +12,18 @@
     "sl_price": 54.12,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 22:06:52",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY",
+        "STOP_LOSS"
+      ]
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
-    "first_entered_at": "2026-10-16 13:06:26"
+    "first_entered_at": "2026-10-16 13:06:26",
+    "last_push_at": "2026-10-19 09:03:40",
+    "last_push_event": "STOP_LOSS"
   },
   "2476": {
     "code": "2476",
@@ -31,11 +38,18 @@
     "sl_price": 122.72,
     "target_id": "test",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY",
+        "STOP_LOSS"
+      ]
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
-    "first_entered_at": "2026-10-16 17:35:58"
+    "first_entered_at": "2026-10-16 17:35:58",
+    "last_push_at": "2026-10-19 09:01:22",
+    "last_push_event": "STOP_LOSS"
   },
   "3221": {
     "code": "3221",
@@ -50,11 +64,17 @@
     "sl_price": 51.34,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 21:46:59",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": [
+        "STOP_LOSS"
+      ]
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
-    "first_entered_at": "2026-10-16 15:26:49"
+    "first_entered_at": "2026-10-16 15:26:49",
+    "last_push_at": "2026-10-19 08:59:15",
+    "last_push_event": "STOP_LOSS"
   },
   "2603": {
     "code": "2603",
@@ -68,11 +88,18 @@
     "sl_price": 240.78,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "entry_price": 261.52,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 5,
-    "has_entered": true
+    "has_entered": true,
+    "last_push_at": "2026-10-19 13:06:24",
+    "last_push_event": "ENTRY",
+    "first_entered_at": "2026-10-19"
   },
   "3034": {
     "code": "3034",
@@ -87,11 +114,17 @@
     "sl_price": 538.35,
     "target_id": "test",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18",
+    "last_push_at": "2026-10-19 08:59:16",
+    "last_push_event": "ENTRY"
   },
   "1102": {
     "code": "1102",
@@ -105,11 +138,18 @@
     "sl_price": 35.97,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "entry_price": 38.2,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 5,
-    "has_entered": true
+    "has_entered": true,
+    "last_push_at": "2026-10-19 08:59:16",
+    "last_push_event": "ENTRY",
+    "first_entered_at": "2026-10-19"
   },
   "2855": {
     "code": "2855",
@@ -123,12 +163,19 @@
     "sl_price": 56.71,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY",
+        "STOP_LOSS"
+      ]
+    },
     "entry_price": 58.3,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 5,
     "has_entered": true,
-    "first_entered_at": "2026-10-16 13:06:26"
+    "first_entered_at": "2026-10-16 13:06:26",
+    "last_push_at": "2026-10-19 09:30:14",
+    "last_push_event": "STOP_LOSS"
   },
   "1319": {
     "code": "1319",
@@ -142,11 +189,18 @@
     "sl_price": 79.74,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "entry_price": 83.5,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 5,
-    "has_entered": true
+    "has_entered": true,
+    "last_push_at": "2026-10-19 08:59:17",
+    "last_push_event": "ENTRY",
+    "first_entered_at": "2026-10-19"
   },
   "2317": {
     "code": "2317",
@@ -161,10 +215,17 @@
     "sl_price": 231.8,
     "target_id": "test",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
-    "has_entered": true
+    "has_entered": true,
+    "last_push_at": "2026-10-19 08:59:17",
+    "last_push_event": "ENTRY",
+    "first_entered_at": "2026-10-19"
   },
   "2352": {
     "code": "2352",
@@ -178,11 +239,18 @@
     "sl_price": 28.22,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "entry_price": 29.3,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 5,
-    "has_entered": true
+    "has_entered": true,
+    "last_push_at": "2026-10-19 08:59:18",
+    "last_push_event": "ENTRY",
+    "first_entered_at": "2026-10-19"
   },
   "4916": {
     "code": "4916",
@@ -197,11 +265,17 @@
     "sl_price": 95.55,
     "target_id": "test",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18",
+    "last_push_at": "2026-10-19 08:59:18",
+    "last_push_event": "ENTRY"
   },
   "2344": {
     "code": "2344",
@@ -216,11 +290,17 @@
     "sl_price": 150.7,
     "target_id": "test",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": [
+        "ENTRY"
+      ]
+    },
     "trading_days_waiting": 0,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "has_entered": true,
-    "first_entered_at": "2026-10-16 17:35:58"
+    "first_entered_at": "2026-10-16 17:35:58",
+    "last_push_at": "2026-10-19 08:59:18",
+    "last_push_event": "ENTRY"
   },
   "8103": {
     "code": "8103",
@@ -235,8 +315,10 @@
     "sl_price": 107.82,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -254,8 +336,10 @@
     "sl_price": 97.38,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -273,8 +357,10 @@
     "sl_price": 179.52,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -292,8 +378,10 @@
     "sl_price": 306.85,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -311,8 +399,10 @@
     "sl_price": 27.06,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -330,8 +420,10 @@
     "sl_price": 26.84,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -349,11 +441,13 @@
     "sl_price": 18.67,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "1229": {
     "code": "1229",
@@ -368,8 +462,10 @@
     "sl_price": 39.54,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -387,8 +483,10 @@
     "sl_price": 74.21,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -406,8 +504,10 @@
     "sl_price": 1695.75,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -425,8 +525,10 @@
     "sl_price": 456.47,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -444,11 +546,13 @@
     "sl_price": 1499.35,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "3706": {
     "code": "3706",
@@ -463,11 +567,13 @@
     "sl_price": 77.74,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2379": {
     "code": "2379",
@@ -482,8 +588,10 @@
     "sl_price": 740.08,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -501,8 +609,10 @@
     "sl_price": 14.66,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
-    "alerted_today": {},
-    "last_rollover": "2026-10-17",
+    "alerted_today": {
+      "2026-10-19": []
+    },
+    "last_rollover": "2026-10-18",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -520,11 +630,13 @@
     "sl_price": 21.54,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2912": {
     "code": "2912",
@@ -539,11 +651,13 @@
     "sl_price": 211.7,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "5880": {
     "code": "5880",
@@ -558,9 +672,11 @@
     "sl_price": 26.38,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
-    "last_rollover": "2026-10-17",
+    "last_rollover": "2026-10-18",
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
   },
@@ -577,11 +693,13 @@
     "sl_price": 42.32,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2890": {
     "code": "2890",
@@ -596,11 +714,13 @@
     "sl_price": 43.69,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:10:17",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2014": {
     "code": "2014",
@@ -615,11 +735,13 @@
     "sl_price": 16.38,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2313": {
     "code": "2313",
@@ -634,11 +756,13 @@
     "sl_price": 230.59,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2610": {
     "code": "2610",
@@ -653,11 +777,13 @@
     "sl_price": 20.04,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "6112": {
     "code": "6112",
@@ -672,11 +798,13 @@
     "sl_price": 46.71,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   },
   "2332": {
     "code": "2332",
@@ -691,10 +819,12 @@
     "sl_price": 20.04,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
-    "alerted_today": {},
+    "alerted_today": {
+      "2026-10-19": []
+    },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-17"
+    "last_rollover": "2026-10-18"
   }
 }

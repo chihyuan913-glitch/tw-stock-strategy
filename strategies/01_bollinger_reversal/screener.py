@@ -415,6 +415,18 @@ def main():
 
     args = parser.parse_args()
 
+    # 自動載入全域市場自適應操盤參數 (Adaptive Regime Parameters)
+    try:
+        from adaptive_regime_manager import get_strategy_adaptive_params
+        adap_p = get_strategy_adaptive_params("01")
+        if adap_p:
+            if args.min_vol == 1000 and "min_volume" in adap_p:
+                args.min_vol = int(adap_p["min_volume"])
+            if args.max_dist == 1.0 and "bb_lower_band_offset_pct" in adap_p:
+                args.max_dist = float(adap_p["bb_lower_band_offset_pct"])
+    except Exception:
+        pass
+
     results = screen_stocks(
         date_str=args.date,
         min_volume_lots=args.min_vol,

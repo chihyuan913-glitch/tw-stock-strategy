@@ -1,22 +1,23 @@
 {
-  "contract_version": "1.0.0",
-  "strategy_id": "07_margin_call_ambush",
-  "strategy_short_id": "07",
-  "strategy_name": "高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
+  "contract_version": "2.0.0",
+  "strategy_id": "08_group_window_dressing",
+  "strategy_short_id": "08",
+  "strategy_name": "台股集團作帳與母子聯動伏擊策略",
   "decisions_locked": {
-    "1": "1-C: 雙向狀態機分流 (SHORT_BREAKDOWN: 🔴【斷頭助跌・放空獵殺】 / LONG_REVERSAL: 🟢【浮額清洗・逆勢抄底】)",
-    "2": "2-A: 官方融資流水帳動態成本推算引擎 (TWSE MI_MARGN / TPEx 融資融券 + Yahoo 股價序列遞推融資均價 C_bar)",
-    "3": "3-A: 4+1 五維度硬性濾網 (上限5個) + 二階段 100分制軟評分 (含 algo_guards 隔日沖扣分與 futures_helper OI 加分)",
-    "4": "4-A: 雙層門檻動態降級容錯 (Tier-1: 使用率>=25% & 維持率<=142%; Tier-2 Fallback: 使用率>=18% & 維持率<=158% Bottom 5%)",
-    "5": "5-C: 全系統雲端排程、盤中雷達、LINE 獨立群組 (LINE_TARGET_STRATEGY_07)、Web 戰情室與 pytest 閉環整合"
+    "1": "1-C: 內建台股 25 大核心作帳集團結構化字典 (group_pool.json) + 每週日 optimize_all.py 自動校準有效成分股",
+    "2": "2-C: 雙向狀態機分流 (GROUP_IGNITION: 🟢【作帳點火・母子共振】 / GROUP_UNWIND: 🔴【集團結帳・順勢放空】) + 4+1 五維度硬篩 + 二階段 100分制軟評分",
+    "3": "3-C: 雙層動態降級容錯 (Tier-1: TIER1_RESONANCE; Tier-2 Fallback: TIER2_GROUP_WATCH Top 6) + 作帳日曆節氣自動判定",
+    "4": "4-C: 現貨與個股期貨雙軌智能適配 (futures_helper.py) + 母子位階強弱配對指引 (👑【集團領頭羊主攻】 / 🚀【母強子落後補漲】 / ⚠️【高檔結帳提款】)",
+    "5": "5-C: 全系統排程整合、盤中防毛刺雷達、LINE 獨立群組 (LINE_TARGET_STRATEGY_08)、Web 戰情室八大策略頁籤與週報集團熱度排行"
   },
   "scope_boundaries": {
     "backend-refactor-agent": [
-      "strategies/07_margin_call_ambush/screener.py",
-      "strategies/07_margin_call_ambush/intraday_scanner.py",
-      "strategies/07_margin_call_ambush/run_daily.bat",
-      "strategies/07_margin_call_ambush/start_intraday.bat",
-      "strategies/07_margin_call_ambush/README.md",
+      "strategies/08_group_window_dressing/group_pool.json",
+      "strategies/08_group_window_dressing/screener.py",
+      "strategies/08_group_window_dressing/intraday_scanner.py",
+      "strategies/08_group_window_dressing/run_daily.bat",
+      "strategies/08_group_window_dressing/start_intraday.bat",
+      "strategies/08_group_window_dressing/README.md",
       "run_all.py",
       "run_all_intraday.py",
       "optimize_all.py",
@@ -31,78 +32,91 @@
       "web/index.html"
     ],
     "test-validator-agent": [
-      "tests/test_strategy_07_margin_call.py"
+      "tests/test_strategy_08_group_dressing.py"
     ]
   },
   "module_contracts": {
     "screener_module": {
-      "path": "strategies/07_margin_call_ambush/screener.py",
+      "path": "strategies/08_group_window_dressing/screener.py",
       "required_functions": {
-        "calculate_margin_cost_and_maintenance(margin_history: list, close_price: float, initial_vwap: float = 0.0) -> dict": {
-          "description": "根據融資買賣現償流水帳遞推平均融資持倉成本 C_bar 與融資維持率 MR (%)",
-          "input_margin_history_item": {
-            "buy_lots": "int (當日融資買進張數)",
-            "sell_lots": "int (當日融資賣出張數)",
-            "cash_repay_lots": "int (當日現金償還張數)",
-            "prev_balance_lots": "int (前日融資餘額張數)",
-            "balance_lots": "int (今日融資餘額張數)",
-            "quota_lots": "int (融資限額張數)",
-            "typical_price": "float (當日典型價格或收盤價)"
+        "load_group_pool(pool_path: str = None) -> list": {
+          "description": "載入 group_pool.json 台股 25 大核心作帳集團字典，至少 20 個集團、總成分股 >= 120 檔",
+          "group_item_schema": {
+            "group_id": "str (如 'G01_WALSIN')",
+            "group_name": "str (如 '華新麗華集團')",
+            "flagship_code": "str (如 '1605')",
+            "flagship_name": "str (如 '華新')",
+            "historical_weight": "float (1.0 ~ 1.5)",
+            "members": "list of dict [{'code': str, 'name': str, 'role': 'FLAGSHIP' | 'SUBSIDIARY'}]"
+          }
+        },
+        "evaluate_window_dressing_calendar(target_date = None) -> dict": {
+          "description": "根據日期判定作帳日曆階段與季節加分",
+          "phases": {
+            "Q4_YEAR_END_PEAK": "11/1 ~ 12/20 -> badge: '🔥 Q4 年底集團作帳主升期', season_bonus: 15, unwind_bonus: 0",
+            "UNWIND_WARNING_ZONE": "3, 6, 9, 12 月之 23 日至月底 -> badge: '⚠️ 季末/年末結帳警戒期', season_bonus: 5, unwind_bonus: 12",
+            "QUARTER_END_SPRINT": "3, 6, 9 月之 1~22 日或 10/15~10/31 -> badge: '⏳ 季底作帳衝刺期', season_bonus: 10, unwind_bonus: 0",
+            "NORMAL_ROTATION": "其他日期 -> badge: '🛡️ 非季底集團輪動觀察期', season_bonus: 5, unwind_bonus: 0"
           },
           "returns": {
-            "avg_cost": "float (平均融資成本 C_bar, 取小數點後2位)",
-            "maintenance_ratio": "float (融資維持率 %, 公式: close_price / (avg_cost * 0.6) * 100, 若分母<=0則回傳 0.0)",
-            "usage_ratio": "float (融資使用率 %, 公式: balance_lots / quota_lots * 100, 若 quota_lots<=0 則回傳 0.0)",
-            "balance_lots": "int",
-            "margin_change_1d_pct": "float (單日融資餘額增減百分比 %)",
-            "margin_change_3d_pct": "float (近3日融資餘額增減百分比 %)"
+            "phase_code": "str",
+            "phase_badge": "str",
+            "season_bonus": "int",
+            "unwind_bonus": "int"
+          }
+        },
+        "calculate_group_resonance_and_hierarchy(stock_records: list) -> list": {
+          "description": "計算同集團轉強共振家數、共振率 %、兄弟股名單與母子強弱配對位階角色，嚴防 ZeroDivisionError",
+          "returns_enriched_fields": {
+            "group_total_count": "int",
+            "group_active_count": "int (同集團滿足 close >= ma20 且 (inst_1d_lots > 0 或 inst_5d_lots > 0 或 ret_5d_pct > 0) 之家數)",
+            "group_resonance_ratio": "float (group_active_count / group_total_count * 100, 取小數點後2位，空池回傳 0.0)",
+            "sibling_leaders": "list of str (同集團其他轉強股，如 ['1605 華新', '2344 華邦電'])",
+            "parent_ret_5d_pct": "float (旗艦母公司5日漲幅%)",
+            "spread_vs_parent_pct": "float (ret_5d_pct - parent_ret_5d_pct)",
+            "hierarchy_role": "str ('👑【集團領頭羊主攻】' | '🚀【母強子落後補漲】' | '🟢【集團協同齊漲】' | '⚠️【高檔結帳提款】')"
           }
         },
         "classify_dual_state_and_pricing(stock_info: dict) -> dict": {
-          "description": "雙向狀態機分流與四大防線定價",
+          "description": "雙向狀態機分流 (GROUP_IGNITION vs. GROUP_UNWIND) 與四大防線定價",
           "states": {
-            "SHORT_BREAKDOWN": {
-              "badge": "🔴【斷頭助跌・放空獵殺】",
-              "condition": "收盤價 < MA20 且 三大法人近5日合計 <= 0 (或當日賣超 < 0) 且 融資未大幅退場 (margin_change_3d_pct >= -3.0)",
-              "pricing_rules": {
-                "entry_price": "round(close, 2) (空單建倉基準)",
-                "addon_price": "round(min(low * 0.995, close * 0.975), 2) (破底加空價)",
-                "tp1_price": "round(close * 0.92, 2) (第一回補目標 -8%)",
-                "tp2_price": "round(close * 0.85, 2) (波段斷頭滿足 -15%)",
-                "sl_price": "round(max(min(ma20 * 1.01, close * 1.035), close * 1.025), 2) (空單嚴格停損回補價，必 > entry_price)"
-              }
+            "GROUP_IGNITION": {
+              "badge": "🟢【作帳點火・母子共振】",
+              "condition": "close >= ma20 且 (inst_1d_lots >= 200 或 (inst_5d_lots >= 500 且 inst_1d_lots > 0)) 且 (close >= open_price 或 lower_shadow_pct >= 25.0) 且 upper_shadow_pct < 45.0",
+              "geometry_invariant": "sl_price < entry_price < addon_price < tp1_price < tp2_price"
             },
-            "LONG_REVERSAL": {
-              "badge": "🟢【浮額清洗・逆勢抄底】",
-              "condition": "融資出現斷頭清洗 (margin_change_1d_pct <= -2.0 或 margin_change_3d_pct <= -4.5) 且 三大法人當日或近3日買超 > 0 且 具備止跌型態 (close >= open 或 下影線佔振幅 >= 30%)",
-              "pricing_rules": {
-                "entry_price": "round(close, 2) (多單建倉上限)",
-                "addon_price": "round(max(high * 1.01, close * 1.025), 2) (突破轉強加碼價)",
-                "tp1_price": "round(max(ma20, close * 1.07), 2) (第一停利目標)",
-                "tp2_price": "round(close * 1.14, 2) (第二停利目標)",
-                "sl_price": "round(min(low * 0.985, close * 0.96), 2) (多單嚴格停損價，必 < entry_price)"
-              }
+            "GROUP_UNWIND": {
+              "badge": "🔴【集團結帳・順勢放空】",
+              "condition": "close < ma20 且 (inst_1d_lots <= -300 或 inst_5d_lots <= -800) 且 (close < open_price 或 upper_shadow_pct >= 35.0 或 ret_5d_pct <= -2.0)",
+              "geometry_invariant": "tp2_price < tp1_price < addon_price < entry_price < sl_price"
             }
           }
         },
         "apply_screening_with_fallback(candidates_raw: list) -> tuple": {
-          "description": "執行 4+1 五維度硬性濾網，若 Tier-1 (使用率>=25%, 維持率<=142%, 餘額>=3000張) 為 0 檔，自動降級啟動 Tier-2 (使用率>=18%, 維持率<=158%, 餘額>=1500張，取維持率最低前 6 檔)",
-          "returns": "(filtered_list: list, tier_mode: str) 其中 tier_mode 為 'TIER1_ABSOLUTE' 或 'TIER2_RELATIVE_WARNING'"
+          "description": "執行 4+1 五維度硬性濾網，若 Tier-1 (avg_vol_5d>=1000, abs(bias20_pct)<=8.0, 多方需 group_active_count>=2) 為 0 檔，自動降級啟動 Tier-2 (avg_vol_5d>=600, abs(bias20_pct)<=10.0, 依 score 與 group_resonance_ratio 由高至低排序取前 6 檔)",
+          "returns": "(filtered_list: list, tier_mode: str) 其中 tier_mode 為 'TIER1_RESONANCE' 或 'TIER2_GROUP_WATCH'"
         }
       },
       "csv_columns": [
         "證券代號",
         "證券名稱",
+        "所屬集團",
+        "集團排名",
+        "集團熱度分",
+        "集團狀態",
+        "集團旗艦母股",
+        "母子位階角色",
+        "同集團共振家數",
+        "集團共振率%",
+        "同集團轉強兄弟股",
+        "作帳日曆階段",
         "收盤價",
         "多空狀態",
         "狀態代碼",
         "門檻層級",
-        "融資使用率%",
-        "融資維持率%",
-        "預估融資均價",
-        "融資餘額(張)",
-        "融資1日增減%",
-        "融資3日增減%",
+        "5日漲幅%",
+        "母股5日漲幅%",
+        "母子強弱差%",
         "法人當日買賣超(張)",
         "法人5日買賣超(張)",
         "當日成交量(張)",
@@ -134,19 +148,27 @@
       ]
     },
     "intraday_scanner_module": {
-      "path": "strategies/07_margin_call_ambush/intraday_scanner.py",
+      "path": "strategies/08_group_window_dressing/intraday_scanner.py",
       "required_functions": {
         "evaluate_intraday_alert(target: dict, rt: dict, alerted_set: set, use_tick_guard: bool = True) -> tuple": {
-          "description": "根據 target['state_code'] ('SHORT_BREAKDOWN' 或 'LONG_REVERSAL') 雙向判定 STOP_LOSS, TP2, TP1, ADDON, ENTRY 五大到價事件，並通過 GLOBAL_TICK_GUARD 防毛刺檢核。",
+          "description": "根據 target['state_code'] ('GROUP_IGNITION' 或 'GROUP_UNWIND') 雙向判定 STOP_LOSS, TP2, TP1, ADDON, ENTRY 五大到價事件，並通過 GLOBAL_TICK_GUARD 防毛刺檢核。",
           "returns": "(event_type: str | None, event_title: str, event_desc: str)"
         }
       }
     },
+    "optimizer_module": {
+      "path": "optimize_all.py",
+      "required_functions": {
+        "audit_and_rank_group_pool() -> tuple": {
+          "description": "校準 strategies/08_group_window_dressing/group_pool.json 有效成分股並產生當週集團作帳資金流向排行摘要，回傳 (group_count: int, member_count: int, ranking_lines: list)"
+        }
+      }
+    },
     "web_api_contract": {
-      "endpoint": "GET /api/strategy/07_margin_call_ambush",
+      "endpoint": "GET /api/strategy/08_group_window_dressing",
       "response": {
-        "name": "策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
-        "desc": "鎖定高融資使用率與逼近 130% 追繳斷頭線之個股，透過「融資增減 × 法人動向」雙向狀態機自動分流【🔴斷頭助跌・放空獵殺】與【🟢浮額清洗・逆勢抄底】。",
+        "name": "策略 08：台股集團作帳與母子聯動伏擊策略",
+        "desc": "鎖定台股 25 大核心集團母子成分股，結合「同集團齊漲共振度 × 作帳日曆節氣 × 母子補漲位階」雙向狀態機，自動分流【🟢作帳點火・母子共振】與【🔴集團結帳・順勢放空】。",
         "columns": "list of string",
         "rows": "list of dict"
       }

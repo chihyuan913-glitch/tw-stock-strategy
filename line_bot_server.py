@@ -642,7 +642,8 @@ async def get_overview():
         "04_cb_pricing_ambush",
         "05_stock_futures_long",
         "06_volume_surge",
-        "07_margin_call_ambush"
+        "07_margin_call_ambush",
+        "08_group_window_dressing"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -697,6 +698,10 @@ async def get_strategy_data(strat_id: str):
         "07_margin_call_ambush": {
             "name": "策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略",
             "desc": "鎖定高融資使用率與逼近 130% 追繳斷頭線之個股，透過「融資增減 × 法人動向」雙向狀態機自動分流【🔴斷頭助跌・放空獵殺】與【🟢浮額清洗・逆勢抄底】。"
+        },
+        "08_group_window_dressing": {
+            "name": "策略 08：台股集團作帳與母子聯動伏擊策略",
+            "desc": "鎖定 25 大核心集團季底與年底作帳行情，透過「母子聯動 × 集團共振」雙向狀態機自動分流【🟢作帳點火・母子共振】與【🔴集團結帳・順勢放空】。"
         }
     }
 
@@ -940,17 +945,53 @@ async def get_radar_watchlist_endpoint():
                     break
         it['has_entered'] = has_entered
 
+        # 判定當日是否觸及到價或發送推播 (triggered_today)
+        today_str = today.strftime('%Y-%m-%d')
+        today_events = []
+        is_triggered_today = False
+
+        if 'alerted_today' in it and isinstance(it['alerted_today'], dict):
+            today_events.extend(it['alerted_today'].get(today_str, []))
+
+        last_push = str(it.get('last_push_at', ''))
+        if last_push.startswith(today_str):
+            is_triggered_today = True
+            pe = it.get('last_push_event', '')
+            if pe and pe not in today_events:
+                today_events.append(pe)
+
+        if today_events:
+            is_triggered_today = True
+
+        it['triggered_today'] = is_triggered_today
+        it['today_events'] = list(dict.fromkeys(today_events))
+        it['today_push_time'] = last_push[11:19] if last_push.startswith(today_str) else ''
+        it['is_new_today'] = bool(added_str and added_str.startswith(today_str))
+
     # 依最近推送時間（無推送紀錄則採掛入時間）由近至遠排序
     items.sort(
         key=lambda x: max(str(x.get('last_push_at', '')), str(x.get('added_at', ''))),
         reverse=True
     )
+    today_triggered_items = [it for it in items if it.get('triggered_today')]
     from radar_manager import sanitize_floats
     return sanitize_floats({
         "status": "ok",
         "count": len(items),
+        "today_triggered_count": len(today_triggered_items),
+        "today_triggered_items": today_triggered_items,
         "items": items
     })
+
+@app.get("/api/radar/triggered_today")
+async def get_radar_triggered_today_endpoint():
+    """專門回傳今日觸及到價與已推播之個股清單"""
+    res = await get_radar_watchlist_endpoint()
+    return {
+        "status": "ok",
+        "count": res.get("today_triggered_count", 0),
+        "items": res.get("today_triggered_items", [])
+    }
 
 @app.post("/api/radar/add")
 async def add_to_radar_endpoint(request: Request):

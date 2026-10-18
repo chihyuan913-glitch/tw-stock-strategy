@@ -1,0 +1,1052 @@
+[
+  {
+    "group_id": "G01_WALSIN",
+    "group_name": "華新麗華集團",
+    "flagship_code": "1605",
+    "flagship_name": "華新",
+    "historical_weight": 1.35,
+    "members": [
+      {
+        "code": "1605",
+        "name": "華新",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2344",
+        "name": "華邦電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6191",
+        "name": "精成科",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "5469",
+        "name": "瀚宇博",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "4919",
+        "name": "新唐",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8110",
+        "name": "華東",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6173",
+        "name": "信昌電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2492",
+        "name": "華新科",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6205",
+        "name": "詮欣",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G02_HONHAI",
+    "group_name": "鴻海集團",
+    "flagship_code": "2317",
+    "flagship_name": "鴻海",
+    "historical_weight": 1.4,
+    "members": [
+      {
+        "code": "2317",
+        "name": "鴻海",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2354",
+        "name": "鴻準",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3413",
+        "name": "京鼎",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6414",
+        "name": "樺漢",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2328",
+        "name": "廣宇",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3062",
+        "name": "建漢",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6196",
+        "name": "帆宣",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "5243",
+        "name": "乙盛-KY",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3149",
+        "name": "正達",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2367",
+        "name": "燿華",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G03_UMC",
+    "group_name": "聯電集團",
+    "flagship_code": "2303",
+    "flagship_name": "聯電",
+    "historical_weight": 1.3,
+    "members": [
+      {
+        "code": "2303",
+        "name": "聯電",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "3034",
+        "name": "聯詠",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3035",
+        "name": "智原",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8016",
+        "name": "矽創",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3014",
+        "name": "聯陽",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6239",
+        "name": "力成",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2363",
+        "name": "矽統",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6770",
+        "name": "力積電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3545",
+        "name": "敦泰",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G04_YAGEO",
+    "group_name": "國巨集團",
+    "flagship_code": "2327",
+    "flagship_name": "國巨*",
+    "historical_weight": 1.25,
+    "members": [
+      {
+        "code": "2327",
+        "name": "國巨*",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "6271",
+        "name": "同欣電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2375",
+        "name": "凱美",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "5328",
+        "name": "華容",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3090",
+        "name": "日電貿",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6284",
+        "name": "佳邦",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G05_FAR_EASTERN",
+    "group_name": "遠東集團",
+    "flagship_code": "1402",
+    "flagship_name": "遠東新",
+    "historical_weight": 1.15,
+    "members": [
+      {
+        "code": "1402",
+        "name": "遠東新",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "1102",
+        "name": "亞泥",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2606",
+        "name": "裕民",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "4904",
+        "name": "遠傳",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2903",
+        "name": "遠百",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1710",
+        "name": "東聯",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1460",
+        "name": "宏遠",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2845",
+        "name": "遠東銀",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G06_FORMOSA",
+    "group_name": "台塑集團",
+    "flagship_code": "1301",
+    "flagship_name": "台塑",
+    "historical_weight": 1.1,
+    "members": [
+      {
+        "code": "1301",
+        "name": "台塑",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "1303",
+        "name": "南亞",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1326",
+        "name": "台化",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6505",
+        "name": "台塑化",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2408",
+        "name": "南亞科",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8046",
+        "name": "南電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1314",
+        "name": "中石化",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1434",
+        "name": "福懋",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G07_VIA_HTC",
+    "group_name": "威盛宏達電集團",
+    "flagship_code": "2388",
+    "flagship_name": "威盛",
+    "historical_weight": 1.3,
+    "members": [
+      {
+        "code": "2388",
+        "name": "威盛",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2498",
+        "name": "宏達電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6756",
+        "name": "威鋒電子",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3508",
+        "name": "位速",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6118",
+        "name": "建達",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2425",
+        "name": "承啟",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G08_SAS_GWC",
+    "group_name": "中美晶環球晶集團",
+    "flagship_code": "5483",
+    "flagship_name": "中美晶",
+    "historical_weight": 1.25,
+    "members": [
+      {
+        "code": "5483",
+        "name": "中美晶",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "6488",
+        "name": "環球晶",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8255",
+        "name": "朋程",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6548",
+        "name": "長科*",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6494",
+        "name": "九齊",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3552",
+        "name": "同致",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G09_MITAC_SYNNEX",
+    "group_name": "神達聯強聯華集團",
+    "flagship_code": "3706",
+    "flagship_name": "神達",
+    "historical_weight": 1.2,
+    "members": [
+      {
+        "code": "3706",
+        "name": "神達",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2347",
+        "name": "聯強",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1229",
+        "name": "聯華",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3005",
+        "name": "神基",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1313",
+        "name": "聯成",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8114",
+        "name": "振樺電",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G10_KINPO_COMPAL",
+    "group_name": "金仁寶集團",
+    "flagship_code": "2324",
+    "flagship_name": "仁寶",
+    "historical_weight": 1.2,
+    "members": [
+      {
+        "code": "2324",
+        "name": "仁寶",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2312",
+        "name": "金寶",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3059",
+        "name": "華晶科",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "5388",
+        "name": "中磊",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8112",
+        "name": "至上",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6282",
+        "name": "康舒",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3596",
+        "name": "智易",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G11_EVERGREEN",
+    "group_name": "長榮集團",
+    "flagship_code": "2603",
+    "flagship_name": "長榮",
+    "historical_weight": 1.25,
+    "members": [
+      {
+        "code": "2603",
+        "name": "長榮",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2618",
+        "name": "長榮航",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2645",
+        "name": "長榮航太",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2607",
+        "name": "榮運",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2851",
+        "name": "中再保",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2636",
+        "name": "台驊控股",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G12_TCC",
+    "group_name": "台泥集團",
+    "flagship_code": "1101",
+    "flagship_name": "台泥",
+    "historical_weight": 1.1,
+    "members": [
+      {
+        "code": "1101",
+        "name": "台泥",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2104",
+        "name": "國際中橡",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1723",
+        "name": "中碳",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2504",
+        "name": "國產",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1103",
+        "name": "嘉泥",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1108",
+        "name": "幸福",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G13_UNI_PRESIDENT",
+    "group_name": "統一集團",
+    "flagship_code": "1216",
+    "flagship_name": "統一",
+    "historical_weight": 1.15,
+    "members": [
+      {
+        "code": "1216",
+        "name": "統一",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2912",
+        "name": "統一超",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "9907",
+        "name": "統一實",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1789",
+        "name": "神隆",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1232",
+        "name": "大統益",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2855",
+        "name": "統一證",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G14_YFY",
+    "group_name": "永豐餘集團",
+    "flagship_code": "1907",
+    "flagship_name": "永豐餘",
+    "historical_weight": 1.2,
+    "members": [
+      {
+        "code": "1907",
+        "name": "永豐餘",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "8069",
+        "name": "元太",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2890",
+        "name": "永豐金",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6582",
+        "name": "申豐",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1909",
+        "name": "榮成",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2601",
+        "name": "益航",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G15_LITEON",
+    "group_name": "光寶集團",
+    "flagship_code": "2301",
+    "flagship_name": "光寶科",
+    "historical_weight": 1.2,
+    "members": [
+      {
+        "code": "2301",
+        "name": "光寶科",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "4958",
+        "name": "臻鼎-KY",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6284",
+        "name": "佳邦",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8042",
+        "name": "金山電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3374",
+        "name": "精材",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2458",
+        "name": "義隆",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G16_YULON",
+    "group_name": "裕隆集團",
+    "flagship_code": "2201",
+    "flagship_name": "裕隆",
+    "historical_weight": 1.2,
+    "members": [
+      {
+        "code": "2201",
+        "name": "裕隆",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2204",
+        "name": "中華",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2227",
+        "name": "裕日車",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "9941",
+        "name": "裕融",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1417",
+        "name": "嘉裕",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1522",
+        "name": "堤維西",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G17_TECO",
+    "group_name": "東元集團",
+    "flagship_code": "1504",
+    "flagship_name": "東元",
+    "historical_weight": 1.15,
+    "members": [
+      {
+        "code": "1504",
+        "name": "東元",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2439",
+        "name": "美律",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1736",
+        "name": "喬山",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2642",
+        "name": "宅配通",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8040",
+        "name": "九暘",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2380",
+        "name": "虹光",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G18_INNOLUX",
+    "group_name": "奇美群創集團",
+    "flagship_code": "3481",
+    "flagship_name": "群創",
+    "historical_weight": 1.15,
+    "members": [
+      {
+        "code": "3481",
+        "name": "群創",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "4960",
+        "name": "誠美材",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3149",
+        "name": "正達",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6164",
+        "name": "華興",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "1762",
+        "name": "中化生",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G19_CATHAY_FUBON",
+    "group_name": "霖園富邦國泰金控集團",
+    "flagship_code": "2881",
+    "flagship_name": "富邦金",
+    "historical_weight": 1.25,
+    "members": [
+      {
+        "code": "2881",
+        "name": "富邦金",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2882",
+        "name": "國泰金",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3045",
+        "name": "台灣大",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8454",
+        "name": "富邦媒",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2501",
+        "name": "國建",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2887",
+        "name": "台新新光金",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G20_ASE",
+    "group_name": "日月光集團",
+    "flagship_code": "3711",
+    "flagship_name": "日月光投控",
+    "historical_weight": 1.3,
+    "members": [
+      {
+        "code": "3711",
+        "name": "日月光投控",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2369",
+        "name": "菱生",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6147",
+        "name": "頎邦",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3264",
+        "name": "欣銓",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6257",
+        "name": "矽格",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2449",
+        "name": "京元電子",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G21_DELTA",
+    "group_name": "台達電集團",
+    "flagship_code": "2308",
+    "flagship_name": "台達電",
+    "historical_weight": 1.35,
+    "members": [
+      {
+        "code": "2308",
+        "name": "台達電",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "3617",
+        "name": "碩天",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "4915",
+        "name": "致伸",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3057",
+        "name": "喬鼎",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6412",
+        "name": "群電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3576",
+        "name": "聯合再生",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G22_QUANTA",
+    "group_name": "廣達集團",
+    "flagship_code": "2382",
+    "flagship_name": "廣達",
+    "historical_weight": 1.35,
+    "members": [
+      {
+        "code": "2382",
+        "name": "廣達",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "2383",
+        "name": "台光電",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6188",
+        "name": "廣明",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3694",
+        "name": "海華",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "8072",
+        "name": "陞泰",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3714",
+        "name": "富采",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G23_WISTRON",
+    "group_name": "緯創集團",
+    "flagship_code": "3231",
+    "flagship_name": "緯創",
+    "historical_weight": 1.35,
+    "members": [
+      {
+        "code": "3231",
+        "name": "緯創",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "6669",
+        "name": "緯穎",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6285",
+        "name": "啟",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "4938",
+        "name": "和碩",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3037",
+        "name": "欣興",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2474",
+        "name": "可成",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G24_ASUS_PEGATRON",
+    "group_name": "華碩和碩集團",
+    "flagship_code": "2357",
+    "flagship_name": "華碩",
+    "historical_weight": 1.3,
+    "members": [
+      {
+        "code": "2357",
+        "name": "華碩",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "4938",
+        "name": "和碩",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "5269",
+        "name": "祥碩",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3189",
+        "name": "景碩",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2395",
+        "name": "研華",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6415",
+        "name": "矽力*-KY",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  },
+  {
+    "group_id": "G25_COOLING_AI",
+    "group_name": "散熱光電AI作帳集團",
+    "flagship_code": "3017",
+    "flagship_name": "奇鋐",
+    "historical_weight": 1.4,
+    "members": [
+      {
+        "code": "3017",
+        "name": "奇鋐",
+        "role": "FLAGSHIP"
+      },
+      {
+        "code": "3324",
+        "name": "雙鴻",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2421",
+        "name": "建準",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6230",
+        "name": "尼得科超眾",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3653",
+        "name": "健策",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "2345",
+        "name": "智邦",
+        "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3036",
+        "name": "文曄",
+        "role": "SUBSIDIARY"
+      }
+    ]
+  }
+]

@@ -108,6 +108,7 @@ def resolve_tokens(strategy: str = None, env: dict = None) -> list:
         "LINE_CHANNEL_ACCESS_TOKEN_05",
         "LINE_CHANNEL_ACCESS_TOKEN_06",
         "LINE_CHANNEL_ACCESS_TOKEN_07",
+        "LINE_CHANNEL_ACCESS_TOKEN_08",
     ]
     for bc in backup_candidates:
         bt = os.environ.get(bc) or env.get(bc)
@@ -359,6 +360,20 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "tp_desc": "TP1初段 / TP2滿足",
             "sl_desc": "嚴格停損風控線",
             "color_theme": "#B91C1C"
+        }
+    elif sid in ("08", "08_group_window_dressing"):
+        return {
+            "id": "08",
+            "name": "集團作帳與母子聯動",
+            "entry_label": "🟢 作帳伏擊進場",
+            "addon_label": "🔵 共振突破加碼",
+            "tp_label": "🔴 作帳停利目標",
+            "sl_label": "🛑 破線嚴格防守",
+            "entry_desc": "母子共振建倉價",
+            "addon_desc": "領頭羊突破續強",
+            "tp_desc": "TP1作帳目標 / TP2波段",
+            "sl_desc": "跌破起漲防守線",
+            "color_theme": "#D97706"
         }
     elif sid == "RADAR":
         return {
@@ -1343,7 +1358,7 @@ def format_screener_markdown_cards(
         tp_str = f"TP1 `{format_price_val(tp1_val)}` 元 ｜ TP2 `{format_price_val(tp2_val)}` 元" if tp2_val else f"`{format_price_val(tp1_val)}` 元"
         sl_str = format_price_val(sl_val)
 
-        status_tag = "🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05") else "🔴【弱勢破線・避險放空】"
+        status_tag = r.get('多空狀態') or ("🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05", "08") else "🔴【弱勢破線・避險放空】")
 
         md_lines.extend([
             f"### 🏷️ 【{i:02d}】{title_badge} {stars} ({score}分) {status_tag}",

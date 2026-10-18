@@ -64,6 +64,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "07_margin_call_ambush" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "08_group_window_dressing",
+        "name": "台股集團作帳與母子聯動伏擊策略",
+        "script": ROOT_DIR / "strategies" / "08_group_window_dressing" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False):

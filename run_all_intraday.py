@@ -73,6 +73,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "07_margin_call_ambush" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "07_margin_call_ambush"
     },
+    {
+        "id": "08_group_window_dressing",
+        "name": "策略 08：台股集團作帳與母子聯動到價雷達",
+        "script": ROOT_DIR / "strategies" / "08_group_window_dressing" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "08_group_window_dressing"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):

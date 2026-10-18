@@ -112,7 +112,7 @@ if ROOT_DIR not in sys.path:
      * 每週一至週五台灣時間 08:58 自動喚醒執行 `run_all_intraday.py --interval 60`。
      * 常駐監控全策略標的之四大防線（🟢進場、🔵加碼、🔴停利、🛑停損），到價即刻推播，至 13:35 收盤自動安全結束。
 3. **雲端金鑰安全管理**：
-   - 包含 LINE Token 與策略分流群組 ID（`LINE_TARGET_STRATEGY_01~07`）一律由 GitHub Repository Secrets 加密保護，不外洩。
+   - 包含 LINE Token 與策略分流群組 ID（`LINE_TARGET_STRATEGY_01~08`）一律由 GitHub Repository Secrets 加密保護，不外洩。
 4. **未來新增策略繼承機制**：
    - 新增策略只需依標準於 `strategies/` 建置好 `screener.py` 與 `intraday_scanner.py`，並於根目錄之 `run_all.py` 與 `run_all_intraday.py` 登記清單，**即自動全面納入雲端盤後選股與盤中雷達託管，完全不需額外編寫雲端工作流**。
 
@@ -221,6 +221,24 @@ if ROOT_DIR not in sys.path:
 3. **雙層門檻動態降級容錯**：
    - Tier-1 絕對斷頭高危（使用率 $\ge 25\%$、維持率 $\le 142\%$、餘額 $\ge 3,000$ 張）。
    - 若 Tier-1 為 0 檔，自動降級啟動 Tier-2 相對高危候補（使用率 $\ge 18\%$、維持率 $\le 165\%$、餘額 $\ge 1,500$ 張，取維持率最低前 6 檔），保證每日戰報品質穩定。
+
+---
+
+## 十八、台股集團作帳母子共振與結帳雙向狀態機標準 (Strategy 08 Group Window Dressing Standard)
+針對鎖定 25 大核心集團季度與年度作帳行情之量化策略（策略 08），強制遵循以下架構：
+1. **25 大核心作帳集團結構化字典 (`group_pool.json`)**：
+   - 建立台股 25 大集團池、130 檔以上核心成分股，精準定義旗艦母公司 (`FLAGSHIP`) 與子公司 (`SUBSIDIARY`)。
+2. **作帳行事曆動態時序評估 (`evaluate_window_dressing_calendar`)**：
+   - 自動識別季度結帳警戒期 (`UNWIND_WARNING_ZONE`)、Q4 年底作帳主升期 (`Q4_YEAR_END_PEAK`)、季底衝刺期 (`QUARTER_END_SPRINT`) 與常態輪動期 (`NORMAL_ROTATION`)。
+3. **母子共振度與階層分工引擎 (`calculate_group_resonance_and_hierarchy`)**：
+   - 動態精算同集團共振率與領頭羊、補漲、協同及提款四重角色，計算相對於母公司的價差利差。
+4. **雙向狀態機分流與四大防線定價 (`classify_dual_state_and_pricing`)**：
+   - 🟢【作帳點火・母子共振 (GROUP_IGNITION)】：站穩月線、法人買超、收紅或下影線 $\ge 25\%$，多方四大防線嚴守數學單調性。
+   - 🔴【集團結帳・順勢放空 (GROUP_UNWIND)】：摜破月線、法人賣超、收黑或上影線 $\ge 35\%$，空方四大防線嚴守停損回補。
+5. **雙層門檻動態降級容錯 (`apply_screening_with_fallback`)**：
+   - Tier-1 母子共振精選（嚴格 4+1 維度，5日均量 $\ge 1,000$ 張、$|\text{Bias20}| \le 8.0\%$、動能家數 $\ge 2$）。
+   - Tier-2 集團潛伏候補（5日均量 $\ge 600$ 張、$|\text{Bias20}| \le 10.0\%$，取前 6 檔），保證戰報品質與流動性。
+
 
 
 

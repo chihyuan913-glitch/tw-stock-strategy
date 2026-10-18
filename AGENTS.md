@@ -28,3 +28,6 @@
     - ④ 💡 **雙向操盤錦囊卡**（【空手者】掛單節奏與防追高 / 【持股者】移動停損與目標拔檔）
     未來新增任何策略，一律強制繼承根目錄共用之 `line_sender.py` 視覺化建構器（`build_screener_carousel`、`format_screener_markdown_cards`、`format_clean_screener_text`、`build_price_alert_card`），嚴禁輸出雜亂無章的純表格或充斥 ASCII 繁複符號之破碎排版。
 17. **高融資斷頭伏擊與浮額清洗雙向狀態機標準 (Strategy 07 Margin Call Ambush Standard)**：針對鎖定市場融資脆弱籌碼之量化策略（策略 07），強制透過 TWSE `MI_MARGN` 遞推加權融資持倉成本與真實維持率（借款以 6 成為基準，嚴防 ZeroDivisionError）；雙向狀態機依融資增減、法人買賣與 K 線止跌型態嚴格分流【🔴斷頭助跌・放空獵殺 (SHORT_BREAKDOWN)】與【🟢浮額清洗・逆勢抄底 (LONG_REVERSAL)】；全面落實 Tier-1 絕對斷頭高危與 Tier-2 相對高危候補（Bottom 6）雙層動態降級容錯架構。
+18. **台股集團作帳母子共振與結帳雙向狀態機標準 (Strategy 08 Group Window Dressing Standard)**：針對鎖定 25 大核心集團季度與年度作帳行情之量化策略（策略 08），強制建立結構化 25 大集團池字典 (`group_pool.json`)；透過作帳時序行事曆動態識別主升期與結帳警戒期；精算集團共振率與領頭羊、補漲、協同、提款四重母子階層分工角色；雙向狀態機分流【🟢作帳點火・母子共振 (GROUP_IGNITION)】與【🔴集團結帳・順勢放空 (GROUP_UNWIND)】；落實 Tier-1 母子共振精選與 Tier-2 集團潛伏候補雙層降級容錯，保證每日選股品質與操盤四大防線嚴格單調性。
+19. **全域自適應市場位階操盤引擎標準 (Universal Adaptive Market Regime Engine Standard)**：為使全策略能隨大盤多空、震盪箱型與季底作帳時序自動自我演化，全策略（現有策略 01~08 及未來所有新增策略）一律強制套用根目錄之 `adaptive_regime_manager.py`。每週日由 `optimize_all.py` 產出 `regime_config.json`，各策略開盤選股時自動繼承大盤位階所派發之動態參數（乖離防追高上限、TP1/TP2 停利目標、移動停利門檻、集團共振度加權與現金水位指引）；同時嚴格恪守量化風控三鐵律（成交量 $\ge 1,000$ 張底線、停損最大安全閥 $\le -7.0\%$、推薦上限 $\le 10$ 檔），杜絕過度擬合 (Overfitting) 與黑天鵝風險。
+
