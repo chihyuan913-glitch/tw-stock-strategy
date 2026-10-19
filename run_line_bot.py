@@ -21,18 +21,30 @@ import urllib.request
 import subprocess
 from pathlib import Path
 
-# 確保在無控制台視窗 (Silent VBS / WScript) 環境下安全記錄日誌
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# 確保在無控制台視窗 (Silent VBS / WScript / Hidden) 環境下安全記錄日誌，防止 WinError 6 控制代碼無效崩潰
+LOG_FILE = ROOT_DIR / "run_line_bot.log"
+_needs_redirect = False
 if sys.stdout is None or sys.stderr is None:
+    _needs_redirect = True
+else:
     try:
-        _bot_log = open(ROOT_DIR / "run_line_bot.log", "w", encoding="utf-8", buffering=1)
+        sys.stdout.write("")
+        sys.stdout.flush()
+    except Exception:
+        _needs_redirect = True
+
+if _needs_redirect:
+    try:
+        _bot_log = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
         sys.stdout = _bot_log
         sys.stderr = _bot_log
     except Exception:
-        pass
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
 else:
     if hasattr(sys.stdout, 'reconfigure'):
         try:
