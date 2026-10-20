@@ -220,7 +220,8 @@ def build_regime_matrix(regime_key: str, market_info: Dict[str, Any], group_info
         "01_bollinger_reversal": {
             "name": "布林通道超跌反轉",
             "active_mode": "LONG_REVERSAL",
-            "bb_lower_band_offset_pct": 0.5 if regime_key != REGIME_BEAR_DEFENSIVE else 1.0,
+            "bb_lower_band_offset_pct": 1.0,
+            "bb_tier2_offset_pct": 2.5,
             "tp1_pct": long_strategies["tp1_pct"],
             "stop_loss_pct": long_strategies["stop_loss_pct"],
             "recommendation_limit": global_controls["max_recommendations_per_strategy"]

@@ -369,10 +369,12 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
     force_long = bool(stock_info.get('force_long', False))
 
     # 1. 多方 GROUP_IGNITION 條件判斷
+    # 型態維度只保留「上影線 < 45%」(墓碑線出貨) 為硬防守；「收黑且下影線不足」改為 candle_weak 旗標，
+    # 由軟評分扣分 (法人明明在買卻因一根收黑 K 被整檔排除，過於武斷)。
+    candle_weak = not (close >= open_price or lower_shadow_pct >= 25.0)
     is_ignition = (
         (close >= ma20)
         and (inst_1d >= 200 or (inst_5d >= 500 and inst_1d > 0))
-        and (close >= open_price or lower_shadow_pct >= 25.0)
         and (upper_shadow_pct < 45.0)
     )
 
@@ -416,6 +418,7 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
             "tp1_price": tp1_price,
             "tp2_price": tp2_price,
             "sl_price": sl_price,
+            "candle_weak": candle_weak,
             "upper_shadow_pct": upper_shadow_pct,
             "lower_shadow_pct": lower_shadow_pct
         }
@@ -488,6 +491,7 @@ def calculate_group_soft_score(
       6. 隔日沖風控扣分: -5 ~ -15
       7. 股期 OI 深度流動性加分: +5
       8. 集團作帳熱度名次 (group_rank, 僅多方): 第1/2/3名 +6/+4/+2
+      9. 型態扣分 (candle_weak, 僅多方): 收黑且下影線 < 25% 扣 10 分；法人當日買超 >= 1000 張扣 5 分
     回傳: (score: int, stars: str)
     """
     score = 50
@@ -546,6 +550,11 @@ def calculate_group_soft_score(
         oi = int(fut_pricing.get('oi', 0))
         if oi >= 2000:
             score += 5
+
+    # 型態扣分：多方標的收黑且下影線不足 (candle_weak)，不再硬性排除，改為扣分；
+    # 法人當日大買 (>= 1000 張) 視為有承接，只扣 5 分，否則扣 10 分
+    if state_code == 'GROUP_IGNITION' and item.get('candle_weak'):
+        score -= 5 if inst_1d >= 1000 else 10
 
     # 集團作帳熱度名次加分 (僅多方點火標的；空方結帳不因集團熱門而加分)
     if group_rank in (1, 2, 3) and state_code == 'GROUP_IGNITION':
@@ -633,10 +642,22 @@ def apply_screening_with_fallback(candidates_raw: list) -> tuple:
         return tier1_list, "TIER1_RESONANCE"
 
     # 若 Tier-1 為 0 檔，自動降級啟動 Tier-2
+    return _build_tier2_candidates(candidates_raw)[:6], "TIER2_GROUP_WATCH"
+
+
+def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None) -> list:
+    """
+    Tier-2 集團潛伏候補 (放寬版硬篩)：5日均量 >= 600、|Bias20| <= 10。
+    非 IGNITION/UNWIND 但站上月線且法人買超者，強制賦予多方四大防線 (force_long)。
+    rescore: 可選回呼，於強制定價後重算該標的分數/股期價位，讓後續「依分數取前 N 檔」使用正確分數
+             (否則會沿用 NEUTRAL 狀態時的舊分數，法人買超越多反而排越後面)。
+    exclude_codes: 已入選 Tier-1 之代號，避免重複入列。回傳依分數排序之完整清單 (不截斷)。
+    """
+    exclude = {str(c).strip() for c in exclude_codes}
     tier2_list = []
     for c in candidates_raw:
         code = str(c.get('code', c.get('證券代號', ''))).strip()
-        if not (code.isdigit() and len(code) == 4):
+        if not (code.isdigit() and len(code) == 4) or code in exclude:
             continue
 
         vol_5d = float(c.get('avg_vol_5d') or c.get('vol_5d_lots') or c.get('5日均量(張)') or 0)
@@ -671,6 +692,8 @@ def apply_screening_with_fallback(candidates_raw: list) -> tuple:
         c_copy['門檻層級'] = "⚠️ Tier-2 集團潛伏候補"
         c_copy['bias20_pct'] = bias20
         c_copy['月線乖離%'] = bias20
+        if rescore is not None and c_copy.get('force_long'):
+            rescore(c_copy)
         tier2_list.append(c_copy)
 
     tier2_list.sort(
@@ -681,7 +704,31 @@ def apply_screening_with_fallback(candidates_raw: list) -> tuple:
         ),
         reverse=True
     )
-    return tier2_list[:6], "TIER2_GROUP_WATCH"
+    return tier2_list
+
+
+def apply_screening_parallel(candidates_raw: list, tier2_cap: int = 6, rescore=None) -> tuple:
+    """
+    Tier-1 精選與 Tier-2 潛伏候補「並行」輸出 (apply_screening_with_fallback 則是 Tier-1 為 0 才降級)。
+    Why: 單純降級時，只要 Tier-1 有 1 檔，Tier-2 就永遠沒有機會出手，站上月線且法人買超、
+    但差一個條件 (如月乖離 8~10%、同集團共振不足) 的標的整天都看不到。並行後 Tier-2 作為
+    「補位觀察名單」，與 Tier-1 以層級標籤區隔 (Tier-2 最多 tier2_cap 檔，不與 Tier-1 重複)。
+    回傳 (filtered_list, tier_mode)，tier_mode 為 'TIER1_PLUS_TIER2' / 'TIER1_RESONANCE' / 'TIER2_GROUP_WATCH'。
+    """
+    first_list, first_mode = apply_screening_with_fallback(candidates_raw)
+    tier1_list = first_list if first_mode == "TIER1_RESONANCE" else []
+
+    tier2_list = _build_tier2_candidates(
+        candidates_raw,
+        exclude_codes=[str(it.get('code', '')).strip() for it in tier1_list],
+        rescore=rescore,
+    )[:max(0, int(tier2_cap))]
+
+    if tier1_list and tier2_list:
+        return tier1_list + tier2_list, "TIER1_PLUS_TIER2"
+    if tier1_list:
+        return tier1_list, "TIER1_RESONANCE"
+    return tier2_list, "TIER2_GROUP_WATCH"
 
 
 def fetch_group_market_data(group_pool: list) -> list:
@@ -1005,6 +1052,7 @@ def cluster_items_by_group_rank(items: list, ranking: list) -> list:
         return (
             rank_map.get(gid, 9999),
             0 if it.get('state_code') == 'GROUP_IGNITION' else 1,
+            1 if "Tier-2" in str(it.get('tier_level', '')) else 0,
             _role_order(it),
             -float(it.get('score', 0) or 0),
             str(it.get('code', '')),
@@ -1024,7 +1072,13 @@ def build_group_markdown_report(ranking: list, items: list, calendar_meta: dict,
                                 tier_mode: str, cards_md: str = "",
                                 inst_real_count: int = 0, inst_total_count: int = 0) -> str:
     """result.md：① 當日集團作帳排行榜 ② 各集團入選個股集中排列 ③ 個股完整字卡。"""
-    tier_label = "🎯 Tier-1 母子共振精選" if tier_mode == "TIER1_RESONANCE" else "⚠️ Tier-2 集團潛伏候補"
+    n_t2 = sum(1 for it in items or [] if "Tier-2" in str(it.get('tier_level', '')))
+    n_t1 = len(items or []) - n_t2
+    tier_label = {
+        "TIER1_RESONANCE": "🎯 Tier-1 母子共振精選",
+        "TIER2_GROUP_WATCH": "⚠️ Tier-2 集團潛伏候補",
+        "TIER1_PLUS_TIER2": "🎯 Tier-1 精選 + ⚠️ Tier-2 潛伏候補並行",
+    }.get(tier_mode, str(tier_mode)) + f" (T1 {n_t1} 檔 / T2 {n_t2} 檔)"
     picks_by_group = {}
     for it in items or []:
         picks_by_group.setdefault(str(it.get('group_id', '')).strip(), []).append(it)
@@ -1064,14 +1118,16 @@ def build_group_markdown_report(ranking: list, items: list, calendar_meta: dict,
         lines += [
             f"### {medal} 第 {g['rank']} 名｜{g['group_name']}｜熱度 {g['heat_score']}｜{g['status_badge']}",
             "",
-            "| 個股 | 母子角色 | 多空 | 進場 | 加碼 | TP1 | 停損 | 評分 |",
-            "| :-- | :-- | :-- | --: | --: | --: | --: | :-: |",
+            "| 個股 | 層級 | 母子角色 | 多空 | 進場 | 加碼 | TP1 | 停損 | 評分 |",
+            "| :-- | :-: | :-- | :-- | --: | --: | --: | --: | :-: |",
         ]
         for it in group_items:
+            tier_icon = "⚠️ T2" if "Tier-2" in str(it.get('tier_level', '')) else "🎯 T1"
+            weak = " ·收黑扣分" if it.get('candle_weak') and it.get('state_code') == 'GROUP_IGNITION' else ""
             lines.append(
-                f"| {it.get('code', '')} {it.get('name', '')} | {it.get('hierarchy_role', '')} | "
+                f"| {it.get('code', '')} {it.get('name', '')} | {tier_icon} | {it.get('hierarchy_role', '')} | "
                 f"{it.get('state_badge', '')} | {it.get('entry_price', 0):.2f} | {it.get('addon_price', 0):.2f} | "
-                f"{it.get('tp1_price', 0):.2f} | {it.get('sl_price', 0):.2f} | {it.get('score', 0)} {it.get('stars', '')} |"
+                f"{it.get('tp1_price', 0):.2f} | {it.get('sl_price', 0):.2f} | {it.get('score', 0)} {it.get('stars', '')}{weak} |"
             )
         lines.append("")
     if not shown:
@@ -1099,7 +1155,10 @@ def format_group_ranking_text(ranking: list, items: list, date_str: str,
         )
         picks = picks_by_group.get(g['group_id'], [])
         if picks:
-            lines.append("　入選：" + "、".join(f"{p.get('code', '')} {p.get('name', '')}" for p in picks))
+            lines.append("　入選：" + "、".join(
+                f"{p.get('code', '')} {p.get('name', '')}" + ("⚠️" if "Tier-2" in str(p.get('tier_level', '')) else "")
+                for p in picks
+            ))
         lines.append("")
     lines.append("💡 熱度越高代表集團資金越集中；結帳提款集團請勿追價。")
     return "\n".join(lines)
@@ -1165,17 +1224,11 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
     taifex_quotes = fetch_taifex_futures_quotes()
 
     # 6. 狀態機分類與定價
-    classified_records = []
-    for r in resonance_records:
-        st = classify_dual_state_and_pricing(r)
-        merged = dict(r)
-        merged.update(st)
-
-        # 隔日沖評估
+    def _enrich(merged: dict) -> dict:
+        """依目前 state/定價計算隔日沖、股期定價與軟評分 (Tier-2 強制多方補位標的需於定價後重算)。"""
         code = str(merged.get('code', ''))
         overnight_guard = evaluate_overnight_broker_risk(code, merged)
 
-        # 股票期貨定價
         f_info = futures_pool.get(code, {'contract': '--', 'name': merged.get('name', '')})
         contract_base = f_info.get('contract', '--')
         fut_q = taifex_quotes.get(contract_base)
@@ -1207,11 +1260,19 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
         merged['星級推薦'] = stars
         merged['overnight_guard'] = overnight_guard
         merged['fut_pricing'] = fut_pricing
-        classified_records.append(merged)
+        return merged
 
-    # 7. 4+1 維度硬篩與 Tier-2 動態降級
-    filtered_list, tier_mode = apply_screening_with_fallback(classified_records)
-    print(f"[✓] 篩選完成！入選檔數：{len(filtered_list)} 檔 (模式: {tier_mode})")
+    classified_records = []
+    for r in resonance_records:
+        merged = dict(r)
+        merged.update(classify_dual_state_and_pricing(r))
+        classified_records.append(_enrich(merged))
+
+    # 7. 4+1 維度硬篩：Tier-1 精選與 Tier-2 潛伏候補並行
+    filtered_list, tier_mode = apply_screening_parallel(classified_records, rescore=_enrich)
+    n_t1 = sum(1 for it in filtered_list if it.get('tier_mode') == "TIER1_RESONANCE")
+    n_t2 = len(filtered_list) - n_t1
+    print(f"[✓] 篩選完成！入選檔數：{len(filtered_list)} 檔 (Tier-1 {n_t1} 檔 + Tier-2 {n_t2} 檔，模式: {tier_mode})")
 
     # 8. 構建標準輸出表：同集團個股集中排列，集團依當日作帳熱度排名由高至低
     rank_lookup = {g['group_id']: g for g in group_ranking}

@@ -864,3 +864,110 @@ def test_group_rank_bonus_and_report_rendering():
     for col in ("集團排名", "集團熱度分", "集團狀態", "所屬集團", "進場價位", "停損價位", "評分"):
         assert col in screener.CSV_COLUMNS
     assert len(screener.CSV_COLUMNS) == len(set(screener.CSV_COLUMNS))
+
+
+# ============================================================================
+# 收黑改軟評分扣分 + Tier-1 / Tier-2 並行
+# ============================================================================
+def _cand(code, state, close, ma20, vol, score, active=3, inst1=500, inst5=800, **kw):
+    d = {
+        "code": code, "name": f"N{code}", "group_id": "GA", "group_name": "甲集團",
+        "state_code": state, "close": close, "ma20": ma20, "open_price": close, "open": close,
+        "high": close * 1.01, "low": close * 0.99,
+        "avg_vol_5d": vol, "group_active_count": active, "group_resonance_ratio": 60.0,
+        "inst_1d_lots": inst1, "inst_5d_lots": inst5, "score": score, "ret_5d_pct": 1.0,
+    }
+    d.update(kw)
+    return d
+
+
+def test_black_candle_becomes_soft_penalty_not_hard_exclusion():
+    """
+    法人買超 + 站上月線 + 收黑 (下影線不足)：原本被硬性排除，現在須成為 GROUP_IGNITION 並帶 candle_weak 旗標，
+    四大防線幾何仍單調；同條件收紅者無旗標。墓碑線 (上影線 >= 45%) 仍須硬性排除。
+    評分：收黑扣 10 分，法人當日買超 >= 1000 張僅扣 5 分，空方與收紅不受影響。
+    """
+    screener = load_screener_module()
+    base = {"ma20": 100.0, "inst_1d_lots": 500, "inst_5d_lots": 900, "ret_5d_pct": 1.0}
+    # 收黑：open 105 > close 103，low 102.8 → 下影線 ≈ 8%，上影線 ≈ 8%
+    black = dict(base, close=103.0, open_price=105.0, high=105.4, low=102.8)
+    red = dict(base, close=105.0, open_price=103.0, high=105.4, low=102.8)
+    rb = screener.classify_dual_state_and_pricing(black)
+    rr = screener.classify_dual_state_and_pricing(red)
+    assert rb["state_code"] == "GROUP_IGNITION" and rb["candle_weak"] is True
+    assert rr["state_code"] == "GROUP_IGNITION" and rr["candle_weak"] is False
+    assert rb["sl_price"] < rb["entry_price"] < rb["addon_price"] < rb["tp1_price"] < rb["tp2_price"]
+
+    tomb = dict(base, close=103.0, open_price=102.0, high=110.0, low=101.5)  # 上影線 ≈ 82%
+    assert screener.classify_dual_state_and_pricing(tomb)["state_code"] == "NEUTRAL"
+
+    cal = {"season_bonus": 10, "unwind_bonus": 5}
+    item = {"state_code": "GROUP_IGNITION", "group_resonance_ratio": 45.0, "inst_1d_lots": 300,
+            "hierarchy_role": "🟢【集團協同齊漲】"}
+    s0, _ = screener.calculate_group_soft_score(item, cal)
+    s_weak, _ = screener.calculate_group_soft_score(dict(item, candle_weak=True), cal)
+    big = dict(item, inst_1d_lots=1500)
+    s_big, _ = screener.calculate_group_soft_score(big, cal)
+    s_big_weak, _ = screener.calculate_group_soft_score(dict(big, candle_weak=True), cal)
+    assert s_weak == s0 - 10
+    assert s_big_weak == s_big - 5
+    short = dict(item, state_code="GROUP_UNWIND", inst_1d_lots=-300, candle_weak=True)
+    assert (screener.calculate_group_soft_score(short, cal)[0]
+            == screener.calculate_group_soft_score(dict(short, candle_weak=False), cal)[0])
+
+
+def test_tier1_and_tier2_run_in_parallel():
+    """
+    A: 通過 Tier-1。B: 月乖離 9% (Tier-1 > 8% 淘汰、Tier-2 <= 10% 通過)。
+    C: 狀態中性但站上月線且法人買超、均量 900 (僅 Tier-2 可入選，需強制多方定價)。
+    D: 破月線且法人買超 (兩層皆淘汰)。E: 均量 500 (兩層皆淘汰)。
+    斷言：模式、不重複、層級標籤、rescore 只對強制補位標的呼叫並影響排序、cap 生效；
+    舊的 apply_screening_with_fallback 行為不變 (Tier-1 有標的時不含 Tier-2)。
+    """
+    screener = load_screener_module()
+    A = _cand("1001", "GROUP_IGNITION", 103.0, 100.0, 2000, 90)
+    B = _cand("1002", "GROUP_IGNITION", 109.0, 100.0, 2000, 60)
+    C = _cand("1003", "NEUTRAL", 102.0, 100.0, 900, 40, inst1=500, inst5=800,
+              open_price=101.0, high=103.0, low=100.5)
+    D = _cand("1004", "NEUTRAL", 95.0, 100.0, 2000, 80, inst1=900)
+    E = _cand("1005", "GROUP_IGNITION", 103.0, 100.0, 500, 95)
+
+    called = []
+
+    def rescore(item):
+        called.append(item["code"])
+        item["score"] = 77
+
+    out, mode = screener.apply_screening_parallel([A, B, C, D, E], rescore=rescore)
+    codes = [i["code"] for i in out]
+    assert mode == "TIER1_PLUS_TIER2"
+    assert codes == ["1001", "1003", "1002"]          # Tier-1 在前；Tier-2 依(重算後)分數 C(77) > B(60)
+    assert len(codes) == len(set(codes))
+    assert called == ["1003"]                          # 只有強制補位者需要重算
+    levels = {i["code"]: i["tier_level"] for i in out}
+    assert "Tier-1" in levels["1001"] and "Tier-2" in levels["1002"] and "Tier-2" in levels["1003"]
+    c_item = next(i for i in out if i["code"] == "1003")
+    assert c_item["state_code"] == "GROUP_IGNITION" and c_item.get("force_long") is True
+    assert c_item["sl_price"] < c_item["entry_price"] < c_item["addon_price"] < c_item["tp1_price"] < c_item["tp2_price"]
+
+    capped, _ = screener.apply_screening_parallel([A, B, C], tier2_cap=1, rescore=rescore)
+    assert [i["code"] for i in capped] == ["1001", "1003"]
+    only_t1, mode_t1 = screener.apply_screening_parallel([A, D, E])
+    assert mode_t1 == "TIER1_RESONANCE" and [i["code"] for i in only_t1] == ["1001"]
+    only_t2, mode_t2 = screener.apply_screening_parallel([B, C, D, E])
+    assert mode_t2 == "TIER2_GROUP_WATCH" and {i["code"] for i in only_t2} == {"1002", "1003"}
+    assert screener.apply_screening_parallel([])[0] == []
+
+    old, old_mode = screener.apply_screening_with_fallback([A, B, C])
+    assert old_mode == "TIER1_RESONANCE" and [i["code"] for i in old] == ["1001"]
+
+
+def test_cluster_puts_tier1_before_tier2_within_group():
+    screener = load_screener_module()
+    ranking = [{"group_id": "GA", "rank": 1}]
+    base = {"group_id": "GA", "state_code": "GROUP_IGNITION", "hierarchy_role": "🟢【集團協同齊漲】"}
+    items = [
+        dict(base, code="2", score=99, tier_level="⚠️ Tier-2 集團潛伏候補"),
+        dict(base, code="1", score=60, tier_level="🎯 Tier-1 母子共振精選"),
+    ]
+    assert [i["code"] for i in screener.cluster_items_by_group_rank(items, ranking)] == ["1", "2"]

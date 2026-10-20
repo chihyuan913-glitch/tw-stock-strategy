@@ -24,7 +24,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 STRATEGIES = [
     {
         "id": "01_bollinger_reversal",
-        "name": "布林通道下軌超跌反轉策略 (V2.0)",
+        "name": "布林通道下軌超跌反轉策略 (V2.5 雙層降級容錯版)",
         "script": ROOT_DIR / "strategies" / "01_bollinger_reversal" / "screener.py",
         "export": "result.csv",
     },
