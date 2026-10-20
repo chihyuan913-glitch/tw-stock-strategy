@@ -109,12 +109,15 @@
       <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
         <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
           <span class="flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> 加權指數 (^TWII)</span>
-          <span id="marketTrendTag" class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">多頭排列</span>
+          <span id="marketTrendTag" class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">箱型震盪</span>
         </div>
-        <div class="text-2xl font-black font-mono text-white" id="twiiPrice">49,313.44</div>
-        <div class="text-xs text-slate-400 mt-1 flex items-center gap-2">
-          <span>20MA: <strong id="twiiMa20" class="text-slate-300">47,687.85</strong></span>
-          <span class="text-emerald-400 font-semibold" id="twiiBias">月線乖離 +3.41%</span>
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <div class="text-2xl font-black font-mono text-white" id="twiiPrice">46,292.93</div>
+          <div class="text-xs font-mono font-bold text-emerald-400" id="twiiChange">▼ -529.15 (-1.13%)</div>
+        </div>
+        <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+          <span>20MA: <strong id="twiiMa20" class="text-slate-300">48,170.13</strong></span>
+          <span class="text-emerald-400 font-semibold" id="twiiBias">月線乖離 -3.90%</span>
         </div>
       </div>
 
@@ -2525,12 +2528,35 @@
         // 載入 overview
         const resp = await fetch('/api/overview');
         const d = await resp.json();
-        document.getElementById('twiiPrice').innerText = d.market.close;
-        document.getElementById('twiiMa20').innerText = d.market.ma20;
-        document.getElementById('twiiBias').innerText = `月線乖離 ${d.market.bias_ma20 > 0 ? '+' : ''}${d.market.bias_ma20}%`;
-        document.getElementById('marketRegime').innerText = d.market.regime;
-        document.getElementById('marketAdvice').innerText = d.market.risk_advice;
-        document.getElementById('marketTrendTag').innerText = d.market.trend;
+        if (d.market) {
+          const m = d.market;
+          document.getElementById('twiiPrice').innerText = m.close;
+          const chEl = document.getElementById('twiiChange');
+          if (chEl) {
+            const ch = Number(m.change || 0);
+            const chPct = Number(m.change_pct || 0);
+            if (ch > 0) {
+              chEl.className = "text-xs font-mono font-bold text-rose-400";
+              chEl.innerText = `▲ +${ch.toFixed(2)} (+${chPct.toFixed(2)}%)`;
+            } else if (ch < 0) {
+              chEl.className = "text-xs font-mono font-bold text-emerald-400";
+              chEl.innerText = `▼ ${ch.toFixed(2)} (${chPct.toFixed(2)}%)`;
+            } else {
+              chEl.className = "text-xs font-mono font-bold text-slate-400";
+              chEl.innerText = `0.00 (0.00%)`;
+            }
+          }
+          document.getElementById('twiiMa20').innerText = m.ma20;
+          const biasVal = Number(m.bias_ma20 || 0);
+          const biasEl = document.getElementById('twiiBias');
+          if (biasEl) {
+            biasEl.innerText = `月線乖離 ${biasVal > 0 ? '+' : ''}${biasVal.toFixed(2)}%`;
+            biasEl.className = biasVal >= 0 ? "text-rose-400 font-semibold" : "text-emerald-400 font-semibold";
+          }
+          document.getElementById('marketRegime').innerText = m.regime;
+          document.getElementById('marketAdvice').innerText = m.risk_advice;
+          document.getElementById('marketTrendTag').innerText = m.trend;
+        }
         document.getElementById('totalCandidatesCount').innerText = d.total_candidates;
         
         if (d.radar_count !== undefined) {

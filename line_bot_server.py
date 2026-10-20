@@ -619,19 +619,177 @@ async def serve_dashboard():
         return FileResponse(WEB_INDEX, headers=headers)
     return HTMLResponse("<h1>台股量化選股策略最高總指揮中心</h1><p>請確認 web/index.html 是否存在。</p>")
 
+# ==============================================================================
+# 全域加權指數 (^TWII) 即時報價與市場位階動態計算引擎
+# ==============================================================================
+_TWII_CACHE = {}
+_TWII_CACHE_EXPIRE = 0.0
+
+def fetch_twii_market_data(force_refresh: bool = False) -> dict:
+    global _TWII_CACHE, _TWII_CACHE_EXPIRE
+    import time
+    now_t = time.time()
+    
+    if not force_refresh and _TWII_CACHE and (now_t < _TWII_CACHE_EXPIRE):
+        return _TWII_CACHE
+
+    market_res = None
+    try:
+        url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            msg_list = data.get('msgArray', [])
+            if msg_list:
+                msg = msg_list[0]
+                z_str = msg.get('z', '')
+                y_str = msg.get('y', '')
+                curr_p = float(z_str) if z_str and z_str != '-' else (float(y_str) if y_str else 0.0)
+                prev_p = float(y_str) if y_str and y_str != '-' else curr_p
+                if curr_p > 0:
+                    ch = round(curr_p - prev_p, 2)
+                    ch_pct = round((ch / prev_p * 100), 2) if prev_p > 0 else 0.0
+                    market_res = {
+                        'close_raw': curr_p,
+                        'close': f'{curr_p:,.2f}',
+                        'prev_close': prev_p,
+                        'change': ch,
+                        'change_pct': ch_pct,
+                        'date': msg.get('d', ''),
+                        'time': msg.get('t', '')
+                    }
+    except Exception as e:
+        print(f'[!] 證交所大盤 API 抓取失敗: {e}')
+
+    ma20_val = 0.0
+    ma60_val = 0.0
+    try:
+        import yfinance as yf
+        import pandas as pd
+        df = yf.download('^TWII', period='4mo', interval='1d', progress=False)
+        if not df.empty and len(df) >= 20:
+            c_series = df['Close']
+            if isinstance(c_series, pd.DataFrame):
+                c_series = c_series.iloc[:, 0]
+            c_series = c_series.dropna()
+            
+            if not market_res or market_res.get('close_raw', 0) <= 0:
+                last_p = float(c_series.iloc[-1])
+                prev_p = float(c_series.iloc[-2]) if len(c_series) >= 2 else last_p
+                ch = round(last_p - prev_p, 2)
+                ch_pct = round((ch / prev_p * 100), 2) if prev_p > 0 else 0.0
+                market_res = {
+                    'close_raw': last_p,
+                    'close': f'{last_p:,.2f}',
+                    'prev_close': prev_p,
+                    'change': ch,
+                    'change_pct': ch_pct,
+                    'date': str(c_series.index[-1])[:10],
+                    'time': '13:30:00'
+                }
+
+            ma20_val = float(c_series.rolling(20).mean().iloc[-1])
+            if len(c_series) >= 60:
+                ma60_val = float(c_series.rolling(60).mean().iloc[-1])
+            else:
+                ma60_val = ma20_val
+    except Exception as e:
+        print(f'[!] yfinance 大盤歷史計算失敗: {e}')
+
+    if not market_res or market_res.get('close_raw', 0) <= 0:
+        cfg_file = ROOT_DIR / 'regime_config.json'
+        if cfg_file.exists():
+            try:
+                with open(cfg_file, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                    mr = cfg.get('market_regime', {})
+                    p = float(mr.get('close', 46292.93))
+                    market_res = {
+                        'close_raw': p,
+                        'close': f'{p:,.2f}',
+                        'prev_close': p,
+                        'change': 0.0,
+                        'change_pct': 0.0,
+                        'date': '',
+                        'time': ''
+                    }
+                    ma20_val = float(mr.get('ma20', 48170.13))
+                    ma60_val = float(mr.get('ma60', 46113.09))
+            except Exception:
+                pass
+
+    if not market_res:
+        market_res = {
+            'close_raw': 46292.93,
+            'close': '46,292.93',
+            'prev_close': 46822.08,
+            'change': -529.15,
+            'change_pct': -1.13,
+            'date': '',
+            'time': ''
+        }
+        ma20_val = 48170.13
+        ma60_val = 46113.09
+
+    if ma20_val <= 0:
+        ma20_val = 48170.13
+    if ma60_val <= 0:
+        ma60_val = 46113.09
+
+    curr_p = market_res['close_raw']
+    bias_ma20 = round((curr_p - ma20_val) / ma20_val * 100, 2)
+    market_res['ma20'] = f'{ma20_val:,.2f}'
+    market_res['ma60'] = f'{ma60_val:,.2f}'
+    market_res['ma20_raw'] = ma20_val
+    market_res['ma60_raw'] = ma60_val
+    market_res['bias_ma20'] = bias_ma20
+
+    if bias_ma20 > 5.0:
+        market_res['regime'] = '🔴【多頭強攻・短線過熱警戒】'
+        market_res['trend'] = '強勢過熱'
+        market_res['risk_advice'] = '月線正乖離過大，嚴防短線主力獲利調節，嚴禁盤中追高，聚焦回測守穩標的。'
+    elif bias_ma20 < -5.0 or curr_p < ma60_val:
+        market_res['regime'] = '🟣【空頭回檔修正・防禦避險】'
+        market_res['trend'] = '空頭防禦'
+        market_res['risk_advice'] = '指數摜破均線防守，提高現金水位至 50% 以上，嚴格執行停損，策略 03 避險放空優先。'
+    elif bias_ma20 >= 0.0 and curr_p >= ma20_val:
+        market_res['regime'] = '🟢【多頭良性主升波段】'
+        market_res['trend'] = '多頭排列'
+        market_res['risk_advice'] = '均線呈多頭排列，可積極佈局策略 02 法人起漲股、策略 04 可轉債與策略 05 股期波段。'
+    else:
+        market_res['regime'] = '🟡【高檔震盪整理・箱型洗盤】'
+        market_res['trend'] = '箱型震盪'
+        market_res['risk_advice'] = '指數跌破月線但守穩季線，類股快速輪動。採高出低進策略，重視布林下軌超跌反彈（策略 01）與低基期標的。'
+
+    try:
+        cfg_file = ROOT_DIR / 'regime_config.json'
+        if cfg_file.exists():
+            with open(cfg_file, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            if 'market_regime' in cfg:
+                cfg['market_regime']['close'] = market_res['close_raw']
+                cfg['market_regime']['bias_ma20'] = market_res['bias_ma20']
+                cfg['market_regime']['ma20'] = market_res['ma20_raw']
+                cfg['market_regime']['ma60'] = market_res['ma60_raw']
+                cfg['market_regime']['label'] = market_res['regime']
+                cfg['market_regime']['trend'] = market_res['trend']
+                cfg['market_regime']['risk_advice'] = market_res['risk_advice']
+                cfg['updated_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                with open(cfg_file, 'w', encoding='utf-8') as f:
+                    json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    _TWII_CACHE = market_res
+    _TWII_CACHE_EXPIRE = now_t + 60.0
+    return market_res
+
 @app.get("/api/overview")
 async def get_overview():
     """提供大盤現況與全策略入選總數概覽"""
     import pandas as pd
     report_file = Path(__file__).resolve().parent / "weekly_report.md"
-    market_data = {
-        "close": "49,313.44",
-        "ma20": "47,687.85",
-        "bias_ma20": 3.41,
-        "regime": "🟢【多頭良性主升波段】",
-        "trend": "多頭排列",
-        "risk_advice": "均線呈多頭排列，可積極佈局策略 02 法人起漲股、策略 04 可轉債伏擊股與策略 05 股票期貨強勢波段。"
-    }
+    market_data = fetch_twii_market_data()
 
     # 計算五大策略總入選數
     total_candidates = 0
