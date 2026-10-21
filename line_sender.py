@@ -117,12 +117,31 @@ def resolve_tokens(strategy: str = None, env: dict = None) -> list:
 
     return tokens
 
-def send_telegram(token: str, chat_id: str, message: str) -> bool:
-    """使用 Telegram Bot API 發送即時戰報 (100% 永久免費・無每月則數上限)"""
+def send_telegram(
+    token: str,
+    chat_id: str,
+    message: str,
+    parse_mode: str = "HTML",
+    stock_code: str = None,
+    buttons: list = None
+) -> bool:
+    """使用 Telegram Bot API 發送即時戰報卡片 (100% 永久免費・支援 HTML 卡片排版與互動按鈕)"""
     if not token or not chat_id:
         return False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    # 建立互動按鈕 (預設附帶戰情室儀表板與個股即時看盤直連)
+    reply_markup = None
+    if buttons is not None:
+        if buttons:
+            reply_markup = {"inline_keyboard": buttons}
+    else:
+        row = [{"text": "📊 開啟台股量化戰情室", "url": "https://stock.chihyuan.date"}]
+        if stock_code and str(stock_code).strip():
+            sc = str(stock_code).strip()
+            row.append({"text": f"📈 查看 {sc} 走勢", "url": f"https://tw.stock.yahoo.com/quote/{sc}"})
+        reply_markup = {"inline_keyboard": [row]}
 
     # Telegram API 限制單則訊息長度 <= 4096 字元，超長自動智慧分段切片
     max_len = 3900
@@ -130,45 +149,77 @@ def send_telegram(token: str, chat_id: str, message: str) -> bool:
     if len(message) <= max_len:
         chunks = [message]
     else:
-        lines = message.split("\n")
+        delimiter = "</blockquote>" if (parse_mode == "HTML" and "</blockquote>" in message) else "\n"
+        parts = message.split(delimiter)
         current_chunk = []
         current_len = 0
-        for line in lines:
-            if current_len + len(line) + 1 > max_len:
+        for p in parts:
+            p_full = p + delimiter if delimiter == "</blockquote>" else p
+            if current_len + len(p_full) + 1 > max_len:
                 if current_chunk:
-                    chunks.append("\n".join(current_chunk))
-                    current_chunk = [line]
-                    current_len = len(line)
+                    chunks.append("".join(current_chunk) if delimiter == "</blockquote>" else "\n".join(current_chunk))
+                    current_chunk = [p_full]
+                    current_len = len(p_full)
                 else:
-                    chunks.append(line[:max_len])
-                    current_chunk = [line[max_len:]]
-                    current_len = len(line[max_len:])
+                    chunks.append(p_full)
+                    current_chunk = []
+                    current_len = 0
             else:
-                current_chunk.append(line)
-                current_len += len(line) + 1
+                current_chunk.append(p_full)
+                current_len += len(p_full) + 1
         if current_chunk:
-            chunks.append("\n".join(current_chunk))
+            chunks.append("".join(current_chunk) if delimiter == "</blockquote>" else "\n".join(current_chunk))
 
     success_all = True
-    for part in chunks:
+    for idx, part in enumerate(chunks):
         payload = {
             "chat_id": chat_id,
             "text": part,
             "disable_web_page_preview": True
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        # 僅在最後一段訊息附帶按鈕
+        if reply_markup and idx == len(chunks) - 1:
+            payload["reply_markup"] = reply_markup
+
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status != 200:
                     success_all = False
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='ignore')
+            print(f"[!] Telegram 發送失敗 (HTTP {e.code}): {err_body}")
+            # 若為 HTML 解析錯誤，嘗試以純文字 Fallback 重送
+            if parse_mode == "HTML" and e.code == 400:
+                print("[⚡] 偵測到 Telegram HTML 格式異常，自動降級為純文字重試發送...")
+                import re
+                plain = re.sub(r'<[^>]+>', '', part)
+                fallback_payload = {
+                    "chat_id": chat_id,
+                    "text": plain,
+                    "disable_web_page_preview": True
+                }
+                if reply_markup and idx == len(chunks) - 1:
+                    fallback_payload["reply_markup"] = reply_markup
+                try:
+                    f_req = urllib.request.Request(url, data=json.dumps(fallback_payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
+                    with urllib.request.urlopen(f_req, timeout=10) as f_resp:
+                        if f_resp.status == 200:
+                            success_all = True
+                            continue
+                except Exception:
+                    pass
+            success_all = False
         except Exception as e:
-            print(f"[!] Telegram 發送失敗: {e}")
+            print(f"[!] Telegram 發送異常: {e}")
             success_all = False
 
     if success_all:
         masked_chat = f"{str(chat_id)[:4]}***" if len(str(chat_id)) > 6 else str(chat_id)
-        print(f"[✓] Telegram 推播發送成功！目標: {masked_chat}")
+        print(f"[✓] Telegram 卡片戰報發送成功！目標: {masked_chat}")
         return True
     return False
 
@@ -312,14 +363,18 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None) -> b
 
     any_success = False
 
-    # 1. Telegram Bot 推播 (100% 永久免費・無額度限制)
+    # 1. Telegram Bot 推播 (100% 永久免費・無額度限制・視覺化卡片排版)
     tg_token = os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")
     tg_chat = (
         os.environ.get(f"TELEGRAM_CHAT_ID_{sid}") or env.get(f"TELEGRAM_CHAT_ID_{sid}") or
         os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID")
     )
     if tg_token and tg_chat:
-        if send_telegram(tg_token, tg_chat, clean_text):
+        tg_card = message.get("_tg_card") if isinstance(message, dict) else None
+        stock_code = message.get("_stock_code") if isinstance(message, dict) else None
+        is_html = bool(tg_card)
+        tg_text = tg_card or clean_text
+        if send_telegram(tg_token, tg_chat, tg_text, parse_mode="HTML" if is_html else None, stock_code=stock_code):
             any_success = True
 
     # 2. Discord Webhook 推播 (100% 永久免費・無額度限制)
@@ -815,11 +870,14 @@ def build_price_alert_card(
 
     clean_alt = f"🚨【盤中雷達】{code} {name} 觸發【{event_title}】：現價 {format_price_val(price)} 元"
     clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id)
+    tg_card = format_telegram_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id)
     return {
         "type": "flex",
         "altText": clean_alt,
         "contents": bubble,
-        "_clean_text": clean_text
+        "_clean_text": clean_text,
+        "_tg_card": tg_card,
+        "_stock_code": code
     }
 
 def format_clean_price_alert_text(
@@ -885,6 +943,84 @@ def format_clean_price_alert_text(
         f"⏰ 偵測時間：{time_str}"
     ])
     return "\n".join(lines)
+
+def format_telegram_price_alert_card(
+    target: dict,
+    rt: dict,
+    event_type: str,
+    event_title: str,
+    event_desc: str,
+    strategy_id: str = "01"
+) -> str:
+    """產出 Telegram 原生高對比 HTML 卡片（含四大防線獨立區塊與狀態徽章）"""
+    import html, datetime
+    meta = resolve_strategy_meta(strategy_id)
+    code = html.escape(str(target.get('code') or target.get('證券代號') or target.get('代號') or ''))
+    name = html.escape(str(target.get('name') or target.get('證券名稱') or target.get('名稱') or ''))
+    stars = html.escape(str(target.get('stars') or target.get('星級推薦') or target.get('星級') or '★★★★☆'))
+    price = rt.get('price') or target.get('收盤價') or 0.0
+    high_p = rt.get('high') or price
+    low_p = rt.get('low') or price
+    vol = rt.get('volume') or target.get('當日成交量(張)') or target.get('日成交量(張)') or 0
+    time_str = html.escape(str(rt.get('time') or datetime.datetime.now().strftime('%H:%M:%S')))
+
+    entry_val = target.get('entry_price') or target.get('進場價位') or target.get('空單進場')
+    addon_val = target.get('addon_price') or target.get('加碼價位') or target.get('加空價位')
+    tp1_val = target.get('tp1_price') or target.get('停利TP1')
+    tp2_val = target.get('tp2_price') or target.get('停利TP2')
+    sl_val = target.get('sl_price') or target.get('停損價位') or target.get('停損回補')
+    og_risk = html.escape(str(target.get('隔日沖風控') or target.get('og_risk') or ''))
+
+    entry_str = format_price_val(entry_val)
+    addon_str = format_price_val(addon_val)
+    tp_str = f"TP1 {format_price_val(tp1_val)} / TP2 {format_price_val(tp2_val)}" if tp2_val else format_price_val(tp1_val)
+    sl_str = format_price_val(sl_val)
+
+    if "STOP_LOSS" in event_type or "停損" in event_title:
+        status_icon = "🛑"
+    elif "TP" in event_type or "停利" in event_title:
+        status_icon = "🔴"
+    elif "ADDON" in event_type or "加碼" in event_title:
+        status_icon = "🔵"
+    else:
+        status_icon = "🟢"
+
+    fut_contract = html.escape(str(target.get('期貨契約') or target.get('contract_sym') or target.get('contract') or ''))
+    fut_month = html.escape(str(target.get('期貨月份') or target.get('month') or ''))
+    basis_desc = html.escape(str(target.get('價差(Basis)') or target.get('basis_desc') or target.get('basis_tag') or ''))
+    margin_1lot = target.get('1口保證金(約)') or target.get('margin_1lot')
+
+    fut_line = ""
+    if fut_contract and fut_contract not in ('--', '--F', 'None'):
+        fut_oi = target.get('期貨未平倉(OI)') or target.get('futures_oi')
+        oi_text = f" ｜ OI: {int(fut_oi):,}口" if fut_oi else ""
+        margin_text = f" ｜ 1口約 ${int(margin_1lot):,}元" if margin_1lot else ""
+        fut_line = f"• 期貨合約：<b>{fut_contract} {fut_month}</b> ({basis_desc}){oi_text}{margin_text}\n"
+
+    card = (
+        f"<b>{status_icon}【盤中雷達・到價警訊】</b>\n"
+        f"<blockquote>"
+        f"🏷️ <b>{code} {name}</b> ｜ {stars}\n"
+        f"🔥 <b>觸發事件：</b> <code>{html.escape(event_title)}</code>\n"
+        f"💵 <b>即時現價：</b> <b>{format_price_val(price)} 元</b> (高 {format_price_val(high_p)} / 低 {format_price_val(low_p)})\n"
+        f"</blockquote>\n"
+        f"<blockquote>"
+        f"🎯 <b>實戰操盤四大防線：</b>\n"
+        f"• {meta['entry_label']}：<code>{entry_str} 元</code> ({meta['entry_desc']})\n"
+        f"• {meta['addon_label']}：<code>{addon_str} 元</code> ({meta['addon_desc']})\n"
+        f"• {meta['tp_label']}：<code>{tp_str} 元</code> ({meta['tp_desc']})\n"
+        f"• {meta['sl_label']}：<code>{sl_str} 元</code> ({meta['sl_desc']})\n"
+        f"</blockquote>\n"
+        f"<blockquote>"
+        f"📊 <b>即時量能與指標：</b>\n"
+        f"• 盤中量能：<b>{vol:,} 張</b>\n"
+        + (f"• 隔日沖風控：{og_risk}\n" if og_risk else "")
+        + fut_line
+        + f"</blockquote>\n"
+        f"💡 <i>【實戰指引】{html.escape(event_desc)}</i>\n"
+        f"⏰ <i>{time_str} ｜ 操盤請嚴守紀律，到達防線確實執行</i>"
+    )
+    return card
 
 def build_aggregated_alert_card(
     alerts: list,
@@ -1007,11 +1143,13 @@ def build_aggregated_alert_card(
 
     clean_alt = f"🔔【{meta['name']}】盤中多檔到價快訊 (共 {len(alerts)} 檔標的)"
     clean_text = format_clean_aggregated_text(alerts, strategy_id=strategy_id, now_str=now_str)
+    tg_card = format_telegram_aggregated_cards(alerts, strategy_id=strategy_id, now_str=now_str)
     return {
         "type": "flex",
         "altText": clean_alt,
         "contents": bubble,
-        "_clean_text": clean_text
+        "_clean_text": clean_text,
+        "_tg_card": tg_card
     }
 
 def format_clean_aggregated_text(
@@ -1054,6 +1192,48 @@ def format_clean_aggregated_text(
     lines.append("💡 操盤指引：請依操盤紀律分批佈局，並確實執行停損防守！")
     return "\n".join(lines)
 
+def format_telegram_aggregated_cards(
+    alerts: list,
+    strategy_id: str = "01",
+    now_str: str = ""
+) -> str:
+    """產出 Telegram 原生多檔合併快訊 HTML 卡片"""
+    import html, datetime
+    meta = resolve_strategy_meta(strategy_id)
+    if not now_str:
+        now_str = datetime.datetime.now().strftime('%H:%M:%S')
+
+    header = (
+        f"<b>🔔【{html.escape(meta['name'])}・盤中多檔到價快訊】</b>\n"
+        f"⏱️ <b>偵測時間：</b> <code>{html.escape(now_str)}</code> ｜ 本輪觸發 {len(alerts)} 檔標的\n"
+    )
+
+    blocks = []
+    for item in alerts[:8]:
+        t = item['target']
+        rt = item['rt']
+        code = html.escape(str(t.get('code') or t.get('證券代號') or t.get('代號') or ''))
+        name = html.escape(str(t.get('name') or t.get('證券名稱') or t.get('名稱') or ''))
+        p = rt.get('price') or t.get('收盤價') or 0.0
+        event_title = html.escape(str(item.get('event_title', item.get('event_code', 'ENTRY'))))
+
+        entry_str = format_price_val(t.get('entry_price') or t.get('進場價位') or t.get('空單進場'))
+        addon_str = format_price_val(t.get('addon_price') or t.get('加碼價位') or t.get('加空價位'))
+        tp1_str = format_price_val(t.get('tp1_price') or t.get('停利TP1'))
+        sl_str = format_price_val(t.get('sl_price') or t.get('停損價位') or t.get('停損回補'))
+
+        block = (
+            f"<blockquote>"
+            f"📍 <b>{code} {name}</b>：<b>{format_price_val(p)} 元</b> ｜ <code>{event_title}</code>\n"
+            f"• 🟢 進場：<code>{entry_str}</code> ｜ 🔵 加碼：<code>{addon_str}</code>\n"
+            f"• 🔴 停利：<code>{tp1_str}</code> ｜ 🛑 停損：<code>{sl_str}</code>\n"
+            f"</blockquote>"
+        )
+        blocks.append(block)
+
+    footer = "\n💡 <i>操盤請嚴守紀律，到達防線確實執行！</i>"
+    return header + "\n".join(blocks) + footer
+
 def build_screener_carousel(
     results: list,
     date_str: str,
@@ -1088,11 +1268,14 @@ def build_screener_carousel(
                 ]
             }
         }
+        clean_text = format_clean_screener_text(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
+        tg_card = format_telegram_screener_cards(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
         return {
             "type": "flex",
             "altText": f"📊【盤後選股】{meta['name']}：今日無符合條件標的",
             "contents": bubble,
-            "_clean_text": format_clean_screener_text(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
+            "_clean_text": clean_text,
+            "_tg_card": tg_card
         }
 
     bubbles = []
@@ -1332,6 +1515,7 @@ def build_screener_carousel(
 
     clean_alt = f"📊【盤後選股】{meta['name']}日報 (共 {len(sorted_res)} 檔，前 {len(bubbles)} 檔精華)"
     clean_text = format_clean_screener_text(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
+    tg_card = format_telegram_screener_cards(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
     return {
         "type": "flex",
         "altText": clean_alt,
@@ -1339,7 +1523,8 @@ def build_screener_carousel(
             "type": "carousel",
             "contents": bubbles
         },
-        "_clean_text": clean_text
+        "_clean_text": clean_text,
+        "_tg_card": tg_card
     }
 
 def format_clean_screener_text(
@@ -1417,6 +1602,86 @@ def format_clean_screener_text(
         lines.append("")
     lines.append("💡【風控紀律】到達建倉區分批進場，跌破停損價無條件執行！")
     return "\n".join(lines)
+
+def format_telegram_screener_cards(
+    results: list,
+    date_str: str,
+    strategy_id: str = "01",
+    max_stocks: int = 5
+) -> str:
+    """產出 Telegram 原生高對比 HTML 日報卡片（每一檔標的獨立 Card 區塊）"""
+    import html
+    meta = resolve_strategy_meta(strategy_id)
+    sorted_res = sorted(results, key=lambda x: x.get('評分', x.get('score', 0)), reverse=True) if results else []
+
+    header = (
+        f"<b>📊【台股盤後】{html.escape(meta['name'])} 量化戰報</b>\n"
+        f"📅 <b>結算日期：</b> <code>{html.escape(date_str)}</code> 盤後結算\n"
+        f"🔥 <b>今日精選：</b> 共 {len(sorted_res)} 檔（展示前 {min(len(sorted_res), max_stocks)} 檔精華）\n\n"
+    )
+
+    if not sorted_res:
+        body = (
+            "<blockquote>"
+            "今日無符合 4+1 嚴格條件標的。\n"
+            "💡 <b>維持資金安全與零虧損，靜待下次機會！</b>"
+            "</blockquote>"
+        )
+        return header + body
+
+    card_blocks = []
+    for i, r in enumerate(sorted_res[:max_stocks], 1):
+        code = html.escape(str(r.get('證券代號') or r.get('代號') or ''))
+        name = html.escape(str(r.get('證券名稱') or r.get('名稱') or ''))
+        stars = html.escape(str(r.get('星級推薦') or r.get('星級') or '★★★★☆'))
+        score = r.get('評分') or r.get('score') or '--'
+        price = r.get('收盤價') or r.get('現價') or 0.0
+
+        entry_val = r.get('進場價位') or r.get('空單進場') or r.get('entry_price')
+        addon_val = r.get('加碼價位') or r.get('加空價位') or r.get('addon_price')
+        tp1_val = r.get('停利TP1') or r.get('tp1_price')
+        tp2_val = r.get('停利TP2') or r.get('tp2_price')
+        sl_val = r.get('停損價位') or r.get('停損回補') or r.get('sl_price')
+        og_risk = html.escape(str(r.get('隔日沖風控') or r.get('og_risk') or ''))
+        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or 0
+
+        entry_str = format_price_val(entry_val)
+        addon_str = format_price_val(addon_val)
+        tp_str = f"TP1 {format_price_val(tp1_val)} / TP2 {format_price_val(tp2_val)}" if tp2_val else format_price_val(tp1_val)
+        sl_str = format_price_val(sl_val)
+
+        fut_contract = html.escape(str(r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''))
+        fut_month = html.escape(str(r.get('期貨月份') or r.get('month') or ''))
+        basis_desc = html.escape(str(r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''))
+        margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
+
+        fut_line = ""
+        if fut_contract and fut_contract not in ('--', '--F', 'None'):
+            fut_oi = r.get('期貨未平倉(OI)') or r.get('futures_oi')
+            oi_text = f" ｜ OI: {int(fut_oi):,}口" if fut_oi else ""
+            margin_text = f" ｜ 1口約 ${int(margin_1lot):,}元" if margin_1lot else ""
+            fut_line = f"• 期貨：<b>{fut_contract} {fut_month}</b> ({basis_desc}){oi_text}{margin_text}\n"
+
+        block = (
+            f"<blockquote>"
+            f"<b>【{i:02d}】📍 {code} {name}</b> ｜ {stars} (評分:{score})\n"
+            f"💵 <b>收盤現價：</b> <b>{format_price_val(price)} 元</b> ｜ 量：{vol:,} 張\n\n"
+            f"🎯 <b>操盤四大防線：</b>\n"
+            f"• {meta['entry_label']}：<code>{entry_str} 元</code>\n"
+            f"• {meta['addon_label']}：<code>{addon_str} 元</code>\n"
+            f"• {meta['tp_label']}：<code>{tp_str} 元</code>\n"
+            f"• {meta['sl_label']}：<code>{sl_str} 元</code>\n"
+            + (f"• ⚖️ 隔日沖風控：{og_risk}\n" if og_risk else "")
+            + fut_line
+            + f"</blockquote>"
+        )
+        card_blocks.append(block)
+
+    if len(sorted_res) > max_stocks:
+        footer = f"\n📋 <i>其餘 {len(sorted_res) - max_stocks} 檔標的完整數據請查閱 result.csv</i>\n💡 <i>【操盤紀律】到達建倉區分批進場，跌破停損價無條件執行！</i>"
+    else:
+        footer = "\n💡 <i>【操盤紀律】到達建倉區分批進場，跌破停損價無條件執行！</i>"
+    return header + "\n".join(card_blocks) + footer
 
 
 def format_screener_markdown_cards(
