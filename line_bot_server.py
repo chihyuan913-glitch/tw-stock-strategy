@@ -380,19 +380,17 @@ async def startup_event():
                         from radar_manager import load_watchlist, get_radar_channel
                         w = load_watchlist()
                         target_ch = get_radar_channel()
-                        if w and target_ch and CHANNEL_ACCESS_TOKEN:
+                        if w:
                             m_card = f"""🔔【台股開盤前夕・盤中到價雷達全自動啟動】
 ━━━━━━━━━━━━━━━
 今日共鎖定 {len(w)} 檔焦點標的！
 雲端即時盯盤引擎已就緒，盤中將每 60 秒比對四大防線價位。
 一旦觸及「🟢進場、🔵加碼、🔴停利、🛑停損」，將立即在此視窗為您即時推播！
 祝福今日操盤順利，嚴守紀律！"""
-                            push_url = "https://api.line.me/v2/bot/message/push"
-                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
-                            body = json.dumps({"to": target_ch, "messages": [{"type": "text", "text": m_card}]}, ensure_ascii=False).encode('utf-8')
                             try:
-                                urllib.request.urlopen(urllib.request.Request(push_url, data=body, headers=headers, method="POST"), timeout=6)
-                                log_debug(f"[✓] 成功發送開盤晨報至雷達視窗")
+                                from line_sender import send_to_line
+                                send_to_line(m_card, strategy="RADAR", target_id=target_ch)
+                                log_debug(f"[✓] 成功發送開盤晨報至雷達與 Telegram 視窗")
                             except Exception as e:
                                 log_debug(f"[!] 開盤晨報推播失敗: {e}")
                         notified_morning = today_str
@@ -408,20 +406,17 @@ async def startup_event():
                     if 1331 <= t_int <= 1335 and notified_closing != today_str:
                         from radar_manager import get_radar_channel
                         target_ch = get_radar_channel()
-                        if target_ch and CHANNEL_ACCESS_TOKEN:
-                            c_card = f"""🏁【今日台股盤中到價雷達監控圓滿結束】
+                        c_card = f"""🏁【今日台股盤中到價雷達監控圓滿結束】
 ━━━━━━━━━━━━━━━
 盤中交易已於 13:30 順利收盤！
 今日到價事件推播完畢，雲端雷達轉入盤後待機模式。
 💡 傍晚可輸入「同步選股」一鍵更新今日三大策略最新黑馬名單！"""
-                            push_url = "https://api.line.me/v2/bot/message/push"
-                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
-                            body = json.dumps({"to": target_ch, "messages": [{"type": "text", "text": c_card}]}, ensure_ascii=False).encode('utf-8')
-                            try:
-                                urllib.request.urlopen(urllib.request.Request(push_url, data=body, headers=headers, method="POST"), timeout=6)
-                                log_debug(f"[✓] 成功發送收盤總結至雷達視窗")
-                            except Exception as e:
-                                log_debug(f"[!] 收盤總結推播失敗: {e}")
+                        try:
+                            from line_sender import send_to_line
+                            send_to_line(c_card, strategy="RADAR", target_id=target_ch)
+                            log_debug(f"[✓] 成功發送收盤總結至雷達與 Telegram 視窗")
+                        except Exception as e:
+                            log_debug(f"[!] 收盤總結推播失敗: {e}")
                         notified_closing = today_str
 
             except Exception as e:

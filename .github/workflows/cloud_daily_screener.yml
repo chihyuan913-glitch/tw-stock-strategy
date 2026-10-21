@@ -43,6 +43,7 @@ jobs:
           LINE_TARGET_STRATEGY_05: ${{ secrets.LINE_TARGET_STRATEGY_05 }}
           LINE_TARGET_STRATEGY_06: ${{ secrets.LINE_TARGET_STRATEGY_06 }}
           LINE_TARGET_STRATEGY_07: ${{ secrets.LINE_TARGET_STRATEGY_07 }}
+          LINE_TARGET_STRATEGY_08: ${{ secrets.LINE_TARGET_STRATEGY_08 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |

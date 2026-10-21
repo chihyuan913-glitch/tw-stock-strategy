@@ -119,21 +119,104 @@ def resolve_tokens(strategy: str = None, env: dict = None) -> list:
 
 def send_telegram(token: str, chat_id: str, message: str) -> bool:
     """使用 Telegram Bot API 發送即時戰報 (100% 永久免費・無每月則數上限)"""
+    if not token or not chat_id:
+        return False
+
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "disable_web_page_preview": True
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            if resp.status == 200:
-                print(f"[✓] Telegram 備援推播發送成功！目標頻道: {chat_id}")
-                return True
-    except Exception as e:
-        print(f"[!] Telegram 發送失敗: {e}")
+
+    # Telegram API 限制單則訊息長度 <= 4096 字元，超長自動智慧分段切片
+    max_len = 3900
+    chunks = []
+    if len(message) <= max_len:
+        chunks = [message]
+    else:
+        lines = message.split("\n")
+        current_chunk = []
+        current_len = 0
+        for line in lines:
+            if current_len + len(line) + 1 > max_len:
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                    current_chunk = [line]
+                    current_len = len(line)
+                else:
+                    chunks.append(line[:max_len])
+                    current_chunk = [line[max_len:]]
+                    current_len = len(line[max_len:])
+            else:
+                current_chunk.append(line)
+                current_len += len(line) + 1
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+    success_all = True
+    for part in chunks:
+        payload = {
+            "chat_id": chat_id,
+            "text": part,
+            "disable_web_page_preview": True
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status != 200:
+                    success_all = False
+        except Exception as e:
+            print(f"[!] Telegram 發送失敗: {e}")
+            success_all = False
+
+    if success_all:
+        masked_chat = f"{str(chat_id)[:4]}***" if len(str(chat_id)) > 6 else str(chat_id)
+        print(f"[✓] Telegram 推播發送成功！目標: {masked_chat}")
+        return True
+    return False
+
+def send_discord_webhook(webhook_url: str, message: str) -> bool:
+    """使用 Discord Webhook 發送即時戰報 (100% 永久免費・無每月則數上限)"""
+    if not webhook_url:
+        return False
+
+    max_len = 1900
+    chunks = []
+    if len(message) <= max_len:
+        chunks = [message]
+    else:
+        lines = message.split("\n")
+        current_chunk = []
+        current_len = 0
+        for line in lines:
+            if current_len + len(line) + 1 > max_len:
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                    current_chunk = [line]
+                    current_len = len(line)
+                else:
+                    chunks.append(line[:max_len])
+                    current_chunk = [line[max_len:]]
+                    current_len = len(line[max_len:])
+            else:
+                current_chunk.append(line)
+                current_len += len(line) + 1
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+    success_all = True
+    for part in chunks:
+        payload = {"content": part}
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(webhook_url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status not in (200, 204):
+                    success_all = False
+        except Exception as e:
+            print(f"[!] Discord Webhook 發送失敗: {e}")
+            success_all = False
+
+    if success_all:
+        print("[✓] Discord Webhook 推播發送成功！")
+        return True
     return False
 
 def send_line_messaging_api(tokens: list, to_id: str, message: str, target_label: str = "") -> bool:
@@ -212,43 +295,74 @@ def send_line_notify(token: str, message: str) -> bool:
 
 def send_to_line(message: str, strategy: str = None, target_id: str = None) -> bool:
     """
-    通用即時推播發送入口：
-    1. 支援多策略獨立 LINE 視窗/群組定向投遞 (strategy="01", "02", "03", "04")
-    2. 支援多 Token 自動容錯輪替 (主 Token 額度超額自動切換至備援 Token)
-    3. 支援 Telegram Bot 雙軌平行備援 (永不受限)
+    通用即時推播發送入口 (多軌分流・支援無限制推播)：
+    1. 支援 Telegram Bot (100% 永久免費・無每月則數限制・手機即時秒推)
+    2. 支援 Discord Webhook (100% 永久免費・無每月則數限制)
+    3. 支援多策略獨立 LINE 視窗/群組定向投遞 (strategy="01", "02", "03", "04"...)
+    4. 支援多 Token 自動容錯輪替 (主 Token 額度超額自動切換至備援 Token)
     """
     env = load_env()
+    sid = str(strategy).strip() if strategy else ""
+
+    # 解析乾淨純文字 (供 Telegram / Discord / 純文字備援使用)
+    if isinstance(message, dict):
+        clean_text = message.get("_clean_text") or message.get("altText") or str(message)
+    else:
+        clean_text = str(message)
+
+    any_success = False
+
+    # 1. Telegram Bot 推播 (100% 永久免費・無額度限制)
+    tg_token = os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")
+    tg_chat = (
+        os.environ.get(f"TELEGRAM_CHAT_ID_{sid}") or env.get(f"TELEGRAM_CHAT_ID_{sid}") or
+        os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID")
+    )
+    if tg_token and tg_chat:
+        if send_telegram(tg_token, tg_chat, clean_text):
+            any_success = True
+
+    # 2. Discord Webhook 推播 (100% 永久免費・無額度限制)
+    dc_url = (
+        os.environ.get(f"DISCORD_WEBHOOK_URL_{sid}") or env.get(f"DISCORD_WEBHOOK_URL_{sid}") or
+        os.environ.get("DISCORD_WEBHOOK_URL") or env.get("DISCORD_WEBHOOK_URL")
+    )
+    if dc_url:
+        if send_discord_webhook(dc_url, clean_text):
+            any_success = True
+
+    # 3. LINE Messaging API / LINE Notify
     tokens = resolve_tokens(strategy=strategy, env=env)
     to_id, target_label = resolve_target_id(strategy=strategy, target_id=target_id, env=env)
     notify_token = os.environ.get("LINE_NOTIFY_TOKEN") or env.get("LINE_NOTIFY_TOKEN")
 
-    # Telegram 雙軌備援
-    tg_token = os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")
-    tg_chat = os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID")
-    if tg_token and tg_chat:
-        tg_text = message.get("altText") if isinstance(message, dict) else str(message)
-        send_telegram(tg_token, tg_chat, tg_text)
-
     if tokens and to_id:
-        success = send_line_messaging_api(tokens, to_id, message, target_label=target_label)
+        line_ok = send_line_messaging_api(tokens, to_id, message, target_label=target_label)
         default_user_id = os.environ.get("LINE_USER_ID") or env.get("LINE_USER_ID")
-        if not success and default_user_id and to_id != default_user_id:
+        if not line_ok and default_user_id and to_id != default_user_id:
             print(f"[⚡] 專屬群組推播未成功 (機器人可能尚未加入該群組)，自動觸發 Fallback 轉送至個人聊天室...")
-            return send_line_messaging_api(tokens, default_user_id, message, target_label="個人聊天室 (Fallback 備援)")
-        return success
+            line_ok = send_line_messaging_api(tokens, default_user_id, message, target_label="個人聊天室 (Fallback 備援)")
+        if line_ok:
+            any_success = True
     elif notify_token:
-        return send_line_notify(notify_token, message)
-    else:
+        line_ok = send_line_notify(notify_token, clean_text)
+        if line_ok:
+            any_success = True
+
+    if not any_success:
         print("\n" + "!" * 65)
-        print("【尚未設定 LINE 推播憑證或目標 ID】")
+        print("【尚未設定任何有效推播管道或憑證額度已耗盡】")
         print(f"請在 {ENV_PATH} 中設定：")
-        print("LINE_CHANNEL_ACCESS_TOKEN=你的機器人存取憑證")
-        print("LINE_USER_ID=你的LINE個人ID (U開頭字串，作為預設)")
-        print("LINE_TARGET_STRATEGY_01=策略一專屬群組ID (C開頭字串)")
-        print("LINE_TARGET_STRATEGY_02=策略二專屬群組ID (C開頭字串)")
-        print("LINE_TARGET_STRATEGY_03=策略三專屬群組ID (C開頭字串)")
+        print("1. Telegram (推薦！永久免費無限制):")
+        print("   TELEGRAM_BOT_TOKEN=你的BotToken")
+        print("   TELEGRAM_CHAT_ID=你的ChatId")
+        print("2. LINE Messaging API (每月限額):")
+        print("   LINE_CHANNEL_ACCESS_TOKEN=你的憑證")
+        print("   LINE_USER_ID=你的LINE個人ID")
         print("!" * 65 + "\n")
         return False
+
+    return any_success
 
 # =====================================================================
 # 旗艦視覺化 UI 建構器 (大字體、高對比、零引線、操盤四大防線一目了然)
@@ -700,10 +814,12 @@ def build_price_alert_card(
     }
 
     clean_alt = f"🚨【盤中雷達】{code} {name} 觸發【{event_title}】：現價 {format_price_val(price)} 元"
+    clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id)
     return {
         "type": "flex",
         "altText": clean_alt,
-        "contents": bubble
+        "contents": bubble,
+        "_clean_text": clean_text
     }
 
 def format_clean_price_alert_text(
@@ -890,10 +1006,12 @@ def build_aggregated_alert_card(
     }
 
     clean_alt = f"🔔【{meta['name']}】盤中多檔到價快訊 (共 {len(alerts)} 檔標的)"
+    clean_text = format_clean_aggregated_text(alerts, strategy_id=strategy_id, now_str=now_str)
     return {
         "type": "flex",
         "altText": clean_alt,
-        "contents": bubble
+        "contents": bubble,
+        "_clean_text": clean_text
     }
 
 def format_clean_aggregated_text(
@@ -973,7 +1091,8 @@ def build_screener_carousel(
         return {
             "type": "flex",
             "altText": f"📊【盤後選股】{meta['name']}：今日無符合條件標的",
-            "contents": bubble
+            "contents": bubble,
+            "_clean_text": format_clean_screener_text(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
         }
 
     bubbles = []
@@ -1212,13 +1331,15 @@ def build_screener_carousel(
         bubbles.append(b)
 
     clean_alt = f"📊【盤後選股】{meta['name']}日報 (共 {len(sorted_res)} 檔，前 {len(bubbles)} 檔精華)"
+    clean_text = format_clean_screener_text(results, date_str, strategy_id=strategy_id, max_stocks=max_stocks)
     return {
         "type": "flex",
         "altText": clean_alt,
         "contents": {
             "type": "carousel",
             "contents": bubbles
-        }
+        },
+        "_clean_text": clean_text
     }
 
 def format_clean_screener_text(
@@ -1703,10 +1824,36 @@ def format_clean_stock_diagnosis_text(data: dict) -> str:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="LINE 推播測試工具")
-    parser.add_argument("message", nargs="?", default="🔔 這是一則來自台股選股策略的 LINE 測試通知！", help="測試訊息文字")
-    parser.add_argument("--strategy", type=str, default=None, help="指定策略編號 (01, 02, 03)")
+    parser = argparse.ArgumentParser(description="多管道即時推播工具 (LINE / Telegram / Discord)")
+    parser.add_argument("message", nargs="?", default="🔔 這是一則來自台股選股策略的即時測試推播！", help="測試訊息文字")
+    parser.add_argument("--strategy", type=str, default=None, help="指定策略編號 (01, 02, 03...)")
     parser.add_argument("--target", type=str, default=None, help="直接指定發送目標 ID (User ID 或 Group ID)")
+    parser.add_argument("--test-tg", action="store_true", help="專門測試 Telegram Bot 發送")
+    parser.add_argument("--test-discord", action="store_true", help="專門測試 Discord Webhook 發送")
+    parser.add_argument("--test-all", action="store_true", help="一鍵測試所有已設定的推播管道")
     args = parser.parse_args()
 
-    send_to_line(args.message, strategy=args.strategy, target_id=args.target)
+    if args.test_tg:
+        env = load_env()
+        token = os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")
+        chat = os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID")
+        if not token or not chat:
+            print("[!] 未在 .env 或環境變數中設定 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID")
+            print("請先在 .env 中填寫 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID！")
+        else:
+            print(f"[*] 正在發送 Telegram 測試訊息至 {chat}...")
+            ok = send_telegram(token, chat, "🚀【Telegram 連線測試成功】\n台股量化戰情室已成功綁定無限制推播！\n未來盤後選股、盤中雷達到價與週日升級戰報將即時為您送達。")
+            if ok:
+                print("[✓] Telegram 測試推播發送成功！")
+    elif args.test_discord:
+        env = load_env()
+        url = os.environ.get("DISCORD_WEBHOOK_URL") or env.get("DISCORD_WEBHOOK_URL")
+        if not url:
+            print("[!] 未在 .env 或環境變數中設定 DISCORD_WEBHOOK_URL")
+        else:
+            print("[*] 正在發送 Discord 測試訊息...")
+            ok = send_discord_webhook(url, "🚀【Discord 連線測試成功】台股量化戰情室已成功綁定無限制推播！")
+            if ok:
+                print("[✓] Discord 測試推播發送成功！")
+    else:
+        send_to_line(args.message, strategy=args.strategy, target_id=args.target)
