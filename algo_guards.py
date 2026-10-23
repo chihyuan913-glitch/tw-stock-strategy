@@ -54,7 +54,8 @@ def evaluate_overnight_broker_risk(
         'advice': str                  # 次日操盤應對指引
       }
     """
-    meta = meta or {}
+    if not isinstance(meta, dict):
+        meta = {}
     vol = float(meta.get('volume', 0))
     dealer_hedge = float(meta.get('dealer_hedge', meta.get('dealer', 0))) # 自營商避險
     foreign = float(meta.get('foreign', 0))

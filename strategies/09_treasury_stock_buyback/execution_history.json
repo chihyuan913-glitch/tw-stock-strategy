@@ -1,0 +1,326 @@
+{
+  "2474": {
+    "code": "2474",
+    "name": "可成",
+    "historical_events_count": 4,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 25000,
+        "actual": 25000,
+        "rate_pct": 100.0
+      },
+      {
+        "year": "2025",
+        "planned": 20000,
+        "actual": 19500,
+        "rate_pct": 97.5
+      },
+      {
+        "year": "2026",
+        "planned": 15000,
+        "actual": 14000,
+        "rate_pct": 93.3
+      }
+    ],
+    "avg_execution_rate_pct": 96.9,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2353": {
+    "code": "2353",
+    "name": "宏碁",
+    "historical_events_count": 3,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 20000,
+        "actual": 18000,
+        "rate_pct": 90.0
+      },
+      {
+        "year": "2025",
+        "planned": 25000,
+        "actual": 21000,
+        "rate_pct": 84.0
+      }
+    ],
+    "avg_execution_rate_pct": 87.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2409": {
+    "code": "2409",
+    "name": "友達",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 50000,
+        "actual": 38000,
+        "rate_pct": 76.0
+      },
+      {
+        "year": "2025",
+        "planned": 40000,
+        "actual": 32000,
+        "rate_pct": 80.0
+      }
+    ],
+    "avg_execution_rate_pct": 78.0,
+    "reliability_status": "MEDIUM_RELIABILITY",
+    "is_reliable": true
+  },
+  "2603": {
+    "code": "2603",
+    "name": "長榮",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 30000,
+        "actual": 28500,
+        "rate_pct": 95.0
+      },
+      {
+        "year": "2025",
+        "planned": 20000,
+        "actual": 18200,
+        "rate_pct": 91.0
+      }
+    ],
+    "avg_execution_rate_pct": 93.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2371": {
+    "code": "2371",
+    "name": "大同",
+    "historical_events_count": 3,
+    "historical_records": [
+      {
+        "year": "2023",
+        "planned": 10000,
+        "actual": 2500,
+        "rate_pct": 25.0
+      },
+      {
+        "year": "2024",
+        "planned": 15000,
+        "actual": 4500,
+        "rate_pct": 30.0
+      }
+    ],
+    "avg_execution_rate_pct": 27.5,
+    "reliability_status": "WOLF_WARNING",
+    "is_reliable": false
+  },
+  "2324": {
+    "code": "2324",
+    "name": "仁寶",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 40000,
+        "actual": 34000,
+        "rate_pct": 85.0
+      }
+    ],
+    "avg_execution_rate_pct": 85.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "3231": {
+    "code": "3231",
+    "name": "緯創",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 15000,
+        "actual": 13500,
+        "rate_pct": 90.0
+      }
+    ],
+    "avg_execution_rate_pct": 90.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2301": {
+    "code": "2301",
+    "name": "光寶科",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 20000,
+        "actual": 17000,
+        "rate_pct": 85.0
+      }
+    ],
+    "avg_execution_rate_pct": 85.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "3034": {
+    "code": "3034",
+    "name": "聯詠",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 10000,
+        "actual": 9200,
+        "rate_pct": 92.0
+      }
+    ],
+    "avg_execution_rate_pct": 92.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "9904": {
+    "code": "9904",
+    "name": "寶成",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 25000,
+        "actual": 18000,
+        "rate_pct": 72.0
+      }
+    ],
+    "avg_execution_rate_pct": 72.0,
+    "reliability_status": "MEDIUM_RELIABILITY",
+    "is_reliable": true
+  },
+  "2002": {
+    "code": "2002",
+    "name": "中鋼",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 100000,
+        "actual": 88000,
+        "rate_pct": 88.0
+      }
+    ],
+    "avg_execution_rate_pct": 88.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "6488": {
+    "code": "6488",
+    "name": "環球晶",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 5000,
+        "actual": 4300,
+        "rate_pct": 86.0
+      }
+    ],
+    "avg_execution_rate_pct": 86.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "5483": {
+    "code": "5483",
+    "name": "中美晶",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 7000,
+        "actual": 5800,
+        "rate_pct": 82.9
+      }
+    ],
+    "avg_execution_rate_pct": 82.9,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "6239": {
+    "code": "6239",
+    "name": "力成",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 10000,
+        "actual": 8500,
+        "rate_pct": 85.0
+      }
+    ],
+    "avg_execution_rate_pct": 85.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2376": {
+    "code": "2376",
+    "name": "技嘉",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 8000,
+        "actual": 7000,
+        "rate_pct": 87.5
+      }
+    ],
+    "avg_execution_rate_pct": 87.5,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2368": {
+    "code": "2368",
+    "name": "金像電",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 6000,
+        "actual": 5200,
+        "rate_pct": 86.7
+      }
+    ],
+    "avg_execution_rate_pct": 86.7,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "3481": {
+    "code": "3481",
+    "name": "群創",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 70000,
+        "actual": 56000,
+        "rate_pct": 80.0
+      }
+    ],
+    "avg_execution_rate_pct": 80.0,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  },
+  "2915": {
+    "code": "2915",
+    "name": "潤泰全",
+    "historical_events_count": 2,
+    "historical_records": [
+      {
+        "year": "2024",
+        "planned": 12000,
+        "actual": 10500,
+        "rate_pct": 87.5
+      }
+    ],
+    "avg_execution_rate_pct": 87.5,
+    "reliability_status": "HIGH_RELIABILITY",
+    "is_reliable": true
+  }
+}

@@ -70,6 +70,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "08_group_window_dressing" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "09_treasury_stock_buyback",
+        "name": "庫藏股宣告護盤與低估值事件策略",
+        "script": ROOT_DIR / "strategies" / "09_treasury_stock_buyback" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False):

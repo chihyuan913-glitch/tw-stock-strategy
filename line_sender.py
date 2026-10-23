@@ -109,6 +109,7 @@ def resolve_tokens(strategy: str = None, env: dict = None) -> list:
         "LINE_CHANNEL_ACCESS_TOKEN_06",
         "LINE_CHANNEL_ACCESS_TOKEN_07",
         "LINE_CHANNEL_ACCESS_TOKEN_08",
+        "LINE_CHANNEL_ACCESS_TOKEN_09",
     ]
     for bc in backup_candidates:
         bt = os.environ.get(bc) or env.get(bc)
@@ -542,6 +543,20 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "addon_desc": "領頭羊突破續強",
             "tp_desc": "TP1作帳目標 / TP2波段",
             "sl_desc": "跌破起漲防守線",
+            "color_theme": "#D97706"
+        }
+    elif sid in ("09", "09_treasury_stock_buyback"):
+        return {
+            "id": "09",
+            "name": "庫藏護盤與低估值事件",
+            "entry_label": "🟢 買進上限",
+            "addon_label": "🔵 續強加碼",
+            "tp_label": "🔴 宣告上限/停利",
+            "sl_label": "🛑 破線停損撤退",
+            "entry_desc": "買進上限防追高",
+            "addon_desc": "突破宣告高點",
+            "tp_desc": "TP1宣告上限 / TP2淨值",
+            "sl_desc": "跌破宣告低點或區間下限",
             "color_theme": "#D97706"
         }
     elif sid == "RADAR":
@@ -1280,19 +1295,19 @@ def build_screener_carousel(
 
     bubbles = []
     for r in sorted_res[:max_stocks]:
-        code = str(r.get('證券代號') or r.get('代號') or '')
-        name = str(r.get('證券名稱') or r.get('名稱') or '')
+        code = str(r.get('證券代號') or r.get('代號') or r.get('股票代碼') or '')
+        name = str(r.get('證券名稱') or r.get('名稱') or r.get('股票名稱') or '')
         stars = str(r.get('星級推薦') or r.get('星級') or '★★★★☆')
         score = r.get('評分') or r.get('score') or '--'
-        price = r.get('收盤價') or r.get('現價') or 0.0
+        price = r.get('收盤價') or r.get('現價') or r.get('最新現價') or 0.0
 
-        entry_val = r.get('進場價位') or r.get('空單進場') or r.get('entry_price')
-        addon_val = r.get('加碼價位') or r.get('加空價位') or r.get('addon_price')
-        tp1_val = r.get('停利TP1') or r.get('tp1_price')
-        tp2_val = r.get('停利TP2') or r.get('tp2_price')
-        sl_val = r.get('停損價位') or r.get('停損回補') or r.get('sl_price')
-        og_risk = r.get('隔日沖風控') or r.get('og_risk') or ''
-        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or 0
+        entry_val = r.get('進場價位') or r.get('進場買進上限') or r.get('空單進場') or r.get('entry_price')
+        addon_val = r.get('加碼價位') or r.get('續強加碼價') or r.get('加空價位') or r.get('addon_price')
+        tp1_val = r.get('停利TP1') or r.get('目標停利TP1') or r.get('tp1_price')
+        tp2_val = r.get('停利TP2') or r.get('目標停利TP2') or r.get('tp2_price')
+        sl_val = r.get('停損價位') or r.get('嚴格停損價') or r.get('停損回補') or r.get('sl_price')
+        og_risk = r.get('隔日沖風控') or r.get('隔日沖風險') or r.get('og_risk') or ''
+        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or r.get('當日成交量') or 0
 
         fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
         fut_month = r.get('期貨月份') or r.get('month') or ''
@@ -1718,24 +1733,24 @@ def format_screener_markdown_cards(
         return "\n".join(md_lines)
 
     for i, r in enumerate(sorted_res[:max_stocks], 1):
-        code = str(r.get('證券代號') or r.get('代號') or '')
-        name = str(r.get('證券名稱') or r.get('名稱') or '')
+        code = str(r.get('證券代號') or r.get('代號') or r.get('股票代碼') or '')
+        name = str(r.get('證券名稱') or r.get('名稱') or r.get('股票名稱') or '')
         stars = str(r.get('星級推薦') or r.get('星級') or '★★★★☆')
         score = r.get('評分') or r.get('score') or '--'
-        price = r.get('收盤價') or r.get('現價') or 0.0
+        price = r.get('收盤價') or r.get('現價') or r.get('最新現價') or 0.0
 
-        entry_val = r.get('進場價位') or r.get('空單進場') or r.get('entry_price')
-        addon_val = r.get('加碼價位') or r.get('加空價位') or r.get('addon_price')
-        tp1_val = r.get('停利TP1') or r.get('tp1_price')
-        tp2_val = r.get('停利TP2') or r.get('tp2_price')
-        sl_val = r.get('停損價位') or r.get('停損回補') or r.get('sl_price')
-        og_risk = r.get('隔日沖風控') or r.get('og_risk') or ''
-        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or 0
+        entry_val = r.get('進場價位') or r.get('進場買進上限') or r.get('空單進場') or r.get('entry_price')
+        addon_val = r.get('加碼價位') or r.get('續強加碼價') or r.get('加空價位') or r.get('addon_price')
+        tp1_val = r.get('停利TP1') or r.get('目標停利TP1') or r.get('tp1_price')
+        tp2_val = r.get('停利TP2') or r.get('目標停利TP2') or r.get('tp2_price')
+        sl_val = r.get('停損價位') or r.get('嚴格停損價') or r.get('停損回補') or r.get('sl_price')
+        og_risk = r.get('隔日沖風控') or r.get('隔日沖風險') or r.get('og_risk') or ''
+        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or r.get('當日成交量') or 0
 
         fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
         fut_month = r.get('期貨月份') or r.get('month') or ''
         basis_desc = r.get('價差(Basis)') or r.get('basis_desc') or r.get('basis_tag') or ''
-        margin_1lot = r.get('1口保證金(約)') or r.get('margin_1lot')
+        margin_1lot = r.get('1口保證金(約)') or r.get('1口保證金(元)') or r.get('margin_1lot')
 
         title_badge = f"{code} {name} ({fut_contract})" if fut_contract and fut_contract not in ('--', '--F', 'None') else f"{code} {name}"
 
@@ -1744,7 +1759,7 @@ def format_screener_markdown_cards(
         tp_str = f"TP1 `{format_price_val(tp1_val)}` 元 ｜ TP2 `{format_price_val(tp2_val)}` 元" if tp2_val else f"`{format_price_val(tp1_val)}` 元"
         sl_str = format_price_val(sl_val)
 
-        status_tag = r.get('多空狀態') or ("🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05", "08") else "🔴【弱勢破線・避險放空】")
+        status_tag = r.get('多空狀態') or r.get('多空位階') or ("🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05", "08", "09") else "🔴【弱勢破線・避險放空】")
 
         md_lines.extend([
             f"### 🏷️ 【{i:02d}】{title_badge} {stars} ({score}分) {status_tag}",

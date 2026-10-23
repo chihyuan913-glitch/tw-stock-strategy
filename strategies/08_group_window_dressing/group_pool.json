@@ -50,6 +50,12 @@
         "code": "6205",
         "name": "詮欣",
         "role": "SUBSIDIARY"
+      },
+      {
+        "code": "6284",
+        "name": "佳邦",
+        "role": "SUBSIDIARY",
+        "sub_sector": "電感與保護元件"
       }
     ]
   },
@@ -109,6 +115,12 @@
         "code": "2367",
         "name": "燿華",
         "role": "SUBSIDIARY"
+      },
+      {
+        "code": "4958",
+        "name": "臻鼎-KY",
+        "role": "SUBSIDIARY",
+        "sub_sector": "PCB載板"
       }
     ]
   },
@@ -163,6 +175,12 @@
         "code": "3545",
         "name": "敦泰",
         "role": "SUBSIDIARY"
+      },
+      {
+        "code": "3037",
+        "name": "欣興",
+        "role": "SUBSIDIARY",
+        "sub_sector": "IC載板與PCB"
       }
     ]
   },
@@ -196,11 +214,6 @@
       {
         "code": "3090",
         "name": "日電貿",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "6284",
-        "name": "佳邦",
         "role": "SUBSIDIARY"
       }
     ]
@@ -289,11 +302,6 @@
       {
         "code": "8046",
         "name": "南電",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "1314",
-        "name": "中石化",
         "role": "SUBSIDIARY"
       },
       {
@@ -633,23 +641,8 @@
         "role": "FLAGSHIP"
       },
       {
-        "code": "4958",
-        "name": "臻鼎-KY",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "6284",
-        "name": "佳邦",
-        "role": "SUBSIDIARY"
-      },
-      {
         "code": "8042",
         "name": "金山電",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "3374",
-        "name": "精材",
         "role": "SUBSIDIARY"
       },
       {
@@ -752,11 +745,6 @@
       {
         "code": "4960",
         "name": "誠美材",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "3149",
-        "name": "正達",
         "role": "SUBSIDIARY"
       },
       {
@@ -947,16 +935,6 @@
       {
         "code": "6285",
         "name": "啟",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "4938",
-        "name": "和碩",
-        "role": "SUBSIDIARY"
-      },
-      {
-        "code": "3037",
-        "name": "欣興",
         "role": "SUBSIDIARY"
       },
       {

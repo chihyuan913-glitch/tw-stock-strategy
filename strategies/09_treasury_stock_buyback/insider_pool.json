@@ -1,0 +1,38 @@
+[
+  {
+    "code": "2303",
+    "name": "聯電",
+    "announcement_date": "2026-10-18",
+    "insider_title": "董事長/全體董監",
+    "shares_increased": 15000,
+    "capital_ratio_pct": 1.25,
+    "current_price": 51.5,
+    "book_value": 38.5,
+    "purpose": "董監事大額回補自願鎖定",
+    "status": "ACTIVE"
+  },
+  {
+    "code": "2882",
+    "name": "國泰金",
+    "announcement_date": "2026-10-16",
+    "insider_title": "大股東控股公司",
+    "shares_increased": 25000,
+    "capital_ratio_pct": 1.50,
+    "current_price": 63.5,
+    "book_value": 56.0,
+    "purpose": "大股東加碼長期投資",
+    "status": "ACTIVE"
+  },
+  {
+    "code": "2308",
+    "name": "台達電",
+    "announcement_date": "2026-10-15",
+    "insider_title": "執行長及主要經理人",
+    "shares_increased": 3500,
+    "capital_ratio_pct": 0.85,
+    "current_price": 385.0,
+    "book_value": 140.0,
+    "purpose": "高階主管自願集中增持",
+    "status": "ACTIVE"
+  }
+]

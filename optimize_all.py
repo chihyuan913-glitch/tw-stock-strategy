@@ -299,7 +299,8 @@ def collect_latest_candidates():
         ("05_stock_futures_long", "策略 05：個股期法人強勢波段"),
         ("06_volume_surge", "策略 06：盤中爆量起漲動能"),
         ("07_margin_call_ambush", "策略 07：高融資斷頭與浮額清洗"),
-        ("08_group_window_dressing", "策略 08：集團作帳與母子聯動")
+        ("08_group_window_dressing", "策略 08：集團作帳與母子聯動"),
+        ("09_treasury_stock_buyback", "策略 09：庫藏宣告與低估護盤")
     ]
     summary = {}
     for folder, name in strategies:

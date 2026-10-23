@@ -411,7 +411,8 @@ def sync_screener_to_radar(target_id: str = "") -> str:
         "05_stock_futures_long": "股期多方",
         "06_volume_surge": "爆量動能",
         "07_margin_call_ambush": "融資斷頭",
-        "08_group_window_dressing": "集團作帳"
+        "08_group_window_dressing": "集團作帳",
+        "09_treasury_stock_buyback": "庫藏護盤"
     }
 
     for path in csv_files:
@@ -426,7 +427,7 @@ def sync_screener_to_radar(target_id: str = "") -> str:
             top_df = df.head(3)
             for _, row in top_df.iterrows():
                 # 代碼欄位辨識
-                code = str(row.get('證券代號', row.get('代號', ''))).strip()
+                code = str(row.get('證券代號', row.get('代號', row.get('股票代碼', '')))).strip()
                 if not code or not code.isdigit() or len(code) != 4:
                     continue
                 name = str(row.get('證券名稱', row.get('名稱', code))).strip()

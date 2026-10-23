@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 台股量化選股策略最高總指揮中心 - LINE 盤中隨傳隨回操盤機器人主執行器
@@ -83,7 +83,7 @@ def _spawn_uvicorn_server(port: int):
     server_cmd = [
         sys.executable, "-u", "-m", "uvicorn",
         "line_bot_server:app",
-        "--host", "0.0.0.0",
+        "--host", "127.0.0.1",
         "--port", str(port),
         "--log-level", "warning"
     ]
@@ -183,3 +183,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

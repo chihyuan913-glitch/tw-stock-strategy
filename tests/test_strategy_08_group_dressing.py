@@ -971,3 +971,74 @@ def test_cluster_puts_tier1_before_tier2_within_group():
         dict(base, code="1", score=60, tier_level="🎯 Tier-1 母子共振精選"),
     ]
     assert [i["code"] for i in screener.cluster_items_by_group_rank(items, ranking)] == ["1", "2"]
+
+
+# ============================================================================
+# 8. 集團成分股權威性與零重複檢驗 (Group Pool Strict Uniqueness & Affiliations)
+# ============================================================================
+def test_group_pool_strict_uniqueness_and_affiliations():
+    """
+    測試 8：驗證 group_pool.json 全域資料庫之權威性、零衝突與個股歸屬正當性
+    - 斷言跨集團絕無重複個股代碼 (len(all_codes) == len(set(all_codes)))
+    - 斷言 3149 正達 僅屬於 G02_HONHAI (鴻海集團)，絕不屬於 G18_INNOLUX (奇美群創)
+    - 斷言 6284 佳邦 僅屬於 G01_WALSIN (華新麗華集團/華新科)，絕不屬於 G04 (國巨) 或 G15
+    - 斷言 4938 和碩 屬於 G24_ASUS_PEGATRON (華碩和碩)，絕不屬於 G23_WISTRON (緯創)
+    - 斷言 3037 欣興 屬於 G03_UMC (聯電集團)，絕不屬於 G23_WISTRON
+    - 斷言 4958 臻鼎-KY 屬於 G02_HONHAI (鴻海集團)
+    - 斷言 1314 中石化 (威京集團) 不在 G06_FORMOSA (台塑集團)
+    - 斷言 3374 精材 不在 G15_LITEON (光寶集團)，且 G25 為散熱光電AI作帳集團
+    """
+    screener = load_screener_module()
+    pool = screener.load_group_pool()
+
+    all_codes = []
+    code_to_groups = {}
+    for g in pool:
+        gid = g["group_id"]
+        for m in g["members"]:
+            c = m["code"]
+            all_codes.append(c)
+            code_to_groups.setdefault(c, []).append((gid, g["group_name"]))
+
+    # 1. 跨集團絕無重複個股代碼
+    duplicates = {c: grps for c, grps in code_to_groups.items() if len(grps) > 1}
+    assert not duplicates, f"發現跨集團重複個股: {duplicates}"
+    assert len(all_codes) == len(set(all_codes)), "成分股總數與唯一代碼數不一致"
+
+    # 2. 3149 正達 歸屬檢核 (必須屬於鴻海集團，非群創)
+    assert "3149" in code_to_groups, "3149 正達 必須存在於集團池中"
+    zheng_da_group = code_to_groups["3149"][0][0]
+    assert zheng_da_group == "G02_HONHAI", f"3149 正達 應歸屬於 G02_HONHAI，實際為: {zheng_da_group}"
+
+    # 3. 6284 佳邦 歸屬檢核 (華新科旗下，必須屬於華新麗華集團)
+    assert "6284" in code_to_groups, "6284 佳邦 必須存在於集團池中"
+    jia_bang_group = code_to_groups["6284"][0][0]
+    assert jia_bang_group == "G01_WALSIN", f"6284 佳邦 應歸屬於 G01_WALSIN，實際為: {jia_bang_group}"
+
+    # 4. 4938 和碩 歸屬檢核 (華碩分割代工，必須屬於華碩和碩集團)
+    assert "4938" in code_to_groups, "4938 和碩 必須存在於集團池中"
+    he_shuo_group = code_to_groups["4938"][0][0]
+    assert he_shuo_group == "G24_ASUS_PEGATRON", f"4938 和碩 應歸屬於 G24_ASUS_PEGATRON，實際為: {he_shuo_group}"
+
+    # 5. 3037 欣興 歸屬檢核 (聯電轉投資載板龍頭，必須屬於聯電集團)
+    assert "3037" in code_to_groups, "3037 欣興 必須存在於集團池中"
+    xin_xing_group = code_to_groups["3037"][0][0]
+    assert xin_xing_group == "G03_UMC", f"3037 欣興 應歸屬於 G03_UMC，實際為: {xin_xing_group}"
+
+    # 6. 4958 臻鼎-KY (鴻海旗下全球 PCB 龍頭)
+    assert "4958" in code_to_groups, "4958 臻鼎-KY 必須存在於集團池中"
+    zhen_ding_group = code_to_groups["4958"][0][0]
+    assert zhen_ding_group == "G02_HONHAI", f"4958 臻鼎-KY 應歸屬於 G02_HONHAI，實際為: {zhen_ding_group}"
+
+    # 7. 1314 中石化 (威京集團) 絕不可誤列台塑集團
+    g06 = next(g for g in pool if g["group_id"] == "G06_FORMOSA")
+    g06_codes = [m["code"] for m in g06["members"]]
+    assert "1314" not in g06_codes, "1314 中石化 屬威京集團，絕不可誤列入 G06 台塑集團"
+
+    # 8. 3374 精材 絕不可誤列光寶集團，且 G25 為散熱光電AI作帳集團 (3017 奇鋐為旗艦)
+    g15 = next(g for g in pool if g["group_id"] == "G15_LITEON")
+    g15_codes = [m["code"] for m in g15["members"]]
+    assert "3374" not in g15_codes, "3374 精材 絕不可誤列入 G15 光寶集團"
+    g25 = next(g for g in pool if g["group_id"] == "G25_COOLING_AI")
+    assert g25["flagship_code"] == "3017", "G25 旗艦應為 3017 奇鋐"
+

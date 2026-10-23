@@ -79,6 +79,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "08_group_window_dressing" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "08_group_window_dressing"
     },
+    {
+        "id": "09_treasury_stock_buyback",
+        "name": "策略 09：庫藏股宣告護盤到價雷達",
+        "script": ROOT_DIR / "strategies" / "09_treasury_stock_buyback" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "09_treasury_stock_buyback"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):

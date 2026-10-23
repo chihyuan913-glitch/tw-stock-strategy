@@ -377,6 +377,14 @@ async def startup_event():
                     
                     # 1. 開盤晨報 (08:58 提醒今日監控標的)
                     if 858 <= t_int <= 900 and notified_morning != today_str:
+                        # 盤前自動拉取雲端昨夜最新選股結果
+                        try:
+                            import subprocess
+                            subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=str(Path(__file__).resolve().parent), timeout=15)
+                            log_debug("[✓] 盤前自動同步雲端最新盤後報表成功")
+                        except Exception as e:
+                            log_debug(f"[!] 盤前同步雲端失敗: {e}")
+
                         from radar_manager import load_watchlist, get_radar_channel
                         w = load_watchlist()
                         target_ch = get_radar_channel()
@@ -796,7 +804,8 @@ async def get_overview():
         "05_stock_futures_long",
         "06_volume_surge",
         "07_margin_call_ambush",
-        "08_group_window_dressing"
+        "08_group_window_dressing",
+        "09_treasury_stock_buyback"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -855,7 +864,11 @@ async def get_strategy_data(strat_id: str):
         "08_group_window_dressing": {
             "name": "策略 08：台股集團作帳與母子聯動伏擊策略",
             "desc": "鎖定 25 大核心集團季底與年底作帳行情，透過「母子聯動 × 集團共振」雙向狀態機自動分流【🟢作帳點火・母子共振】與【🔴集團結帳・順勢放空】。"
-        }
+        },
+        "09_treasury_stock_buyback": {
+            "name": "策略 09：庫藏股宣告護盤與低估值事件策略",
+            "desc": "鎖定 MOPS 法定庫藏股申報、過往 3 年執行率誠信檢核、4+1 維度低估值護盤與法人防對倒共振，三層動態降級容錯。"
+        },
     }
 
     meta = strat_meta.get(strat_id, {"name": strat_id, "desc": ""})
@@ -878,12 +891,12 @@ async def get_strategy_data(strat_id: str):
         from radar_manager import fetch_batch_realtime_quotes
         codes = []
         for r in rows:
-            c = str(r.get('證券代號') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
+            c = str(r.get('證券代號') or r.get('股票代碼') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
             if c:
                 codes.append(c)
         quotes = fetch_batch_realtime_quotes(codes) if codes else {}
         for r in rows:
-            c = str(r.get('證券代號') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
+            c = str(r.get('證券代號') or r.get('股票代碼') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
             q = quotes.get(c, {})
             curr_p = q.get('price')
             if curr_p is not None:
@@ -894,7 +907,7 @@ async def get_strategy_data(strat_id: str):
                 r['quote_time'] = q.get('time', '')
 
             # 建議進場價評估
-            entry_raw = str(r.get('進場價位') or r.get('多單進場') or r.get('空單進場') or r.get('現貨進場') or '').replace(',', '').strip()
+            entry_raw = str(r.get('進場價位') or r.get('進場買進上限') or r.get('建議進場價') or r.get('多單進場') or r.get('空單進場') or r.get('現貨進場') or '').replace(',', '').strip()
             try:
                 ep = float(entry_raw)
             except Exception:
@@ -903,7 +916,7 @@ async def get_strategy_data(strat_id: str):
             eval_p = curr_p if curr_p is not None else 0.0
             if not eval_p:
                 try:
-                    eval_p = float(str(r.get('收盤價') or r.get('現價') or r.get('期貨收盤價') or 0).replace(',', ''))
+                    eval_p = float(str(r.get('收盤價') or r.get('最新現價') or r.get('現價') or r.get('期貨收盤價') or 0).replace(',', ''))
                 except Exception:
                     eval_p = 0.0
 
@@ -921,9 +934,30 @@ async def get_strategy_data(strat_id: str):
                     r['position_badge'] = '⚠️ 高於進場價'
                     r['position_desc'] = f'溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)'
 
+        # 解析戰報交易日期
+        date_str = ""
+        md_file = csv_file.parent / "result.md"
+        if md_file.exists():
+            try:
+                with open(md_file, "r", encoding="utf-8") as mf:
+                    for line in mf:
+                        if "交易日期" in line:
+                            import re
+                            m = re.search(r'[`\s](\d{4}[-/]?\d{2}[-/]?\d{2})', line)
+                            if m:
+                                date_str = m.group(1)
+                            break
+            except Exception:
+                pass
+        if not date_str:
+            import datetime
+            mtime = datetime.datetime.fromtimestamp(csv_file.stat().st_mtime)
+            date_str = mtime.strftime('%Y-%m-%d')
+
         return {
             "name": meta["name"],
             "desc": meta["desc"],
+            "date": date_str,
             "columns": cols,
             "rows": rows
         }
@@ -1254,6 +1288,15 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
         background_tasks.add_task(_task)
         return {"message": "已在背景啟動每週日動態優化 (optimize_all.py --line)！"}
 
+    elif action_name == "sync_cloud":
+        def _task():
+            try:
+                subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=str(root_dir), timeout=25)
+            except Exception as e:
+                log_debug(f"[!] 同步雲端失敗: {e}")
+        background_tasks.add_task(_task)
+        return {"message": "已在背景啟動同步雲端最新選股成果！"}
+
     elif action_name == "test_line":
         def _task():
             from line_sender import send_to_line
@@ -1308,4 +1351,5 @@ if __name__ == '__main__':
     print(f"  本機端點: http://127.0.0.1:{port}/callback")
     print(f"  LINE Token 設定狀態: {'已就緒' if CHANNEL_ACCESS_TOKEN else '未設定'}")
     print(f"=====================================================")
-    uvicorn.run("line_bot_server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("line_bot_server:app", host="127.0.0.1", port=port, reload=False)
+
