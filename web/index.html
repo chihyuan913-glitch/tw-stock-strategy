@@ -252,6 +252,25 @@
             </div>
           </div>
         </div>
+
+        <!-- 5 日滾動週期篩選列 -->
+        <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-950/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 font-semibold mr-1">🔍 週期視圖：</span>
+            <button onclick="setStrategyRollingFilter('all')" id="rf-all" class="px-2.5 py-1 rounded-md font-semibold transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              全部保留 (共 <span id="rfCountAll">0</span> 檔)
+            </button>
+            <button onclick="setStrategyRollingFilter('today')" id="rf-today" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700">
+              🟢 今日新選 (<span id="rfCountToday">0</span> 檔)
+            </button>
+            <button onclick="setStrategyRollingFilter('tracking')" id="rf-tracking" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700">
+              ⏳ 5日內追蹤 (<span id="rfCountTracking">0</span> 檔)
+            </button>
+          </div>
+          <div class="text-[11px] text-slate-400 flex items-center gap-1">
+            <span>🛡️ 已啟用 5 日滾動保留機制，波段持股不漏接</span>
+          </div>
+        </div>
         
         <!-- 卡片模式容器 (預設) -->
         <div id="strategyCardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
@@ -2010,7 +2029,55 @@
 
     // 載入策略資料
     let currentStrategy = '01_bollinger_reversal';
-    let currentStrategyView = 'cards'; // 'cards' | 'table'
+    let currentStrategyView = 'cards';
+    let currentStrategyRawData = null;
+    let currentRollingFilter = 'all';
+
+    function setStrategyRollingFilter(filterType) {
+      currentRollingFilter = filterType;
+      const btns = {
+        'all': document.getElementById('rf-all'),
+        'today': document.getElementById('rf-today'),
+        'tracking': document.getElementById('rf-tracking')
+      };
+      for (const [k, b] of Object.entries(btns)) {
+        if (!b) continue;
+        if (k === filterType) {
+          b.className = "px-2.5 py-1 rounded-md font-semibold transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        } else {
+          b.className = "px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700";
+        }
+      }
+      if (!currentStrategyRawData) return;
+      applyRollingFilterAndRender();
+    }
+
+    function applyRollingFilterAndRender() {
+      if (!currentStrategyRawData) return;
+      const rawRows = currentStrategyRawData.rows || [];
+      const latestDate = currentStrategyRawData.date || '';
+
+      let filteredRows = rawRows;
+      if (currentRollingFilter === 'today') {
+        filteredRows = rawRows.filter(r => {
+          const d = String(r['選股日期'] || '').trim();
+          const days = String(r['入選天數'] || '').trim();
+          const st = String(r['狀態標註'] || '').trim();
+          return st.includes('今日') || days.includes('T+0') || (latestDate && d === latestDate);
+        });
+      } else if (currentRollingFilter === 'tracking') {
+        filteredRows = rawRows.filter(r => {
+          const d = String(r['選股日期'] || '').trim();
+          const days = String(r['入選天數'] || '').trim();
+          const st = String(r['狀態標註'] || '').trim();
+          return !st.includes('今日') && !days.includes('T+0') && (!latestDate || d !== latestDate);
+        });
+      }
+
+      const displayData = { ...currentStrategyRawData, rows: filteredRows };
+      renderStrategyCards(displayData);
+      renderStrategyTable(displayData);
+    } // 'cards' | 'table'
 
     function toggleStrategyView(mode) {
       currentStrategyView = mode;
@@ -2048,12 +2115,20 @@
       try {
         const resp = await fetch(`/api/strategy/${stratId}`);
         const data = await resp.json();
+        currentStrategyRawData = data;
         document.getElementById('currentStrategyTitle').innerText = data.name || stratId;
         document.getElementById('currentStrategyDesc').innerText = data.desc || '';
-        const dateTag = data.date ? `（結算日：${data.date}）` : '';
-        document.getElementById('currentStrategyCount').innerText = `${data.rows ? data.rows.length : 0} 檔入選 ${dateTag}`;
-        renderStrategyCards(data);
-        renderStrategyTable(data);
+        const dateTag = data.date ? `（最新選股日：${data.date}）` : '';
+        const total = data.total_count !== undefined ? data.total_count : (data.rows ? data.rows.length : 0);
+        const todayCnt = data.today_count !== undefined ? data.today_count : (data.rows ? data.rows.filter(r => String(r['狀態標註']||'').includes('今日') || String(r['入選天數']||'').includes('T+0')).length : 0);
+        const trackCnt = total - todayCnt;
+
+        document.getElementById('currentStrategyCount').innerText = `${total} 檔追蹤中（今日新選 ${todayCnt} 檔 ｜ 5日累計） ${dateTag}`;
+        if (document.getElementById('rfCountAll')) document.getElementById('rfCountAll').innerText = total;
+        if (document.getElementById('rfCountToday')) document.getElementById('rfCountToday').innerText = todayCnt;
+        if (document.getElementById('rfCountTracking')) document.getElementById('rfCountTracking').innerText = trackCnt;
+
+        applyRollingFilterAndRender();
       } catch (e) {
         console.error("載入策略失敗:", e);
       }
@@ -2149,6 +2224,24 @@
         card.className = "rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-700/80 p-5 shadow-xl transition-all duration-200 hover:-translate-y-0.5 space-y-4 relative group flex flex-col justify-between";
 
         let badgesHtml = '';
+
+        // 5 日滾動入選日期與天數標籤
+        const pickDate = String(r['選股日期'] || '').trim();
+        const pickDays = String(r['入選天數'] || '').trim();
+        const pickStatus = String(r['狀態標註'] || '').trim();
+        if (pickDate || pickDays || pickStatus) {
+          let badgeStyle = "bg-slate-700/40 text-slate-300 border-slate-600/40";
+          if (pickStatus.includes('今日') || pickDays.includes('T+0')) {
+            badgeStyle = "bg-emerald-500/25 text-emerald-300 border-emerald-500/40 font-bold";
+          } else if (pickStatus.includes('續強')) {
+            badgeStyle = "bg-amber-500/25 text-amber-300 border-amber-500/40 font-bold";
+          } else {
+            badgeStyle = "bg-sky-500/20 text-sky-300 border-sky-500/30";
+          }
+          const shortDate = pickDate.length >= 10 ? pickDate.slice(5) : pickDate;
+          const displayLabel = pickStatus ? `${pickStatus} (${shortDate} · ${pickDays})` : `📅 ${shortDate} (${pickDays})`;
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded ${badgeStyle} text-[10px] border shadow-sm">${displayLabel}</span> `;
+        }
         if (marginState) {
           let stateClass = "bg-slate-700/30 text-slate-300 border-slate-600/30";
           if (marginState.includes('斷頭助跌') || marginState.includes('🔴')) {

@@ -1050,7 +1050,8 @@ def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FIL
     """匯出 UTF-8-BOM CSV 與高對比字卡 Markdown 戰報"""
     if not stocks:
         df_empty = pd.DataFrame(columns=CSV_COLUMNS)
-        df_empty.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        from rolling_retention_manager import save_rolling_result_csv
+        save_rolling_result_csv(csv_path, df_empty, today_date_str=datetime.date.today().strftime('%Y/%m/%d'), max_days=5)
         with open(md_path, 'w', encoding='utf-8') as f:
             f.write(f"# 【{STRATEGY_NAME}】最新選股戰報\n\n今日無標的符合斷頭高危或浮額清洗條件。\n")
         print(f"[✓] 今日無入選標的，已建立空白報表: {csv_path}")
@@ -1063,7 +1064,8 @@ def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FIL
             df[col] = ""
     df = df[CSV_COLUMNS]
 
-    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+    from rolling_retention_manager import save_rolling_result_csv
+    df = save_rolling_result_csv(csv_path, df, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功匯出 CSV 報表至: {csv_path}")
 
     today_str = datetime.date.today().strftime('%Y/%m/%d')

@@ -40,6 +40,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
 from futures_helper import (
     load_stock_futures_pool,
     fetch_taifex_futures_quotes,
@@ -214,6 +215,29 @@ def evaluate_window_dressing_calendar(target_date=None) -> dict:
     }
 
 
+def evaluate_spread_tactical_status(
+    spread_vs_parent_pct: float,
+    parent_ret_5d: float,
+    parent_above_ma20: bool,
+    member_ret_5d: float
+) -> str:
+    """
+    母子動態價差乖離指數 (Spread Anomaly Index) 戰術定位：
+    1. 🚀【低基期落後補漲】：spread <= -3.0% 且母公司強勢 (parent_ret >= 1.5 或 站上月線)。母公司拉開空間，子公司具均值回歸補漲動能。
+    2. ⚠️【正乖離過大・防母提款】：spread >= 8.0% 且子公司漲幅 >= 10.0%。子公司漲幅遠超母公司，慎防母公司高檔調節處分持股。
+    3. 👑【動能領頭羊先行】：spread >= 2.0% 且子公司漲幅 > 0。
+    4. 🟢【母子步調一致】：其餘正常價差區間。
+    """
+    if spread_vs_parent_pct <= -3.0 and (parent_ret_5d >= 1.5 or parent_above_ma20):
+        return "🚀【低基期落後補漲】"
+    elif spread_vs_parent_pct >= 8.0 and member_ret_5d >= 10.0:
+        return "⚠️【正乖離過大・防母提款】"
+    elif spread_vs_parent_pct >= 2.0 and member_ret_5d > 0:
+        return "👑【動能領頭羊先行】"
+    else:
+        return "🟢【母子步調一致】"
+
+
 def calculate_group_resonance_and_hierarchy(stock_records: list) -> list:
     """
     計算同集團內部的多維共振率與母子層級角色分工 (Hierarchy Role)
@@ -295,6 +319,12 @@ def calculate_group_resonance_and_hierarchy(stock_records: list) -> list:
             inst_5d = float(m.get('inst_5d_lots', 0.0))
 
             spread_vs_parent_pct = round(ret_5d - parent_ret_5d, 2)
+            spread_tactical_status = evaluate_spread_tactical_status(
+                spread_vs_parent_pct=spread_vs_parent_pct,
+                parent_ret_5d=parent_ret_5d,
+                parent_above_ma20=parent_above_ma20,
+                member_ret_5d=ret_5d
+            )
 
             # 同集團協同動能夥伴 (排除自己，最多取前 4 檔)
             sibling_leaders = [
@@ -331,6 +361,7 @@ def calculate_group_resonance_and_hierarchy(stock_records: list) -> list:
             item['sibling_leaders_str'] = " / ".join(sibling_leaders) if sibling_leaders else "集團獨立先鋒"
             item['spread_vs_parent_pct'] = spread_vs_parent_pct
             item['hierarchy_role'] = hierarchy_role
+            item['spread_tactical_status'] = spread_tactical_status
             item['parent_ret_5d_pct'] = parent_ret_5d
 
             enriched_records.append(item)
@@ -338,7 +369,7 @@ def calculate_group_resonance_and_hierarchy(stock_records: list) -> list:
     return enriched_records
 
 
-def classify_dual_state_and_pricing(stock_info: dict) -> dict:
+def classify_dual_state_and_pricing(stock_info: dict, adaptive_params: dict = None) -> dict:
     """
     雙向狀態機分流與四大防線定價
     狀態分流：
@@ -392,11 +423,25 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
         state_code = "GROUP_IGNITION"
         state_badge = "🟢【作帳點火・母子共振】"
 
+        # 自適應市場位階動態停利停損係數
+        tp1_mult = 1.0 + (float(adaptive_params.get("tp1_pct", 7.0)) / 100.0) if adaptive_params else 1.07
+        tp2_mult = 1.0 + (float(adaptive_params.get("tp2_pct", 14.0)) / 100.0) if adaptive_params else 1.14
+        sl_pct_raw = float(adaptive_params.get("stop_loss_pct", -4.5)) if adaptive_params else -4.5
+        sl_mult = 1.0 - (abs(sl_pct_raw) / 100.0)
+
+        # 價差戰術加乘：若為落後補漲，目標空間向上延展；若正乖離過大防母提款，縮緊停利防線
+        spread_status = stock_info.get('spread_tactical_status', '')
+        if spread_status == "🚀【低基期落後補漲】":
+            tp1_mult = max(tp1_mult, 1.08)
+            tp2_mult = max(tp2_mult, 1.16)
+        elif spread_status == "⚠️【正乖離過大・防母提款】":
+            tp1_mult = min(tp1_mult, 1.05)
+
         entry_price = round(close, 2)
         addon_price = round(max(high * 1.01, close * 1.025, entry_price + 0.5), 2)
-        tp1_price = round(max(addon_price * 1.03, close * 1.07, addon_price + 0.5), 2)
-        tp2_price = round(max(tp1_price * 1.04, close * 1.14, tp1_price + 0.5), 2)
-        sl_price = round(min(low * 0.985, ma20 * 0.985, close * 0.955, entry_price - 0.5), 2)
+        tp1_price = round(max(addon_price * 1.03, close * tp1_mult, addon_price + 0.5), 2)
+        tp2_price = round(max(tp1_price * 1.04, close * tp2_mult, tp1_price + 0.5), 2)
+        sl_price = round(min(low * 0.985, ma20 * 0.985, close * sl_mult, entry_price - 0.5), 2)
 
         # 嚴格數學單調性保護
         if addon_price <= entry_price:
@@ -478,7 +523,8 @@ def calculate_group_soft_score(
     calendar_meta: dict,
     overnight_guard: dict = None,
     fut_pricing: dict = None,
-    group_rank: int = None
+    group_rank: int = None,
+    adaptive_params: dict = None
 ) -> tuple:
     """
     二階段 100 分制集團作帳綜合軟評分矩陣
@@ -496,13 +542,31 @@ def calculate_group_soft_score(
     """
     score = 50
 
+    season_weight = float(adaptive_params.get('season_focus_weight', 1.0)) if adaptive_params else 1.0
     state_code = item.get('state_code', 'NEUTRAL')
     if state_code == 'GROUP_IGNITION':
-        score += calendar_meta.get('season_bonus', 5)
+        score += int(round(calendar_meta.get('season_bonus', 5) * season_weight))
     elif state_code == 'GROUP_UNWIND':
-        score += calendar_meta.get('unwind_bonus', 5)
+        score += int(round(calendar_meta.get('unwind_bonus', 5) * season_weight))
     else:
         score += 3
+
+    # 價差戰術地位加減分 (落後補漲 vs 過熱提款)
+    spread_tactical = item.get('spread_tactical_status', '')
+    if spread_tactical == "🚀【低基期落後補漲】":
+        score += 5
+    elif spread_tactical == "⚠️【正乖離過大・防母提款】":
+        score -= 5
+
+    # 季末結帳出貨防禦 (Quarter-End Unwind Defense)
+    # 季末警戒期若個股短線大漲 (ret_5d >= 8%) 且爆量收黑或長上影線，嚴扣 15 分防最後一棒追高
+    phase_code = calendar_meta.get('phase_code', '')
+    ret_5d = float(item.get('ret_5d_pct', 0.0))
+    upper_shadow = float(item.get('upper_shadow_pct', 0.0))
+    if phase_code == 'UNWIND_WARNING_ZONE' and state_code == 'GROUP_IGNITION':
+        if ret_5d >= 8.0 and (upper_shadow >= 30.0 or item.get('candle_weak')):
+            score -= 15
+            item['unwind_warning'] = True
 
     # 共振率加分
     res_ratio = float(item.get('group_resonance_ratio', 0.0))
@@ -576,7 +640,7 @@ def calculate_group_soft_score(
     return score, stars
 
 
-def apply_screening_with_fallback(candidates_raw: list) -> tuple:
+def apply_screening_with_fallback(candidates_raw: list, adaptive_bias_max: float = 8.0) -> tuple:
     """
     執行 4+1 五維度硬性濾網，若 Tier-1 為 0 檔，自動降級啟動 Tier-2 集團潛伏候補
     條件規範：
@@ -611,7 +675,8 @@ def apply_screening_with_fallback(candidates_raw: list) -> tuple:
         else:
             bias20 = float(c.get('bias20_pct', c.get('月線乖離%', 0.0)))
 
-        if abs(bias20) > 8.0:
+        bias_cap = max(3.0, min(8.0, float(adaptive_bias_max))) if adaptive_bias_max is not None else 8.0
+        if abs(bias20) > bias_cap:
             continue
 
         state_code = str(c.get('state_code', 'NEUTRAL'))
@@ -642,10 +707,10 @@ def apply_screening_with_fallback(candidates_raw: list) -> tuple:
         return tier1_list, "TIER1_RESONANCE"
 
     # 若 Tier-1 為 0 檔，自動降級啟動 Tier-2
-    return _build_tier2_candidates(candidates_raw)[:6], "TIER2_GROUP_WATCH"
+    return _build_tier2_candidates(candidates_raw, adaptive_bias_max=adaptive_bias_max)[:6], "TIER2_GROUP_WATCH"
 
 
-def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None) -> list:
+def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None, adaptive_bias_max: float = 8.0) -> list:
     """
     Tier-2 集團潛伏候補 (放寬版硬篩)：5日均量 >= 600、|Bias20| <= 10。
     非 IGNITION/UNWIND 但站上月線且法人買超者，強制賦予多方四大防線 (force_long)。
@@ -655,6 +720,7 @@ def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None
     """
     exclude = {str(c).strip() for c in exclude_codes}
     tier2_list = []
+    tier2_bias_cap = min(10.0, max(5.0, float(adaptive_bias_max) + 1.5)) if adaptive_bias_max is not None else 10.0
     for c in candidates_raw:
         code = str(c.get('code', c.get('證券代號', ''))).strip()
         if not (code.isdigit() and len(code) == 4) or code in exclude:
@@ -671,7 +737,7 @@ def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None
         else:
             bias20 = float(c.get('bias20_pct', c.get('月線乖離%', 0.0)))
 
-        if abs(bias20) > 10.0:
+        if abs(bias20) > tier2_bias_cap:
             continue
 
         c_copy = dict(c)
@@ -707,7 +773,7 @@ def _build_tier2_candidates(candidates_raw: list, exclude_codes=(), rescore=None
     return tier2_list
 
 
-def apply_screening_parallel(candidates_raw: list, tier2_cap: int = 6, rescore=None) -> tuple:
+def apply_screening_parallel(candidates_raw: list, tier2_cap: int = 6, rescore=None, adaptive_bias_max: float = 8.0) -> tuple:
     """
     Tier-1 精選與 Tier-2 潛伏候補「並行」輸出 (apply_screening_with_fallback 則是 Tier-1 為 0 才降級)。
     Why: 單純降級時，只要 Tier-1 有 1 檔，Tier-2 就永遠沒有機會出手，站上月線且法人買超、
@@ -715,13 +781,14 @@ def apply_screening_parallel(candidates_raw: list, tier2_cap: int = 6, rescore=N
     「補位觀察名單」，與 Tier-1 以層級標籤區隔 (Tier-2 最多 tier2_cap 檔，不與 Tier-1 重複)。
     回傳 (filtered_list, tier_mode)，tier_mode 為 'TIER1_PLUS_TIER2' / 'TIER1_RESONANCE' / 'TIER2_GROUP_WATCH'。
     """
-    first_list, first_mode = apply_screening_with_fallback(candidates_raw)
+    first_list, first_mode = apply_screening_with_fallback(candidates_raw, adaptive_bias_max=adaptive_bias_max)
     tier1_list = first_list if first_mode == "TIER1_RESONANCE" else []
 
     tier2_list = _build_tier2_candidates(
         candidates_raw,
         exclude_codes=[str(it.get('code', '')).strip() for it in tier1_list],
         rescore=rescore,
+        adaptive_bias_max=adaptive_bias_max,
     )[:max(0, int(tier2_cap))]
 
     if tier1_list and tier2_list:
@@ -1006,6 +1073,12 @@ def calculate_group_ranking(records: list, group_pool: list = None) -> list:
             status = "🧊 觀望冷卻"
 
         movers = sorted(active, key=lambda m: float(m.get('ret_5d_pct', 0) or 0), reverse=True)[:3]
+        total_turnover = sum(
+            float(m.get('close', 0.0) or 0.0) * float(m.get('volume_lots', m.get('avg_vol_5d', 0.0)) or 0.0) * 1000.0
+            for m in ms
+        )
+        turnover_billion = round(total_turnover / 100000000.0, 2)
+
         ranking.append({
             'group_id': gid,
             'group_name': str(ms[0].get('group_name', gid)),
@@ -1019,6 +1092,7 @@ def calculate_group_ranking(records: list, group_pool: list = None) -> list:
             'net_inst_1d_lots': net_1d,
             'net_inst_5d_lots': net_5d,
             'flow_pct': flow_pct,
+            'turnover_billion_ntd': turnover_billion,
             'ignition_count': ignition,
             'unwind_count': unwind,
             'heat_score': heat,
@@ -1070,7 +1144,8 @@ def _fmt_signed(v, digits: int = 1) -> str:
 
 def build_group_markdown_report(ranking: list, items: list, calendar_meta: dict, date_str: str,
                                 tier_mode: str, cards_md: str = "",
-                                inst_real_count: int = 0, inst_total_count: int = 0) -> str:
+                                inst_real_count: int = 0, inst_total_count: int = 0,
+                                adaptive_cfg: dict = None) -> str:
     """result.md：① 當日集團作帳排行榜 ② 各集團入選個股集中排列 ③ 個股完整字卡。"""
     n_t2 = sum(1 for it in items or [] if "Tier-2" in str(it.get('tier_level', '')))
     n_t1 = len(items or []) - n_t2
@@ -1083,26 +1158,34 @@ def build_group_markdown_report(ranking: list, items: list, calendar_meta: dict,
     for it in items or []:
         picks_by_group.setdefault(str(it.get('group_id', '')).strip(), []).append(it)
 
+    regime_info = (adaptive_cfg or {}).get('market_regime', {})
+    global_ctrl = (adaptive_cfg or {}).get('global_controls', {})
+    regime_label = regime_info.get('label', '🟡【高檔震盪整理・箱型洗盤】')
+    tactical_txt = global_ctrl.get('tactical_guidance', '維持紀律，嚴守 4+1 維度防線。')
+
     lines = [
         f"# 🏆 策略 08：集團作帳日報 ({date_str})",
         "",
+        f"- **🌐 大盤位階**：{regime_label} ｜ 模式：`{global_ctrl.get('mode', '標準')}` (建議現金 `{global_ctrl.get('cash_target_pct', 35)}%`)",
+        f"- **💡 操盤指引**：{tactical_txt}",
         f"- **📅 作帳階段**：{calendar_meta.get('phase_badge', '')}",
         f"- **🎯 選股模式**：{tier_label} ｜ 入選 `{len(items or [])}` 檔 / `{len(picks_by_group)}` 個集團",
         f"- **📊 法人資料**：證交所 T86 真實數據覆蓋 `{inst_real_count}/{inst_total_count}` 檔 (上櫃股無 T86，以量價推估)",
         "",
         "## 🏆 今日集團作帳熱度排行榜",
         "",
-        "| 名次 | 集團 | 熱度 | 狀態 | 共振 | 5日均漲 | 法人淨買(張) | 旗艦母股 | 入選 |",
-        "| :-: | :-- | :-: | :-- | :-: | :-: | --: | :-- | :-: |",
+        "| 名次 | 集團 | 熱度 | 狀態 | 成交額(億) | 共振 | 5日均漲 | 法人淨買(張) | 旗艦母股 | 入選 |",
+        "| :-: | :-- | :-: | :-- | --: | :-: | :-: | --: | :-- | :-: |",
     ]
     for g in ranking or []:
         medal = _RANK_MEDALS.get(g['rank'], f"{g['rank']}")
         flag_ret = g.get('flagship_ret_5d_pct')
         flag_txt = f"{g['flagship_code']} {g['flagship_name']}" + (f" ({_fmt_signed(flag_ret)}%)" if flag_ret is not None else "")
         picked = len(picks_by_group.get(g['group_id'], []))
+        turnover_txt = f"{g.get('turnover_billion_ntd', 0.0):.1f}"
         lines.append(
             f"| {medal} | {g['group_name']} | **{g['heat_score']}** | {g['status_badge']} | "
-            f"{g['active_count']}/{g['member_count']} ({g['resonance_ratio']:.0f}%) | "
+            f"{turnover_txt} | {g['active_count']}/{g['member_count']} ({g['resonance_ratio']:.0f}%) | "
             f"{_fmt_signed(g['avg_ret_5d_pct'], 2)}% | {g['net_inst_1d_lots']:+,} | {flag_txt} | {picked} |"
         )
 
@@ -1149,8 +1232,9 @@ def format_group_ranking_text(ranking: list, items: list, date_str: str,
     for g in (ranking or [])[:top_n]:
         medal = _RANK_MEDALS.get(g['rank'], f"{g['rank']}.")
         lines.append(f"{medal} {g['group_name']}　熱度 {g['heat_score']}　{g['status_badge']}")
+        t_bil = g.get('turnover_billion_ntd', 0.0)
         lines.append(
-            f"　共振 {g['active_count']}/{g['member_count']}｜5日均漲 {_fmt_signed(g['avg_ret_5d_pct'], 1)}%"
+            f"　成交 {t_bil:.1f} 億｜共振 {g['active_count']}/{g['member_count']}｜5日均漲 {_fmt_signed(g['avg_ret_5d_pct'], 1)}%"
             f"｜法人淨買 {g['net_inst_1d_lots']:+,} 張"
         )
         picks = picks_by_group.get(g['group_id'], [])
@@ -1191,6 +1275,14 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
         return [], "ERROR"
     print(f"[✓] 成功載入 {len(group_pool)} 大集團池配置。")
 
+    # 1.5 載入全域自適應操盤引擎參數 (Adaptive Market Regime Engine)
+    adaptive_cfg = load_adaptive_config()
+    adaptive_params = get_strategy_adaptive_params("08")
+    adaptive_bias_max = float(adaptive_params.get("bias_max_pct", 8.0))
+    regime_info = adaptive_cfg.get("market_regime", {})
+    global_ctrl = adaptive_cfg.get("global_controls", {})
+    print(f"[✓] 自適應大盤位階：{regime_info.get('label', '標準箱型')} | 模式：{global_ctrl.get('mode', '標準')} | 乖離防追高上限：{adaptive_bias_max}%")
+
     # 2. 評估作帳時序
     calendar_meta = evaluate_window_dressing_calendar()
     print(f"[✓] 當前台股時序狀態：{calendar_meta['phase_badge']} ({calendar_meta['phase_code']})")
@@ -1211,7 +1303,7 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
     pre_states = []
     for r in resonance_records:
         tmp = dict(r)
-        tmp.update(classify_dual_state_and_pricing(r))
+        tmp.update(classify_dual_state_and_pricing(r, adaptive_params=adaptive_params))
         pre_states.append(tmp)
     group_ranking = calculate_group_ranking(pre_states, group_pool)
     group_rank_map = {g['group_id']: g['rank'] for g in group_ranking}
@@ -1251,7 +1343,8 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
             calendar_meta=calendar_meta,
             overnight_guard=overnight_guard,
             fut_pricing=fut_pricing,
-            group_rank=group_rank_map.get(str(merged.get('group_id', '')).strip())
+            group_rank=group_rank_map.get(str(merged.get('group_id', '')).strip()),
+            adaptive_params=adaptive_params
         )
 
         merged['score'] = score
@@ -1265,11 +1358,11 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
     classified_records = []
     for r in resonance_records:
         merged = dict(r)
-        merged.update(classify_dual_state_and_pricing(r))
+        merged.update(classify_dual_state_and_pricing(r, adaptive_params=adaptive_params))
         classified_records.append(_enrich(merged))
 
     # 7. 4+1 維度硬篩：Tier-1 精選與 Tier-2 潛伏候補並行
-    filtered_list, tier_mode = apply_screening_parallel(classified_records, rescore=_enrich)
+    filtered_list, tier_mode = apply_screening_parallel(classified_records, rescore=_enrich, adaptive_bias_max=adaptive_bias_max)
     n_t1 = sum(1 for it in filtered_list if it.get('tier_mode') == "TIER1_RESONANCE")
     n_t2 = len(filtered_list) - n_t1
     print(f"[✓] 篩選完成！入選檔數：{len(filtered_list)} 檔 (Tier-1 {n_t1} 檔 + Tier-2 {n_t2} 檔，模式: {tier_mode})")
@@ -1348,7 +1441,8 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
         output_rows.append(row)
 
     df_out = pd.DataFrame(output_rows, columns=CSV_COLUMNS)
-    df_out.to_csv(export_path, index=False, encoding='utf-8-sig')
+    from rolling_retention_manager import save_rolling_result_csv
+    df_out = save_rolling_result_csv(export_path, df_out, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功輸出選股報表至: {export_path}")
 
     # 產出 Markdown 戰報 result.md：排行榜 → 各集團個股集中排列 → 個股完整字卡
@@ -1369,6 +1463,7 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
             cards_md=cards_md,
             inst_real_count=inst_real_count,
             inst_total_count=len(market_records),
+            adaptive_cfg=adaptive_cfg,
         )
         with open(MD_FILE, 'w', encoding='utf-8') as f:
             f.write(report_md)

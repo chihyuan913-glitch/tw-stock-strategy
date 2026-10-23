@@ -1042,3 +1042,148 @@ def test_group_pool_strict_uniqueness_and_affiliations():
     g25 = next(g for g in pool if g["group_id"] == "G25_COOLING_AI")
     assert g25["flagship_code"] == "3017", "G25 旗艦應為 3017 奇鋐"
 
+
+
+# ============================================================================
+# 9. 策略 08 旗艦升級：自適應大盤位階、母子價差雷達、季末結帳防禦與成交額精算
+# ============================================================================
+def test_adaptive_regime_integration_and_dynamic_parameters():
+    """
+    驗證策略 08 深度接軌全域自適應操盤引擎 (Rule 19)：
+    1. classify_dual_state_and_pricing 接收 adaptive_params 後，動態微調 TP1/TP2/SL
+       並嚴格維持幾何單調性 (sl < entry < addon < tp1 < tp2)。
+    2. calculate_group_soft_score 支援 season_focus_weight 加權。
+    3. apply_screening_parallel 支援 adaptive_bias_max 依大盤位階動態縮緊乖離上限。
+    """
+    screener = load_screener_module()
+
+    # 1. 自適應定價動態性與單調性檢驗
+    base_stock = {
+        "code": "1605", "name": "華新", "close": 100.0, "open_price": 99.0,
+        "high": 100.5, "low": 98.5, "ma20": 95.0,
+        "inst_1d_lots": 1500, "inst_5d_lots": 3000, "ret_5d_pct": 5.0,
+        "spread_tactical_status": "🟢【母子步調一致】"
+    }
+
+    # 多頭進攻型參數 (tp1=8%, tp2=15%, sl=-5.5%)
+    bull_params = {"tp1_pct": 8.0, "tp2_pct": 15.0, "stop_loss_pct": -5.5}
+    res_bull = screener.classify_dual_state_and_pricing(base_stock, adaptive_params=bull_params)
+    assert res_bull["state_code"] == "GROUP_IGNITION"
+    assert res_bull["sl_price"] < res_bull["entry_price"] < res_bull["addon_price"] < res_bull["tp1_price"] < res_bull["tp2_price"]
+    assert res_bull["tp1_price"] >= 108.0
+
+    # 震盪防禦型參數 (tp1=4.0%, tp2=7.0%, sl=-4.0%)
+    def_params = {"tp1_pct": 4.0, "tp2_pct": 7.0, "stop_loss_pct": -4.0}
+    res_def = screener.classify_dual_state_and_pricing(base_stock, adaptive_params=def_params)
+    assert res_def["sl_price"] < res_def["entry_price"] < res_def["addon_price"] < res_def["tp1_price"] < res_def["tp2_price"]
+
+    # 2. 軟評分之時序加權
+    cal = {"season_bonus": 10, "unwind_bonus": 5, "phase_code": "QUARTER_END_SPRINT"}
+    item = {"state_code": "GROUP_IGNITION", "group_resonance_ratio": 50.0, "inst_1d_lots": 800,
+            "hierarchy_role": "👑【集團領頭羊主攻】"}
+    # 旺季加權 1.3 倍 vs 標準 1.0 倍
+    s_std, _ = screener.calculate_group_soft_score(item, cal, adaptive_params={"season_focus_weight": 1.0})
+    s_boost, _ = screener.calculate_group_soft_score(item, cal, adaptive_params={"season_focus_weight": 1.3})
+    assert s_boost >= s_std, f"旺季加權應使評分提高或持平: boost={s_boost}, std={s_std}"
+
+    # 3. 乖離率防追高上限自適應 (例如短線過熱時上限縮緊為 4.0%)
+    c1 = {"code": "1001", "close": 106.0, "ma20": 100.0, "avg_vol_5d": 1500, "state_code": "GROUP_IGNITION", "group_active_count": 2} # 乖離 6.0%
+    out_wide, _ = screener.apply_screening_parallel([c1], adaptive_bias_max=8.0)
+    out_tight, _ = screener.apply_screening_parallel([c1], adaptive_bias_max=4.0)
+    assert len(out_wide) == 1, "乖離上限 8% 時，乖離 6% 標的應通過"
+    assert len(out_tight) == 0, "乖離上限 4% 時，乖離 6% 標的應被自適應防追高濾除"
+
+
+def test_spread_anomaly_tactical_roles():
+    """
+    驗證母子動態價差乖離指數 (Spread Anomaly Index) 戰術定位判定：
+    - 落後補漲 (spread <= -3.0% 且母強) -> 🚀【低基期落後補漲】
+    - 正乖離過大 (spread >= 8.0% 且子漲 >= 10%) -> ⚠️【正乖離過大・防母提款】
+    - 動能領先 (spread >= 2.0% 且子漲 > 0) -> 👑【動能領頭羊先行】
+    - 正常範圍 -> 🟢【母子步調一致】
+    - 驗證軟評分對落後補漲給予 +5 分獎勵，對高檔提款給予 -5 分風控防禦。
+    """
+    screener = load_screener_module()
+    eval_fn = screener.evaluate_spread_tactical_status
+
+    # (a) 母公司大漲 +6%，子公司漲 +1% (價差 -5%) -> 落後補漲
+    role_laggard = eval_fn(spread_vs_parent_pct=-5.0, parent_ret_5d=6.0, parent_above_ma20=True, member_ret_5d=1.0)
+    assert role_laggard == "🚀【低基期落後補漲】"
+
+    # (b) 子公司大漲 +18%，母公司漲 +5% (價差 +13%) -> 過熱提款
+    role_overheat = eval_fn(spread_vs_parent_pct=13.0, parent_ret_5d=5.0, parent_above_ma20=True, member_ret_5d=18.0)
+    assert role_overheat == "⚠️【正乖離過大・防母提款】"
+
+    # (c) 子公司漲 +6%，母公司漲 +3% (價差 +3%) -> 動能領頭羊
+    role_leader = eval_fn(spread_vs_parent_pct=3.0, parent_ret_5d=3.0, parent_above_ma20=True, member_ret_5d=6.0)
+    assert role_leader == "👑【動能領頭羊先行】"
+
+    # (d) 正常價差
+    role_normal = eval_fn(spread_vs_parent_pct=0.5, parent_ret_5d=2.0, parent_above_ma20=True, member_ret_5d=2.5)
+    assert role_normal == "🟢【母子步調一致】"
+
+    # 檢驗軟評分加減分
+    cal = {"season_bonus": 5, "unwind_bonus": 5}
+    base_item = {"state_code": "GROUP_IGNITION", "group_resonance_ratio": 40.0, "inst_1d_lots": 300,
+                 "hierarchy_role": "🟢【集團協同齊漲】"}
+    item_laggard = dict(base_item, spread_tactical_status="🚀【低基期落後補漲】")
+    item_overheat = dict(base_item, spread_tactical_status="⚠️【正乖離過大・防母提款】")
+    item_normal = dict(base_item, spread_tactical_status="🟢【母子步調一致】")
+
+    s_lag, _ = screener.calculate_group_soft_score(item_laggard, cal)
+    s_norm, _ = screener.calculate_group_soft_score(item_normal, cal)
+    s_over, _ = screener.calculate_group_soft_score(item_overheat, cal)
+    assert s_lag == s_norm + 5, "落後補漲應獲得額外 5 分加分"
+    assert s_over == s_norm - 5, "過熱提款應被扣除 5 分"
+
+
+def test_quarter_end_unwind_defense():
+    """
+    驗證季末結帳出貨防禦機制 (Quarter-End Unwind Defense)：
+    當日曆節氣進入 UNWIND_WARNING_ZONE 且個股近 5 日漲幅 >= 8.0%：
+    若當日高檔爆量長上影線 (upper_shadow >= 30%) 或收黑，強制扣 15 分並標註 unwind_warning。
+    """
+    screener = load_screener_module()
+    cal_unwind = {"phase_code": "UNWIND_WARNING_ZONE", "season_bonus": 5, "unwind_bonus": 12}
+    cal_normal = {"phase_code": "NORMAL_ROTATION", "season_bonus": 5, "unwind_bonus": 0}
+
+    # 短線大漲 +12%，當日上影線 35% 爆量滯漲
+    exhaust_item = {
+        "state_code": "GROUP_IGNITION", "group_resonance_ratio": 50.0, "inst_1d_lots": 500,
+        "hierarchy_role": "👑【集團領頭羊主攻】", "ret_5d_pct": 12.0, "upper_shadow_pct": 35.0,
+        "candle_weak": False
+    }
+
+    s_warn, _ = screener.calculate_group_soft_score(exhaust_item, cal_unwind)
+    s_norm, _ = screener.calculate_group_soft_score(exhaust_item, cal_normal)
+    assert exhaust_item.get("unwind_warning") is True
+    assert s_warn <= s_norm - 15, "季末警戒期爆量上影線標的應被重扣 15 分"
+
+
+def test_group_turnover_calculation_in_ranking():
+    """
+    驗證集團作帳熱度排行榜精算成交額 (turnover_billion_ntd)：
+    1. 每個集團排名物件皆含有大於等於 0 之 turnover_billion_ntd 數值。
+    2. Markdown 表格與 LINE 純文字戰報正確輸出「成交額」或「成交 X.X 億」。
+    """
+    screener = load_screener_module()
+    recs = [
+        {"code": "2330", "group_id": "G25", "group_name": "台積電集團", "close": 1000.0, "volume_lots": 50000, "avg_vol_5d": 40000, "ma20": 980.0, "ret_5d_pct": 3.0, "inst_1d_lots": 5000, "inst_5d_lots": 12000, "flagship_code": "2330", "state_code": "GROUP_IGNITION"},
+        {"code": "5347", "group_id": "G25", "group_name": "台積電集團", "close": 120.0, "volume_lots": 10000, "avg_vol_5d": 8000, "ma20": 115.0, "ret_5d_pct": 2.0, "inst_1d_lots": 1000, "inst_5d_lots": 3000, "flagship_code": "2330", "state_code": "GROUP_IGNITION"},
+    ]
+    ranking = screener.calculate_group_ranking(recs)
+    assert len(ranking) == 1
+    g = ranking[0]
+    assert "turnover_billion_ntd" in g
+    # 2330: 1000 * 50000 * 1000 = 500 億; 5347: 120 * 10000 * 1000 = 12 億 -> 共 512 億
+    assert g["turnover_billion_ntd"] == pytest.approx(512.0, abs=1.0)
+
+    # 驗證 Markdown 戰報表頭包含「成交額(億)」
+    cal = {"phase_badge": "🔥 Q4 年底作帳主升期", "phase_code": "Q4_YEAR_END_PEAK"}
+    md = screener.build_group_markdown_report(ranking, recs, cal, "2026-10-24", "TIER1_RESONANCE")
+    assert "成交額(億)" in md
+    assert "512.0" in md
+
+    # 驗證 LINE 文字包含「成交 512.0 億」
+    line_txt = screener.format_group_ranking_text(ranking, recs, "2026-10-24", cal)
+    assert "成交 512.0 億" in line_txt

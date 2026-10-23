@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔬 台股量化策略實驗室 - 自動化回測戰情室</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #0b0f19; color: #e2e8f0; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-5 gap-4">
+      <div class="flex items-center gap-3">
+        <div class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+          <i data-lucide="flask-conical" class="w-8 h-8"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-bold tracking-tight text-white">台股量化策略實驗室</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full">Quant Lab v1.0</span>
+          </div>
+          <p class="text-sm text-slate-400 mt-0.5">台股原生事件撮合引擎・零未來函數・四大防線狀態機・T+2交割與交易稅費精算</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition border border-slate-700">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> 回戰情總入口
+        </a>
+      </div>
+    </header>
+
+    <!-- Control Panel -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-xl">
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">選擇量化策略</label>
+        <select id="strategySelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+          <option value="01">策略 01: 布林通道下軌超跌反彈 (做多)</option>
+          <option value="02">策略 02: 法人集中起漲動能 (做多)</option>
+          <option value="03">策略 03: 均線下彎弱勢破線 (放空避險)</option>
+          <option value="06">策略 06: 爆量長紅動能突破 (做多)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">回測標的代碼</label>
+        <input id="symbolInput" type="text" value="2330" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="例如: 2330, 2454">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">起始資金 (NT$)</label>
+        <input id="cashInput" type="number" value="1000000" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+      </div>
+      <div class="flex items-end">
+        <button id="runBtn" onclick="runLabBacktest()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition active:scale-95">
+          <i data-lucide="play" class="w-4 h-4 fill-white"></i> 執行事件回測
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <div class="space-y-3">
+      <!-- Row 1: 核心報酬與風險 -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">總報酬率</p>
+          <h3 id="mTotalReturn" class="text-xl font-bold mt-1 text-emerald-400">--</h3>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">年化報酬 (CAGR)</p>
+          <h3 id="mCagr" class="text-xl font-bold mt-1 text-emerald-400">--</h3>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">最大回撤 (MDD)</p>
+          <h3 id="mMdd" class="text-xl font-bold mt-1 text-rose-400">--</h3>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">夏普值 (Sharpe)</p>
+          <h3 id="mSharpe" class="text-xl font-bold mt-1 text-amber-400">--</h3>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">勝率 (Win Rate)</p>
+          <h3 id="mWinRate" class="text-xl font-bold mt-1 text-cyan-400">--</h3>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">獲利因子 (PF)</p>
+          <h3 id="mProfitFactor" class="text-xl font-bold mt-1 text-indigo-400">--</h3>
+        </div>
+      </div>
+
+      <!-- Row 2: 機構級進階指標 (Calmar, Alpha, Beta, 持倉週期) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">卡瑪比率 (Calmar)</p>
+          <h3 id="mCalmar" class="text-lg font-bold mt-1 text-emerald-400">--</h3>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">Alpha (年化超額)</p>
+          <h3 id="mAlpha" class="text-lg font-bold mt-1 text-cyan-400">--</h3>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">Beta (大盤敏感度)</p>
+          <h3 id="mBeta" class="text-lg font-bold mt-1 text-purple-400">--</h3>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">平均持倉天數</p>
+          <h3 id="mHoldingDays" class="text-lg font-bold mt-1 text-slate-200">--</h3>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">最長連勝</p>
+          <h3 id="mConsWins" class="text-lg font-bold mt-1 text-emerald-400">--</h3>
+        </div>
+        <div class="bg-slate-900/40 border border-slate-800/60 p-3.5 rounded-xl">
+          <p class="text-xs font-medium text-slate-400">最長連敗</p>
+          <h3 id="mConsLosses" class="text-lg font-bold mt-1 text-rose-400">--</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart: Equity Curve -->
+    <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="line-chart" class="w-5 h-5 text-emerald-400"></i> 權益曲線 (Equity Curve)
+        </h2>
+        <span id="finalEquityBadge" class="text-xs px-2.5 py-1 bg-slate-800 text-slate-300 rounded-lg border border-slate-700">最終權益: --</span>
+      </div>
+      <div class="h-72 w-full">
+        <canvas id="equityChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Trade History Table -->
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="clipboard-list" class="w-5 h-5 text-emerald-400"></i> 回測成交明細 (Trade History)
+        </h2>
+        <span id="tradeCountBadge" class="text-xs text-slate-400">共 0 筆交易</span>
+      </div>
+      <div class="overflow-x-auto max-h-80">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="text-xs uppercase bg-slate-950/60 text-slate-400 sticky top-0 border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-3">日期</th>
+              <th class="px-4 py-3">標的</th>
+              <th class="px-4 py-3">方向</th>
+              <th class="px-4 py-3">動作</th>
+              <th class="px-4 py-3">成交股數</th>
+              <th class="px-4 py-3">價格</th>
+              <th class="px-4 py-3">手續費/稅</th>
+              <th class="px-4 py-3">已實現損益</th>
+              <th class="px-4 py-3">持有天數</th>
+              <th class="px-4 py-3">原因/防線</th>
+            </tr>
+          </thead>
+          <tbody id="tradeTableBody" class="divide-y divide-slate-800/60">
+            <tr>
+              <td colspan="8" class="px-4 py-8 text-center text-slate-500">尚無回測資料，請點擊上方「執行事件回測」按鈕</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let equityChartInstance = null;
+
+    async function runLabBacktest() {
+      const runBtn = document.getElementById("runBtn");
+      runBtn.disabled = true;
+      runBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 回測運算中...`;
+      lucide.createIcons();
+
+      const strategyId = document.getElementById("strategySelect").value;
+      const symbol = document.getElementById("symbolInput").value.trim() || "2330";
+      const cash = parseFloat(document.getElementById("cashInput").value) || 1000000;
+
+      try {
+        const resp = await fetch("/api/lab/backtest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            strategy_id: strategyId,
+            symbols: [symbol],
+            initial_cash: cash
+          })
+        });
+        const data = await resp.json();
+        if (data.status !== "success") {
+          alert("回測失敗: " + (data.detail || "未知錯誤"));
+          return;
+        }
+
+        renderMetrics(data.metrics);
+        renderChart(data.equity_curve, cash);
+        renderTrades(data.trades);
+      } catch (err) {
+        alert("連線回測服務異常：" + err.message);
+      } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-white"></i> 執行事件回測`;
+        lucide.createIcons();
+      }
+    }
+
+    function renderMetrics(m) {
+      const fmtPct = (val, elId, isMdd=false) => {
+        const el = document.getElementById(elId);
+        el.innerText = (val >= 0 ? "+" : "") + val.toFixed(2) + "%";
+        if (isMdd) {
+          el.className = "text-xl font-bold mt-1 text-rose-400";
+        } else {
+          el.className = val >= 0 ? "text-xl font-bold mt-1 text-emerald-400" : "text-xl font-bold mt-1 text-rose-400";
+        }
+      };
+
+      fmtPct(m.total_return_pct, "mTotalReturn");
+      fmtPct(m.cagr_pct, "mCagr");
+      document.getElementById("mMdd").innerText = "-" + m.max_drawdown_pct.toFixed(2) + "%";
+      document.getElementById("mSharpe").innerText = m.sharpe_ratio.toFixed(2);
+      document.getElementById("mWinRate").innerText = m.win_rate.toFixed(1) + "%";
+      document.getElementById("mProfitFactor").innerText = m.profit_factor >= 999 ? "∞" : m.profit_factor.toFixed(2);
+      document.getElementById("finalEquityBadge").innerText = `最終權益: NT$ ${m.final_equity.toLocaleString()}`;
+
+      // 機構級進階指標渲染
+      document.getElementById("mCalmar").innerText = (m.calmar_ratio || 0).toFixed(2);
+      const alphaEl = document.getElementById("mAlpha");
+      const alphaVal = m.alpha_pct || 0.0;
+      alphaEl.innerText = (alphaVal >= 0 ? "+" : "") + alphaVal.toFixed(2) + "%";
+      alphaEl.className = alphaVal >= 0 ? "text-lg font-bold mt-1 text-cyan-400" : "text-lg font-bold mt-1 text-rose-400";
+      document.getElementById("mBeta").innerText = (m.beta || 1.0).toFixed(2);
+      document.getElementById("mHoldingDays").innerText = (m.avg_holding_days || 0).toFixed(1) + " 天";
+      document.getElementById("mConsWins").innerText = (m.max_cons_wins || 0) + " 連勝";
+      document.getElementById("mConsLosses").innerText = (m.max_cons_losses || 0) + " 連敗";
+    }
+
+    function renderChart(curve, initialCash) {
+      const labels = curve.map(c => c.date);
+      const values = curve.map(c => c.total_equity);
+
+      const ctx = document.getElementById('equityChart').getContext('2d');
+      if (equityChartInstance) {
+        equityChartInstance.destroy();
+      }
+
+      equityChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '總權益 (NT$)',
+            data: values,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.2,
+            pointRadius: values.length > 50 ? 0 : 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` 權益: NT$ ${ctx.raw.toLocaleString()}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', font: { size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: {
+                color: '#94a3b8',
+                callback: (val) => 'NT$' + (val / 1000).toFixed(0) + 'k'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTrades(trades) {
+      const tbody = document.getElementById("tradeTableBody");
+      document.getElementById("tradeCountBadge").innerText = `共 ${trades.length} 筆交易`;
+
+      if (!trades || trades.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">此區間未觸發交易條件</td></tr>`;
+        return;
+      }
+
+      let html = "";
+      for (const t of trades) {
+        const isLong = (t.direction || "LONG") === "LONG";
+        const dirBadge = isLong
+          ? `<span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">做多 LONG</span>`
+          : `<span class="px-2 py-0.5 text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-full">放空 SHORT</span>`;
+
+        const isEntry = t.action.includes("ENTRY") || t.action.includes("SHORT") && !t.action.includes("COVER");
+        const actionBadge = isEntry
+          ? `<span class="px-2 py-0.5 text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 rounded-full">${t.action}</span>`
+          : `<span class="px-2 py-0.5 text-xs font-semibold ${t.realized_pnl >= 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'} rounded-full">${t.action}</span>`;
+
+        const pnlStr = !isEntry
+          ? `<span class="${t.realized_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-semibold">NT$ ${t.realized_pnl > 0 ? '+' : ''}${t.realized_pnl.toLocaleString()} (${t.pnl_pct > 0 ? '+' : ''}${t.pnl_pct}%)</span>`
+          : `<span class="text-slate-500">--</span>`;
+
+        const holdingStr = !isEntry ? `${t.holding_days || 1} 天` : `--`;
+
+        html += `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-4 py-2.5 text-xs text-slate-400 font-mono">${t.date}</td>
+            <td class="px-4 py-2.5 font-bold text-white">${t.symbol}</td>
+            <td class="px-4 py-2.5">${dirBadge}</td>
+            <td class="px-4 py-2.5">${actionBadge}</td>
+            <td class="px-4 py-2.5 text-right font-mono">${t.shares.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-mono">NT$ ${t.price.toFixed(2)}</td>
+            <td class="px-4 py-2.5 text-right text-xs text-slate-400 font-mono">NT$ ${(t.commission + t.tax).toFixed(0)}</td>
+            <td class="px-4 py-2.5 text-right font-mono">${pnlStr}</td>
+            <td class="px-4 py-2.5 text-center text-xs text-slate-400 font-mono">${holdingStr}</td>
+            <td class="px-4 py-2.5 text-xs text-slate-400">${t.reason}</td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      // 頁面初次載入自動執行預設回測
+      runLabBacktest();
+    });
+  </script>
+</body>
+</html>

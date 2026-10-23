@@ -40,8 +40,12 @@ spec_scan.loader.exec_module(scanner_06)
 get_market_progress_ratio = scanner_06.get_market_progress_ratio
 calculate_projected_volume = scanner_06.calculate_projected_volume
 evaluate_volume_surge_and_alert = scanner_06.evaluate_volume_surge_and_alert
+evaluate_intraday_trailing_stop = scanner_06.evaluate_intraday_trailing_stop
+HIGH_WATER_MARKS = scanner_06.HIGH_WATER_MARKS
+TRAILING_STOPPED = scanner_06.TRAILING_STOPPED
 TRIGGERED_LEVELS = scanner_06.TRIGGERED_LEVELS
 TZ_TW = scanner_06.TZ_TW
+from adaptive_regime_manager import load_adaptive_config, get_strategy_adaptive_params
 from line_sender import resolve_strategy_meta
 from run_all import STRATEGIES as RUN_ALL_STRATEGIES
 from run_all_intraday import INTRADAY_STRATEGIES as RUN_INTRADAY_STRATEGIES
@@ -51,7 +55,7 @@ class TestVolumeSurgeEngine:
     """一、時間加權動態預估量與開盤進度比例測試"""
 
     def test_market_progress_ratio_boundaries(self):
-        """測試盤中不同時間點的進度比計算與邊界平滑防呆"""
+        """測試盤中不同時間點的進度比計算與非線性/線性雙模型驗證"""
         base_day = datetime.date(2026, 10, 16)
 
         # 1. 盤前 (08:30) -> 回傳防呆下限 0.05
@@ -62,10 +66,14 @@ class TestVolumeSurgeEngine:
         t_early = datetime.datetime.combine(base_day, datetime.time(9, 5), tzinfo=TZ_TW)
         assert get_market_progress_ratio(t_early) == 0.05
 
-        # 3. 盤中中段 (11:15，經過 135 分鐘，剛好一半 135/270)
+        # 3-A. 線性模型下的盤中中段 (11:15，經過 135 分鐘，剛好一半 135/270 = 0.50)
         t_mid = datetime.datetime.combine(base_day, datetime.time(11, 15), tzinfo=TZ_TW)
-        progress_mid = get_market_progress_ratio(t_mid)
-        assert pytest.approx(progress_mid, 0.01) == 0.50
+        progress_mid_linear = get_market_progress_ratio(t_mid, method='linear')
+        assert pytest.approx(progress_mid_linear, 0.01) == 0.50
+
+        # 3-B. 機構級非線性時段加權模型 (11:15，早盤權重較高，累積進度比約 54.4%)
+        progress_mid_emp = get_market_progress_ratio(t_mid, method='empirical')
+        assert pytest.approx(progress_mid_emp, 0.01) == 0.544
 
         # 4. 尾盤收盤 (13:30) -> 回傳 1.0
         t_close = datetime.datetime.combine(base_day, datetime.time(13, 30), tzinfo=TZ_TW)
@@ -285,3 +293,196 @@ class TestSystemIntegrationRegistry:
         assert "6112 邁達特" in clean_text
         assert "2332 友訊" in clean_text
         assert "爆量" in clean_text
+
+
+class TestAdaptiveRegimeIntegration:
+    """六、全域大盤位階自適應整合測試 (Adaptive Market Regime)"""
+
+    def test_adaptive_parameters_extraction(self):
+        """測試策略 06 自適應參數提取與預設防呆回退"""
+        cfg = load_adaptive_config()
+        params = get_strategy_adaptive_params("06", cfg)
+
+        assert 'rvol_threshold' in params
+        assert 'bias_threshold' in params
+        assert 'tp1_ratio' in params
+        assert 'tp2_ratio' in params
+        assert 'stop_loss_pct' in params
+        assert 'trailing_activation_pct' in params
+        assert 'trailing_pullback_pct' in params
+        assert 'max_recommendations' in params
+
+        # 檢驗數值合理邊界
+        assert 1.8 <= params['rvol_threshold'] <= 3.0
+        assert 5.0 <= params['bias_threshold'] <= 10.0
+        assert params['tp1_ratio'] >= 1.05
+        assert params['tp2_ratio'] > params['tp1_ratio']
+        assert -8.0 <= params['stop_loss_pct'] <= -3.0
+        assert params['max_recommendations'] <= 10
+
+    def test_mock_regime_scenarios(self):
+        """測試不同市場狀態下的參數自適應防禦與攻擊特性"""
+        mock_bull_cfg = {
+            "current_regime": "BULL_AGGRESSIVE",
+            "regime_name": "多頭主攻攻擊位階",
+            "bias_max_mult": 1.15,
+            "tp_target_mult": 1.20,
+            "sl_tighten_mult": 1.0,
+            "max_picks": 6
+        }
+        bull_params = get_strategy_adaptive_params("06", mock_bull_cfg)
+        assert bull_params['tp1_ratio'] > 1.08  # 多頭目標拔高
+        assert bull_params['bias_threshold'] > 8.0  # 乖離容忍度提升
+
+        mock_bear_cfg = {
+            "current_regime": "BEAR_DEFENSIVE",
+            "regime_name": "空頭防禦風控位階",
+            "bias_max_mult": 0.70,
+            "tp_target_mult": 0.80,
+            "sl_tighten_mult": 0.85,
+            "max_picks": 3
+        }
+        bear_params = get_strategy_adaptive_params("06", mock_bear_cfg)
+        assert bear_params['tp1_ratio'] < bull_params['tp1_ratio']  # 熊市提早停利
+        assert bear_params['bias_threshold'] < bull_params['bias_threshold']  # 嚴格壓低乖離防追高
+        assert bear_params['max_recommendations'] <= 3
+
+
+class TestInstitutionalQualityScoring:
+    """七、法人吃貨鎖碼純度評估 (Institutional Volume Quality) 測試"""
+
+    def test_institutional_lockup_high_quality(self):
+        """測試法人大額吃貨鎖碼 (淨買超佔比 >= 20%) -> 標籤與加分 (+20)"""
+        score, stars, q_data = calculate_score_and_stars(
+            rvol=3.0,
+            solid_ratio=0.85,
+            foreign_lots=1200,
+            trust_lots=300,
+            curr_vol_lots=5000,
+            broker_penalty=0,
+            return_quality=True
+        )
+        assert q_data['inst_absorption_ratio'] == 30.0  # 1500 / 5000 = 30%
+        assert "法人吃貨鎖碼" in q_data['quality_label']
+        assert q_data['quality_bonus'] == 20
+        assert score >= 85
+        assert stars == "★★★★★"
+
+    def test_institutional_dumping_retail_trap(self):
+        """測試主力倒貨散戶出貨 (淨賣超佔比 <= -5%) -> 標籤與扣分 (-5)"""
+        score, stars, q_data = calculate_score_and_stars(
+            rvol=3.0,
+            solid_ratio=0.70,
+            foreign_lots=-300,
+            trust_lots=-100,
+            curr_vol_lots=5000,
+            broker_penalty=0,
+            return_quality=True
+        )
+        assert q_data['inst_absorption_ratio'] == -8.0  # -400 / 5000 = -8%
+        assert "主力調節倒貨" in q_data['quality_label']
+        assert q_data['quality_bonus'] == -5
+        assert score < 75
+
+    def test_neutral_healthy_rotation(self):
+        """測試常態良性換手整理 (買超佔比 0% ~ 10%) -> 標籤與加分 (+5)"""
+        _, _, q_data = calculate_score_and_stars(
+            rvol=2.5,
+            solid_ratio=0.75,
+            foreign_lots=200,
+            trust_lots=50,
+            curr_vol_lots=5000,
+            return_quality=True
+        )
+        assert q_data['inst_absorption_ratio'] == 5.0
+        assert "良性換手" in q_data['quality_label']
+        assert q_data['quality_bonus'] == 5
+
+
+class TestIntradayTrailingStop:
+    """八、盤中高水位動態移動停利 (High-Water Mark Trailing Stop) 測試"""
+
+    def setup_method(self):
+        HIGH_WATER_MARKS.clear()
+        TRAILING_STOPPED.clear()
+
+    def test_trailing_stop_activation_and_pullback_trigger(self):
+        """測試未達啟動門檻、達標未回撤、達標回撤觸發與同日去重防呆"""
+        target = {
+            'code': '8888',
+            'name': '動態起漲股',
+            'entry_price': 100.0,
+            'v5_avg': 2000
+        }
+
+        # 1. 案例一：未達啟動門檻 (最高價 103 元，漲幅 +3.0% < +4.5%)
+        snap_low_gain = {
+            'price': 101.5,
+            'high': 103.0,
+            'low': 99.5,
+            'open': 100.0,
+            'volume_lots': 1500,
+            'change_pct': 1.5
+        }
+        ok, _ = evaluate_intraday_trailing_stop(
+            target, snap_low_gain, activation_pct=4.5, pullback_limit_pct=2.0, force_pass=True
+        )
+        assert ok is False
+        assert HIGH_WATER_MARKS['8888'] == 103.0
+
+    def test_trailing_stop_pullback_execution(self):
+        """測試獲利達標後自高點回檔超過 2.0% 精準觸發"""
+        target = {
+            'code': '8888',
+            'name': '動態起漲股',
+            'entry_price': 100.0,
+            'v5_avg': 2000
+        }
+
+        # 2. 案例二：高點攻上 108 元 (波段 +8.0% >= +4.5% 啟動)，現價 107.5 元 (拉回 0.46% < 2.0%)
+        snap_high = {
+            'price': 107.5,
+            'high': 108.0,
+            'low': 99.5,
+            'open': 100.0,
+            'volume_lots': 3500,
+            'change_pct': 7.5
+        }
+        ok, _ = evaluate_intraday_trailing_stop(
+            target, snap_high, activation_pct=4.5, pullback_limit_pct=2.0, force_pass=True
+        )
+        assert ok is False
+        assert HIGH_WATER_MARKS['8888'] == 108.0
+
+        # 3. 案例三：盤中急殺回吐，現價跌至 105.0 元 (自 108 元拉回 2.78% >= 2.0%)
+        snap_pullback = {
+            'price': 105.0,
+            'high': 108.0,
+            'low': 99.5,
+            'open': 100.0,
+            'volume_lots': 4200,
+            'change_pct': 5.0
+        }
+        ok, event_info = evaluate_intraday_trailing_stop(
+            target, snap_pullback, activation_pct=4.5, pullback_limit_pct=2.0, force_pass=True
+        )
+        assert ok is True
+        assert event_info['event_type'] == "TRAILING_STOP"
+        assert "移動停利保全獲利" in event_info['event_title']
+        assert event_info['hwm'] == 108.0
+        assert event_info['pullback_pct'] == 2.78
+        assert '8888' in TRAILING_STOPPED
+
+        # 4. 案例四：同日再度下跌至 103.0 元 (去重抑制，絕不洗版)
+        snap_further_drop = {
+            'price': 103.0,
+            'high': 108.0,
+            'low': 99.5,
+            'open': 100.0,
+            'volume_lots': 4800,
+            'change_pct': 3.0
+        }
+        ok_dup, _ = evaluate_intraday_trailing_stop(
+            target, snap_further_drop, activation_pct=4.5, pullback_limit_pct=2.0, force_pass=True
+        )
+        assert ok_dup is False

@@ -681,7 +681,8 @@ def run_screener(export_csv: bool = True, send_line: bool = False, pool_path: st
 
     # 匯出 CSV (UTF-8-BOM 編碼，Excel 開啟不亂碼)
     if export_csv:
-        df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+        from rolling_retention_manager import save_rolling_result_csv
+        df = save_rolling_result_csv(CSV_FILE, df, today_date_str=date_str, max_days=5)
         print(f"[+] 報表已匯出至: {CSV_FILE}")
 
     # 格式化 Markdown 卡片戰報

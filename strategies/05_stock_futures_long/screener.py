@@ -571,7 +571,9 @@ def main():
         if not os.path.isabs(export_path) and os.path.dirname(export_path) == "":
             export_path = os.path.join(os.path.dirname(__file__), export_path)
         if export_path.endswith('.csv'):
-            df_res.to_csv(export_path, index=False, encoding='utf-8-sig')
+            from rolling_retention_manager import save_rolling_result_csv
+            target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
+            df_res = save_rolling_result_csv(export_path, df_res, today_date_str=target_date, max_days=5)
             print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
             # 同步產出視覺化字卡 Markdown 戰報
             md_path = export_path[:-4] + ".md"

@@ -311,7 +311,8 @@ def run_screener(date_str=None, export_path=None, send_line=False):
         out_file = export_path
         if not os.path.isabs(out_file):
             out_file = os.path.join(os.path.dirname(__file__), export_path)
-        df.to_csv(out_file, index=False, encoding='utf-8-sig')
+        from rolling_retention_manager import save_rolling_result_csv
+        df = save_rolling_result_csv(out_file, df, today_date_str=date_str, max_days=5)
         print(f"[✓] 選股報表已成功匯出至：{out_file} (UTF-8-BOM 編碼，Excel 開啟不亂碼)")
 
         # 同步產出視覺化字卡 Markdown 戰報

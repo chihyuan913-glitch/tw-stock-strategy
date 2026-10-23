@@ -651,6 +651,9 @@ def build_price_alert_card(
     elif event_type == "ENTRY":
         pill_bg = "#14532D"
         pill_text = "#BBF7D0"
+    elif event_type in ["TRAILING_STOP", "TRAILING"]:
+        pill_bg = "#701A75"
+        pill_text = "#F5D0FE"
     else:
         pill_bg = "#1E293B"
         pill_text = "#94A3B8"

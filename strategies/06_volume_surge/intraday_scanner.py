@@ -42,6 +42,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
 from line_sender import (
     send_to_line,
     build_price_alert_card,
@@ -71,14 +72,23 @@ WATCHLIST_FILE = os.path.join(ROOT_DIR, 'watchlist.json')
 # 階梯式去重狀態機：{code: int_level (0: 無, 1: 已發L1, 2: 已發L2)}
 TRIGGERED_LEVELS = {}
 
+# 盤中最高水位追蹤與動態移動停利狀態機 (Trailing Stop)
+HIGH_WATER_MARKS = {}           # {code: float_highest_price}
+TRAILING_STOPPED = set()        # {code}
 
-def get_market_progress_ratio(now_dt: datetime.datetime = None) -> float:
+
+def get_market_progress_ratio(now_dt: datetime.datetime = None, method: str = "empirical") -> float:
     """
     計算台股盤中開盤時間進度比例 Pt (09:00 ~ 13:30，共 270 分鐘)
-    - 開盤前 (<09:00)：回傳 0.05 (以平滑預熱防呆)
-    - 09:00~09:15：為避免早盤 10 分鐘極端毛刺，下限鎖定為 0.05 (13.5分鐘)
-    - 09:15~13:30：精確進度 (經過分鐘數 / 270.0)
-    - 收盤後 (>=13:30)：回傳 1.0
+    支援兩種模式：
+    1. 'empirical' (機構級分段時間加權模型，預設)：
+       - 09:00~09:13.5 (早盤防毛刺期)：鎖定平滑下限 0.05
+       - 09:13.5~09:30 (早盤動能開展期)：進度由 0.05 平滑升至 0.18
+       - 09:30~12:00 (盤中趨勢延續期)：進度由 0.18 平滑升至 0.70
+       - 12:00~13:30 (尾盤收斂結算期)：進度由 0.70 平滑升至 1.00
+       大幅降低早盤線性外推引發的虛報暴量毛刺！
+    2. 'linear' (傳統線性模型)：
+       - 經過分鐘數 / 270.0，下限 0.05
     """
     if now_dt is None:
         now_dt = datetime.datetime.now(TZ_TW)
@@ -92,7 +102,26 @@ def get_market_progress_ratio(now_dt: datetime.datetime = None) -> float:
         return 1.0
 
     elapsed_minutes = (now_dt - open_time).total_seconds() / 60.0
-    progress = elapsed_minutes / 270.0
+    t = elapsed_minutes
+
+    if method == "linear":
+        progress = t / 270.0
+        return max(0.05, min(1.0, progress))
+
+    # empirical: 機構級非線性時段加權模型
+    if t <= 13.5:
+        # 早盤前 13.5 分鐘防毛刺鎖定 0.05
+        return 0.05
+    elif t <= 30.0:
+        # 09:13.5 ~ 09:30: 0.05 -> 0.18
+        progress = 0.05 + 0.13 * ((t - 13.5) / 16.5)
+    elif t <= 180.0:
+        # 09:30 ~ 12:00: 0.18 -> 0.70
+        progress = 0.18 + 0.52 * ((t - 30.0) / 150.0)
+    else:
+        # 12:00 ~ 13:30: 0.70 -> 1.00
+        progress = 0.70 + 0.30 * ((t - 180.0) / 90.0)
+
     return max(0.05, min(1.0, progress))
 
 
@@ -306,9 +335,9 @@ def fetch_intraday_snapshot(codes: list) -> dict:
     return snapshots
 
 
-def evaluate_volume_surge_and_alert(target: dict, snap: dict, progress_ratio: float, force_pass: bool = False) -> tuple:
+def evaluate_volume_surge_and_alert(target: dict, snap: dict, progress_ratio: float, force_pass: bool = False, surge_threshold: float = 2.5) -> tuple:
     """
-    評估單檔個股是否觸發階梯式爆量警報
+    評估單檔個股是否觸發階梯式爆量警報 (支援自適應量比門檻)
     回傳: (should_alert, alert_level, rvol, event_info)
     """
     code = target['code']
@@ -319,11 +348,11 @@ def evaluate_volume_surge_and_alert(target: dict, snap: dict, progress_ratio: fl
 
     curr_level = TRIGGERED_LEVELS.get(code, 0)
 
-    # 1. 量比門檻檢查 (階梯式 4-A)
+    # 1. 量比門檻檢查 (自適應階梯式 4-A)
     target_level = 0
     if rvol >= 4.0 and curr_level < 2:
         target_level = 2
-    elif rvol >= 2.5 and curr_level < 1:
+    elif rvol >= surge_threshold and curr_level < 1:
         target_level = 1
 
     if target_level == 0:
@@ -373,6 +402,91 @@ def evaluate_volume_surge_and_alert(target: dict, snap: dict, progress_ratio: fl
     }
 
     return True, target_level, rvol, event_info
+
+
+def evaluate_intraday_trailing_stop(
+    target: dict,
+    snap: dict,
+    activation_pct: float = 4.5,
+    pullback_limit_pct: float = 2.0,
+    force_pass: bool = False
+) -> tuple:
+    """
+    盤中高水位動態移動停利評估引擎 (High-Water Mark Trailing Stop)
+    邏輯:
+    1. 追蹤當日最高價 (High-Water Mark, HWM)。
+    2. 若自進場成本/開盤價起算波段最大漲幅 >= activation_pct (預設 +4.5%)，啟動移動停利機制。
+    3. 自當日最高點拉回 >= pullback_limit_pct (預設 2.0%)，觸發保全獲利告警。
+    4. 套用防毛刺守門器過濾 1-tick 瞬間假跌破。
+
+    回傳: (should_alert: bool, event_info: dict or None)
+    """
+    code = target['code']
+    price = snap['price']
+
+    # 1. 成本基準估算
+    cost_price = target.get('entry_price', 0.0)
+    if cost_price <= 0:
+        cost_price = snap.get('open', price)
+    if cost_price <= 0:
+        return False, None
+
+    # 2. 更新並維護高水位 High-Water Mark
+    current_high = max(snap.get('high', price), price)
+    prev_hwm = HIGH_WATER_MARKS.get(code, 0.0)
+    hwm = max(prev_hwm, current_high)
+    HIGH_WATER_MARKS[code] = hwm
+
+    # 3. 檢驗是否達到啟動門檻 (例如波段漲幅 >= +4.5%)
+    max_gain_pct = ((hwm - cost_price) / cost_price) * 100.0
+    if max_gain_pct < activation_pct:
+        return False, None
+
+    # 4. 檢驗高檔回撤幅度 (自最高點拉回)
+    pullback_pct = ((hwm - price) / hwm) * 100.0
+    if pullback_pct < pullback_limit_pct:
+        return False, None
+
+    # 5. 防重複觸發檢驗
+    if code in TRAILING_STOPPED:
+        return False, None
+
+    # 6. 防毛刺守門檢驗
+    trailing_target_price = round(hwm * (1.0 - pullback_limit_pct / 100.0), 2)
+    is_tick_confirmed, _ = GLOBAL_TICK_GUARD.check_confirmation(
+        code=code,
+        event_code="TRAILING_STOP",
+        current_price=price,
+        target_price=trailing_target_price,
+        force_pass=force_pass
+    )
+    if not is_tick_confirmed:
+        return False, None
+
+    # 7. 判定通過，註記已觸發
+    TRAILING_STOPPED.add(code)
+
+    event_type = "TRAILING_STOP"
+    event_title = "🔒【高檔回馬槍・移動停利保全獲利】"
+    event_desc = (
+        f"盤中創波段最高點 {hwm} 元 (波段最高利潤 +{round(max_gain_pct, 1)}%)，"
+        f"現價拉回至 {price} 元 (自高點回吐 {round(pullback_pct, 1)}%)，"
+        f"已跌破動態移動防守線 {trailing_target_price} 元！建議分批落袋為安，守住主升段戰果！"
+    )
+
+    event_info = {
+        'event_type': event_type,
+        'event_title': event_title,
+        'event_desc': event_desc,
+        'hwm': hwm,
+        'cost_price': cost_price,
+        'max_gain_pct': round(max_gain_pct, 2),
+        'pullback_pct': round(pullback_pct, 2),
+        'trailing_target_price': trailing_target_price,
+        'rvol': round(snap.get('volume_lots', 0) / max(target.get('v5_avg', 1000), 1), 2)
+    }
+
+    return True, event_info
 
 
 def send_surge_alert(target: dict, snap: dict, event_info: dict):
@@ -440,25 +554,38 @@ def send_aggregated_price_alerts(alerts: list):
 
 
 def scan_once(pool: dict, progress_ratio: float):
-    """執行單次快篩巡邏 (支援多檔到價合併發送，省額度防洗版)"""
+    """執行單次快篩巡邏 (支援自適應動態門檻、爆量起漲 ＋ 盤中移動停利多檔合併發送)"""
     codes = list(pool.keys())
     print(f"[*] 正在獲取 {len(codes)} 檔監控標的之盤中即時快照 (進度比: {round(progress_ratio*100, 1)}%)...")
+
+    # 1. 載入大盤自適應動態門檻
+    try:
+        adaptive_cfg = load_adaptive_config()
+        strat_params = get_strategy_adaptive_params("06", adaptive_cfg)
+    except Exception:
+        strat_params = {}
+
+    surge_threshold = strat_params.get("rvol_threshold", 2.2)
+    trailing_activation = strat_params.get("trailing_activation_pct", 4.5)
+    trailing_pullback = strat_params.get("trailing_pullback_pct", 2.0)
 
     snapshots = fetch_intraday_snapshot(codes)
     triggered_alerts = []
 
     for code, snap in snapshots.items():
         target = pool[code]
-        should_alert, new_level, rvol, event_info = evaluate_volume_surge_and_alert(
+
+        # 檢驗 (A): 異常爆量起漲動能判定
+        should_alert_surge, new_level, rvol, event_info_surge = evaluate_volume_surge_and_alert(
             target=target,
             snap=snap,
-            progress_ratio=progress_ratio
+            progress_ratio=progress_ratio,
+            surge_threshold=surge_threshold
         )
-        if should_alert:
+        if should_alert_surge:
             TRIGGERED_LEVELS[code] = new_level
-            # 準備四大防線與即時報價結構
-            price = snap['price']
             t_copy = dict(target)
+            price = snap['price']
             if t_copy.get('entry_price', 0) == 0:
                 t_copy['entry_price'] = round(price * 1.01, 2)
             if t_copy.get('addon_price', 0) == 0:
@@ -482,10 +609,38 @@ def scan_once(pool: dict, progress_ratio: float):
                 'target': t_copy,
                 'rt': rt_data,
                 'snap': snap,
-                'event_code': event_info['event_type'],
-                'event_title': event_info['event_title'],
-                'event_desc': event_info['event_desc'],
-                'event_info': event_info
+                'event_code': event_info_surge['event_type'],
+                'event_title': event_info_surge['event_title'],
+                'event_desc': event_info_surge['event_desc'],
+                'event_info': event_info_surge
+            })
+
+        # 檢驗 (B): 高水位回撤動態移動停利判定 (Trailing Stop)
+        should_alert_trailing, event_info_trailing = evaluate_intraday_trailing_stop(
+            target=target,
+            snap=snap,
+            activation_pct=trailing_activation,
+            pullback_limit_pct=trailing_pullback
+        )
+        if should_alert_trailing:
+            t_copy = dict(target)
+            price = snap['price']
+            rt_data = {
+                'price': price,
+                'high': snap['high'],
+                'low': snap['low'],
+                'open': snap['open'],
+                'volume': snap['volume_lots'],
+                'change_pct': snap['change_pct']
+            }
+            triggered_alerts.append({
+                'target': t_copy,
+                'rt': rt_data,
+                'snap': snap,
+                'event_code': event_info_trailing['event_type'],
+                'event_title': event_info_trailing['event_title'],
+                'event_desc': event_info_trailing['event_desc'],
+                'event_info': event_info_trailing
             })
 
     print(f"[✓] 快篩巡邏完成，已檢驗 {len(snapshots)} 檔，本次觸發告警: {len(triggered_alerts)} 筆。")
@@ -501,8 +656,44 @@ def scan_once(pool: dict, progress_ratio: float):
         send_aggregated_price_alerts(triggered_alerts)
 
 
-def test_push_alert():
-    """模擬發送測試卡片至 LINE (驗證連線與排版)"""
+def test_push_alert(test_type: str = "surge"):
+    """模擬發送測試卡片至 LINE (驗證連線與排版，支援爆量起漲與動態移動停利)"""
+    if test_type == "trailing":
+        print(f"[*] 正在準備發送【{STRATEGY_NAME}】模擬動態移動停利測試卡片...")
+        demo_target = {
+            'code': '2330',
+            'name': '台積電',
+            'stars': '★★★★★',
+            'entry_price': 1050.0,
+            'addon_price': 1080.0,
+            'tp1_price': 1140.0,
+            'tp2_price': 1215.0,
+            'sl_price': 1020.0,
+            'v5_avg': 28500
+        }
+        demo_snap = {
+            'price': 1075.0,
+            'high': 1100.0,
+            'low': 1045.0,
+            'open': 1050.0,
+            'volume_lots': 38000,
+            'change_pct': 2.38
+        }
+        demo_event = {
+            'event_type': 'TRAILING_STOP',
+            'event_title': '🔒【高檔回馬槍・移動停利保全獲利・模擬測試】',
+            'event_desc': '盤中創波段高點 1100 元 (最高利潤 +4.76%) 後，現價拉回至 1075 元 (自高點回吐 2.27%)，觸發動態防守線！建議分批收網保本！',
+            'rvol': 3.42,
+            'hwm': 1100.0,
+            'cost_price': 1050.0,
+            'max_gain_pct': 4.76,
+            'pullback_pct': 2.27,
+            'trailing_target_price': 1078.0
+        }
+        send_surge_alert(demo_target, demo_snap, demo_event)
+        print(f"[✓] 策略 06 模擬動態移動停利戰訊卡已成功發送！")
+        return
+
     print(f"[*] 正在準備發送【{STRATEGY_NAME}】模擬到價快訊測試卡片...")
     demo_target = {
         'code': '2330',
@@ -542,15 +733,20 @@ def main():
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
     parser.add_argument("--once", action="store_true", help="執行單次快篩巡邏後結束")
     parser.add_argument("--test-push", "--force-test", dest="test_push", action="store_true", help="一鍵發送模擬爆量戰訊卡至 LINE 測試連線")
+    parser.add_argument("--test-trailing", action="store_true", help="一鍵發送模擬動態移動停利戰訊卡至 LINE 測試連線")
     args = parser.parse_args()
 
+    if args.test_trailing:
+        test_push_alert(test_type="trailing")
+        return
+
     if args.test_push:
-        test_push_alert()
+        test_push_alert(test_type="surge")
         return
 
     now_tw = datetime.datetime.now(TZ_TW)
     print("=" * 70)
-    print(f"📡 【{STRATEGY_NAME}】盤中即時雷達啟動")
+    print(f"📡 【{STRATEGY_NAME}】盤中即時雷達啟動 (V2.0 自適應與動態移動停利旗艦版)")
     print(f"⏰ 當前台灣時間: {now_tw.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"⚡ 輪詢間隔: {args.interval} 秒 | 單次快篩: {args.once}")
     print("=" * 70)

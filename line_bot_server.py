@@ -58,6 +58,12 @@ CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or ENV.get("L
 
 app = FastAPI(title="台股盤中即時隨傳隨回 LINE Bot")
 
+try:
+    from lab.web.router import router as lab_router
+    app.include_router(lab_router)
+except Exception as _err:
+    pass
+
 import collections
 import datetime
 
@@ -934,30 +940,43 @@ async def get_strategy_data(strat_id: str):
                     r['position_badge'] = '⚠️ 高於進場價'
                     r['position_desc'] = f'溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)'
 
-        # 解析戰報交易日期
+        # 解析戰報交易日期與 5 日滾動統計
         date_str = ""
-        md_file = csv_file.parent / "result.md"
-        if md_file.exists():
-            try:
-                with open(md_file, "r", encoding="utf-8") as mf:
-                    for line in mf:
-                        if "交易日期" in line:
-                            import re
-                            m = re.search(r'[`\s](\d{4}[-/]?\d{2}[-/]?\d{2})', line)
-                            if m:
-                                date_str = m.group(1)
-                            break
-            except Exception:
-                pass
+        if "選股日期" in df.columns and not df["選股日期"].dropna().empty:
+            dates = sorted([str(d).strip() for d in df["選股日期"].dropna().unique() if str(d).strip()], reverse=True)
+            if dates:
+                date_str = dates[0]
+
+        if not date_str:
+            md_file = csv_file.parent / "result.md"
+            if md_file.exists():
+                try:
+                    with open(md_file, "r", encoding="utf-8") as mf:
+                        for line in mf:
+                            if "交易日期" in line or "產出時間" in line:
+                                import re
+                                m = re.search(r'[`\s](\d{4}[-/]?\d{2}[-/]?\d{2})', line)
+                                if m:
+                                    date_str = m.group(1)
+                                break
+                except Exception:
+                    pass
         if not date_str:
             import datetime
             mtime = datetime.datetime.fromtimestamp(csv_file.stat().st_mtime)
             date_str = mtime.strftime('%Y-%m-%d')
 
+        today_rows = [r for r in rows if str(r.get('選股日期', '')).strip() == date_str or 'T+0' in str(r.get('入選天數', '')) or '今日' in str(r.get('狀態標註', ''))]
+        today_count = len(today_rows)
+        tracking_count = len(rows) - today_count
+
         return {
             "name": meta["name"],
             "desc": meta["desc"],
             "date": date_str,
+            "total_count": len(rows),
+            "today_count": today_count,
+            "tracking_count": tracking_count,
             "columns": cols,
             "rows": rows
         }

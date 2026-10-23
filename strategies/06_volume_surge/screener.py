@@ -43,6 +43,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
 from line_sender import (
     send_to_line,
     build_screener_carousel,
@@ -174,10 +175,11 @@ def calculate_candle_metrics(open_p: float, high_p: float, low_p: float, close_p
 
 
 def calculate_score_and_stars(rvol: float, solid_ratio: float, foreign_lots: int, trust_lots: int,
-                              broker_penalty: int = 0) -> tuple:
+                              broker_penalty: int = 0, curr_vol_lots: int = 0, return_quality: bool = False) -> tuple:
     """
     第二階段軟評分矩陣 (滿分 100 分)
-    回傳: (total_score, stars)
+    包含爆量強度、K線實體飽滿度、法人籌碼動能與吃貨品質指標
+    回傳: (total_score, stars) 或 (total_score, stars, quality_tag)
     """
     # 1. 爆量強度 (0~35 分)
     if rvol >= 4.0:
@@ -197,16 +199,33 @@ def calculate_score_and_stars(rvol: float, solid_ratio: float, foreign_lots: int
     else:
         s_candle = 5
 
-    # 3. 法人動能 (0~20 分)
+    # 3. 法人動能與吃貨品質評估 (0~20 分 + 品質調節)
     inst_lots = foreign_lots + trust_lots
-    if inst_lots >= 1000:
+    absorption_ratio = (inst_lots / curr_vol_lots) if curr_vol_lots > 0 else 0.0
+
+    abs_pct = round(absorption_ratio * 100.0, 2)
+    if inst_lots >= 1000 and abs_pct >= 12.0:
         s_inst = 20
+        quality_tag = "🟢 法人吃貨鎖碼"
+    elif inst_lots >= 1000:
+        s_inst = 18
+        quality_tag = "🟢 法人大額買超"
     elif inst_lots >= 500:
         s_inst = 15
+        quality_tag = "🔵 法人溫和吃貨"
     elif inst_lots > 0:
-        s_inst = 10
+        if abs_pct <= 10.0:
+            s_inst = 5
+            quality_tag = "⚖️ 良性換手整理"
+        else:
+            s_inst = 10
+            quality_tag = "⚪ 法人小幅偏多"
+    elif inst_lots <= -250 or abs_pct <= -5.0:
+        s_inst = -5
+        quality_tag = "⚠️ 主力調節倒貨"
     else:
         s_inst = 0
+        quality_tag = "⚪ 內資散戶換手"
 
     # 4. 基礎動態權重 (20 分)
     s_base = 20
@@ -223,13 +242,36 @@ def calculate_score_and_stars(rvol: float, solid_ratio: float, foreign_lots: int
     else:
         stars = "★★☆☆☆"
 
+    quality_info = {
+        'quality_tag': quality_tag,
+        'quality_label': quality_tag,
+        'quality_bonus': s_inst,
+        'inst_lots': inst_lots,
+        'inst_absorption_ratio': round(absorption_ratio * 100.0, 2)
+    }
+
+    if return_quality:
+        return final_score, stars, quality_info
     return final_score, stars
 
 
-def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_rvol: float = 2.5):
+def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_rvol: float = None, max_bias_pct: float = None):
     """
-    執行策略 06 盤後選股主流程
+    執行策略 06 盤後選股主流程 (V2.0 旗艦自適應版)
     """
+    # 載入全域大盤自適應操盤參數
+    adaptive_cfg = load_adaptive_config()
+    adaptive_params = get_strategy_adaptive_params("06")
+    regime_info = adaptive_cfg.get("market_regime", {})
+    global_ctrl = adaptive_cfg.get("global_controls", {})
+
+    effective_rvol_min = min_rvol if min_rvol is not None else float(adaptive_params.get("volume_surge_multiplier", 2.5))
+    effective_bias_max = max_bias_pct if max_bias_pct is not None else float(adaptive_params.get("bias_max_pct", 10.0))
+    adaptive_tp1_pct = float(adaptive_params.get("tp1_pct", 8.0))
+    adaptive_tp2_pct = float(adaptive_params.get("tp2_pct", 15.0))
+    adaptive_sl_pct = float(adaptive_params.get("stop_loss_pct", -4.5))
+    rec_limit = int(adaptive_params.get("recommendation_limit", 4))
+
     if not date_str:
         date_str = get_latest_trading_date()
         if not date_str:
@@ -238,6 +280,8 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
 
     print(f"============================================================")
     print(f"🚀 開始執行【{STRATEGY_NAME}】選股流程 (基準日: {date_str})")
+    print(f"📡 當前大盤位階：{regime_info.get('label', '標準箱型')} ｜ 操盤模式：{global_ctrl.get('mode', '標準')}")
+    print(f"⚙️ 自適應參數：量比低標 {effective_rvol_min}x ｜ 乖離上限 {effective_bias_max}% ｜ TP1 +{adaptive_tp1_pct}% ｜ TP2 +{adaptive_tp2_pct}% ｜ 停損 {adaptive_sl_pct}%")
     print(f"============================================================")
 
     quotes, chips = fetch_twse_market_data(date_str)
@@ -305,8 +349,8 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
             curr_vol_lots = q['volume'] // 1000
             rvol = round(curr_vol_lots / v5_avg, 2) if v5_avg > 0 else 0.0
 
-            # 硬篩 3：爆量突破動能 Rvol >= min_rvol (2.5x)
-            if rvol < min_rvol:
+            # 硬篩 3：爆量突破動能 Rvol >= effective_rvol_min
+            if rvol < effective_rvol_min:
                 continue
 
             curr_close = q['close']
@@ -314,9 +358,9 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
             if curr_close < ma20_now or ma20_now < (ma20_prev * 0.995):
                 continue
 
-            # 硬篩 5：月線正乖離率 < 10%
+            # 硬篩 5：月線正乖離率 < effective_bias_max (自適應防追高)
             bias_pct = round(((curr_close - ma20_now) / ma20_now) * 100.0, 2)
-            if bias_pct >= 10.0:
+            if bias_pct >= effective_bias_max:
                 continue
 
             candle_m = calculate_candle_metrics(q['open'], q['high'], q['low'], q['close'])
@@ -341,18 +385,31 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
             )
 
             penalty = broker_guard.get('penalty_score', 0)
-            score, stars = calculate_score_and_stars(rvol, candle_m['solid_ratio'], f_lots, t_lots, penalty)
+            score, stars, quality_tag = calculate_score_and_stars(
+                rvol=rvol,
+                solid_ratio=candle_m['solid_ratio'],
+                foreign_lots=f_lots,
+                trust_lots=t_lots,
+                broker_penalty=penalty,
+                curr_vol_lots=curr_vol_lots,
+                return_quality=True
+            )
 
-            # 四大實戰價位精算
+            # 四大實戰價位精算 (自適應動態定價，嚴守數學單調性)
             entry_p = round(curr_close * 1.01, 2)       # 建議進場買進上限
-            addon_p = round(q['high'] * 1.005, 2)       # 突破今日高點動能加碼
-            tp1_p = round(curr_close * 1.08, 2)         # TP1 +8%
-            tp2_p = round(curr_close * 1.15, 2)         # TP2 +15%
-            sl_p = round(max(q['low'], curr_close * 0.965), 2)  # 跌破當日紅K低點或 -3.5%
+            addon_p = round(max(q['high'] * 1.005, entry_p + 0.05), 2)  # 突破今日高點動能加碼
+            tp1_mult = 1.0 + (adaptive_tp1_pct / 100.0)
+            tp2_mult = 1.0 + (adaptive_tp2_pct / 100.0)
+            sl_pct_abs = abs(adaptive_sl_pct)
+            sl_mult = 1.0 - (sl_pct_abs / 100.0)
+
+            tp1_p = round(max(curr_close * tp1_mult, addon_p + 0.05), 2)
+            tp2_p = round(max(curr_close * tp2_mult, tp1_p + 0.05), 2)
+            sl_p = round(min(curr_close * 0.985, max(q['low'], curr_close * sl_mult)), 2)
 
             # 錦囊指引
-            playbook_cash = f"於 {curr_close}~{entry_p} 區間掛單進場，超過 {entry_p} 嚴禁追高。"
-            playbook_hold = f"以 {sl_p} 為移動停損，突破 {addon_p} 可動態加碼，攻抵 {tp1_p} 分批拔檔。"
+            playbook_cash = f"【自適應{global_ctrl.get('mode', '標準')}】於 {curr_close}~{entry_p} 區間掛單，超過 {entry_p} 嚴禁追高。"
+            playbook_hold = f"以 {sl_p} 為嚴格防守底線，突破 {addon_p} 動態加碼，攻抵 {tp1_p} 先獲利落袋 1/3~1/2。"
 
             qualified_stocks.append({
                 '證券代號': code,
@@ -367,9 +424,11 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
                 '月線乖離%': bias_pct,
                 '外資買超(張)': f_lots,
                 '投信買超(張)': t_lots,
+                '換手品質': quality_tag,
                 '綜合評分': score,
                 '星級推薦': stars,
                 '隔日沖警示': broker_guard.get('tag', '安全・無顯著集中'),
+                '大盤位階': regime_info.get('label', '標準箱型'),
                 '建議進場價': entry_p,
                 '動能加碼價': addon_p,
                 '停利TP1': tp1_p,
@@ -388,32 +447,44 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
 
 
 def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FILE):
-    """匯出 UTF-8-BOM CSV 與高對比字卡 Markdown 戰報"""
+    """匯出 UTF-8-BOM CSV 與高對比字卡 Markdown 戰報 (附自適應大盤位階)"""
+    adaptive_cfg = load_adaptive_config()
+    regime_info = adaptive_cfg.get("market_regime", {})
+    global_ctrl = adaptive_cfg.get("global_controls", {})
+    adaptive_params = get_strategy_adaptive_params("06")
+    rec_limit = int(adaptive_params.get("recommendation_limit", 6))
+
     if not stocks:
         empty_cols = ['證券代號', '證券名稱', '收盤價', '當日漲跌%', '成交量(張)', '5日均量(張)',
-                      '量比倍數(Rvol)', '建議進場價', '動能加碼價', '停利TP1', '停利TP2', '嚴格停損價']
+                      '量比倍數(Rvol)', '換手品質', '建議進場價', '動能加碼價', '停利TP1', '停利TP2', '嚴格停損價']
         df_empty = pd.DataFrame(columns=empty_cols)
-        df_empty.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        from rolling_retention_manager import save_rolling_result_csv
+        save_rolling_result_csv(csv_path, df_empty, today_date_str=datetime.date.today().strftime('%Y/%m/%d'), max_days=5)
         with open(md_path, 'w', encoding='utf-8') as f:
-            f.write(f"# 【{STRATEGY_NAME}】最新選股戰報\n\n今日無標的符合 4+1 維度爆量條件。\n")
+            f.write(f"# 【{STRATEGY_NAME}】最新選股戰報\n\n")
+            f.write(f"> [!NOTE]\n> **當前大盤位階**：{regime_info.get('label', '標準箱型')} ｜ **操盤模式**：{global_ctrl.get('mode', '標準')} ｜ **建議現金水位**：{global_ctrl.get('cash_target_pct', 40)}%\n\n")
+            f.write("今日無標的符合 4+1 維度爆量條件，建議保留現金耐心觀望。\n")
         return
 
     df = pd.DataFrame(stocks)
-    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+    from rolling_retention_manager import save_rolling_result_csv
+    df = save_rolling_result_csv(csv_path, df, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功匯出 CSV 報表至: {csv_path}")
 
     today_str = datetime.date.today().strftime('%Y/%m/%d')
 
     # 產出標準 Markdown 字卡
     cards_md = format_screener_markdown_cards(
-        results=stocks[:8],
+        results=stocks[:rec_limit],
         date_str=today_str,
         strategy_id=STRATEGY_ID,
-        max_stocks=8
+        max_stocks=rec_limit
     )
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(f"# 【{STRATEGY_NAME}】盤後選股戰訊報表\n\n")
         f.write(f"產出時間：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        f.write(f"> [!NOTE]\n> **當前大盤位階**：{regime_info.get('label', '標準箱型')} ｜ **自適應模式**：{global_ctrl.get('mode', '標準')} ｜ **建議現金水位**：{global_ctrl.get('cash_target_pct', 40)}%\n")
+        f.write(f"> **量化動態參數**：量比門檻 {adaptive_params.get('volume_surge_multiplier', 2.5)}x ｜ 追高乖離上限 {adaptive_params.get('bias_max_pct', 10.0)}% ｜ TP1 +{adaptive_params.get('tp1_pct', 8.0)}% ｜ SL {adaptive_params.get('stop_loss_pct', -4.5)}%\n\n")
         f.write(cards_md)
         f.write("\n\n## 完整入選量化數據明細表\n\n")
         f.write(df.to_markdown(index=False))
@@ -429,19 +500,22 @@ def push_to_line(stocks: list, date_str: str = None):
         return
 
     today_str = date_str or datetime.date.today().strftime('%Y/%m/%d')
-    top_stocks = stocks[:6]
+    adaptive_params = get_strategy_adaptive_params("06")
+    rec_limit = int(adaptive_params.get("recommendation_limit", 6))
+    top_stocks = stocks[:rec_limit]
+
     carousel = build_screener_carousel(
         results=top_stocks,
         date_str=today_str,
         strategy_id=STRATEGY_ID,
-        max_stocks=6
+        max_stocks=rec_limit
     )
 
     clean_text = format_clean_screener_text(
         results=top_stocks,
         date_str=today_str,
         strategy_id=STRATEGY_ID,
-        max_stocks=6
+        max_stocks=rec_limit
     )
 
     print(f"[*] 正在推播 {len(top_stocks)} 檔爆量起漲精華至 LINE (strategy={STRATEGY_ID})...")
@@ -451,13 +525,19 @@ def push_to_line(stocks: list, date_str: str = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤後選股器")
+    parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤後選股器 (V2.0 旗艦自適應版)")
     parser.add_argument("--date", type=str, default=None, help="指定日期 (YYYYMMDD)")
+    parser.add_argument("--max-bias", type=float, default=None, help="20MA 正乖離上限百分比(%%)，留空則自動載入自適應參數")
+    parser.add_argument("--min-rvol", type=float, default=None, help="最低量比倍數門檻，留空則自動載入自適應參數")
     parser.add_argument("--line", action="store_true", help="執行後推播 LINE 戰報")
     parser.add_argument("--export", type=str, default=CSV_FILE, help="匯出 CSV 路徑")
     args = parser.parse_args()
 
-    results = screen_volume_surge(date_str=args.date)
+    results = screen_volume_surge(
+        date_str=args.date,
+        max_bias_pct=args.max_bias,
+        min_rvol=args.min_rvol
+    )
     export_reports(results, csv_path=args.export, md_path=MD_FILE)
 
     if args.line:

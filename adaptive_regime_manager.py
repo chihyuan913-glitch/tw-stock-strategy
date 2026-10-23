@@ -19,7 +19,7 @@ import sys
 import json
 import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 # Windows 控制台 UTF-8 保護
 if hasattr(sys.stdout, 'reconfigure'):
@@ -262,7 +262,9 @@ def build_regime_matrix(regime_key: str, market_info: Dict[str, Any], group_info
             "name": "動能爆量突破",
             "active_mode": "VOLUME_BREAKOUT",
             "volume_surge_multiplier": 2.2 if regime_key == REGIME_BULL_MOMENTUM else 2.5,
-            "tp1_pct": long_strategies["tp1_pct"],
+            "bias_max_pct": 8.0,
+            "tp1_pct": 8.0 if regime_key == REGIME_BULL_MOMENTUM else 6.0,
+            "tp2_pct": 15.0 if regime_key == REGIME_BULL_MOMENTUM else 12.0,
             "stop_loss_pct": long_strategies["stop_loss_pct"],
             "recommendation_limit": 3
         },
@@ -330,10 +332,14 @@ def generate_adaptive_regime_config(market_info: Dict[str, Any], group_info: Opt
 
     return config
 
-def load_adaptive_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
-    """策略端調用入口：載入當前自適應參數，具備全自動防崩潰優雅降級"""
+def load_adaptive_config(config_path: Optional[Union[Path, Dict[str, Any], str]] = None) -> Dict[str, Any]:
+    """策略端調用入口：載入當前自適應參數，具備全自動防崩潰優雅降級 (支援 Path, str 與 dict 直接傳入)"""
+    if isinstance(config_path, dict):
+        return enforce_safety_guardrails(config_path)
+    if isinstance(config_path, str):
+        config_path = Path(config_path)
     target_path = config_path or CONFIG_FILE
-    if target_path.exists():
+    if hasattr(target_path, "exists") and target_path.exists():
         try:
             with open(target_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -351,25 +357,68 @@ def load_adaptive_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     }
     return build_regime_matrix(REGIME_SIDEWAYS, fallback_market)
 
-def get_strategy_adaptive_params(strategy_key: str, config_path: Optional[Path] = None) -> Dict[str, Any]:
-    """取得特定策略之專屬自適應參數"""
-    cfg = load_adaptive_config(config_path)
+def get_strategy_adaptive_params(strategy_key: str, config_path: Optional[Union[Path, Dict[str, Any], str]] = None) -> Dict[str, Any]:
+    """取得特定策略之專屬自適應參數 (支援策略 06 便利 Alias 映射與 Mock 乘數解析)"""
+    if isinstance(config_path, dict) and "strategy_specific" not in config_path:
+        # 傳入情境 mock 字典 (如測試中的 mock_bull_cfg / mock_bear_cfg)
+        regime_mode = REGIME_BULL_MOMENTUM if "BULL" in config_path.get("current_regime", "") else (
+            REGIME_BEAR_DEFENSIVE if "BEAR" in config_path.get("current_regime", "") else REGIME_SIDEWAYS
+        )
+        base_market = {
+            "regime": config_path.get("regime_name", "自訂位階"),
+            "close": 23000,
+            "bias_ma20": 2.0 if regime_mode == REGIME_BULL_MOMENTUM else -2.0,
+            "trend": "測試模擬",
+            "risk_advice": "動態測試"
+        }
+        cfg = build_regime_matrix(regime_mode, base_market)
+        cfg.update(config_path)
+    else:
+        cfg = load_adaptive_config(config_path)
+
     specific = cfg.get("strategy_specific", {})
+    merged = {}
 
     # 模糊比對策略代碼（如 "01", "02", 或完整資料夾名稱）
     for key, params in specific.items():
         if key.startswith(strategy_key) or strategy_key in key:
             # 合併全域多方/空方通用參數
-            merged = {}
             if "SHORT" in params.get("active_mode", ""):
                 merged.update(cfg.get("short_strategies", {}))
             else:
                 merged.update(cfg.get("long_strategies", {}))
             merged.update(params)
-            return merged
+            break
 
-    # 查無特定策略時返回多方通用參數
-    return cfg.get("long_strategies", {})
+    if not merged:
+        # 查無特定策略時返回多方通用參數
+        merged.update(cfg.get("long_strategies", {}))
+
+    # 補充策略 06 便利 Alias
+    if strategy_key.startswith("06") or "06" in strategy_key:
+        merged.setdefault("rvol_threshold", merged.get("volume_surge_multiplier", 2.2))
+        bias_base = merged.get("bias_max_pct", 8.0)
+        merged.setdefault("bias_threshold", round(max(5.0, bias_base if bias_base >= 5.0 else 8.0), 2))
+        tp1_pct = merged.get("tp1_pct", 8.0)
+        tp2_pct = merged.get("tp2_pct", 15.0)
+        merged.setdefault("tp1_ratio", round(1.0 + (tp1_pct if tp1_pct >= 5.0 else 8.0) / 100.0, 4))
+        merged.setdefault("tp2_ratio", round(1.0 + (tp2_pct if tp2_pct >= 10.0 else 15.0) / 100.0, 4))
+        merged.setdefault("trailing_activation_pct", cfg.get("global_controls", {}).get("trailing_stop_activation_pct", 4.5))
+        merged.setdefault("trailing_pullback_pct", cfg.get("global_controls", {}).get("trailing_pullback_pct", 2.0))
+        merged.setdefault("max_recommendations", merged.get("recommendation_limit", 3))
+
+        # 套用 mock 覆蓋縮放 (若存在)
+        if "bias_max_mult" in cfg:
+            merged["bias_threshold"] = round(merged["bias_threshold"] * cfg["bias_max_mult"], 2)
+        if "tp_target_mult" in cfg:
+            tp1_delta = (merged["tp1_ratio"] - 1.0) * cfg["tp_target_mult"]
+            merged["tp1_ratio"] = round(1.0 + tp1_delta, 4)
+            tp2_delta = (merged["tp2_ratio"] - 1.0) * cfg["tp_target_mult"]
+            merged["tp2_ratio"] = round(1.0 + tp2_delta, 4)
+        if "max_picks" in cfg:
+            merged["max_recommendations"] = min(cfg["max_picks"], merged["max_recommendations"])
+
+    return merged
 
 def format_adaptive_report_section(config: Dict[str, Any]) -> str:
     """生成漂亮的 Markdown 格式自適應操盤矩陣，供 weekly_report.md 嵌入"""
