@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 台股量化選股策略最高總指揮中心 - LINE 盤中隨傳隨回操盤機器人主執行器
@@ -25,37 +25,50 @@ ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# 確保在無控制台視窗 (Silent VBS / WScript / Hidden) 環境下安全記錄日誌，防止 WinError 6 控制代碼無效崩潰
+# 安全日誌包裝器：防範 Windows 無視窗 (Windowless/Silent VBS/WScript) 環境下
+# 寫入無效控制台句柄拋出 OSError: [WinError 6] 控點無效 導致守護行程無聲崩潰。
 LOG_FILE = ROOT_DIR / "run_line_bot.log"
-_needs_redirect = False
-if sys.stdout is None or sys.stderr is None:
-    _needs_redirect = True
-else:
-    try:
-        sys.stdout.write("")
-        sys.stdout.flush()
-    except Exception:
-        _needs_redirect = True
 
-if _needs_redirect:
-    try:
-        _bot_log = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
-        sys.stdout = _bot_log
-        sys.stderr = _bot_log
-    except Exception:
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")
-        sys.stderr = open(os.devnull, "w", encoding="utf-8")
-else:
-    if hasattr(sys.stdout, 'reconfigure'):
+class SafeOutputLogger:
+    def __init__(self, filename, original_stream):
+        self.filename = filename
+        self.original_stream = original_stream
+        self._file = None
         try:
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            self._file = open(filename, "a", encoding="utf-8", buffering=1)
         except Exception:
             pass
-    if hasattr(sys.stderr, 'reconfigure'):
-        try:
-            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-        except Exception:
-            pass
+
+    def write(self, s):
+        if self._file:
+            try:
+                self._file.write(s)
+            except Exception:
+                pass
+        if self.original_stream:
+            try:
+                self.original_stream.write(s)
+            except Exception:
+                pass
+
+    def flush(self):
+        if self._file:
+            try:
+                self._file.flush()
+            except Exception:
+                pass
+        if self.original_stream:
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
+
+    def reconfigure(self, **kwargs):
+        pass
+
+# 替換 stdout 與 stderr 為防呆 SafeOutputLogger
+sys.stdout = SafeOutputLogger(LOG_FILE, sys.stdout)
+sys.stderr = SafeOutputLogger(LOG_FILE, sys.stderr)
 
 from tunnel_manager import start_tunnel_async, stop_tunnel, get_current_tunnel_url
 
@@ -87,15 +100,23 @@ def _spawn_uvicorn_server(port: int):
         "--port", str(port),
         "--log-level", "warning"
     ]
-    creationflags = 0x08000000 if os.name == "nt" else 0
+    # 使用 CREATE_NO_WINDOW 確保無黑窗並允許檔案重定向日誌
+    CREATE_NO_WINDOW = 0x08000000
+    creationflags = CREATE_NO_WINDOW if os.name == "nt" else 0
     log_path = ROOT_DIR / "start_web.log"
     log_fp = open(log_path, "a", encoding="utf-8", buffering=1)
+    
+    # 強制設定 LOCAL_WEB_MODE="0"，確保台股量化戰情室 24H 永不因瀏覽器關閉而自動休眠退出
+    env = os.environ.copy()
+    env["LOCAL_WEB_MODE"] = "0"
+    
     proc = subprocess.Popen(
         server_cmd,
         cwd=str(ROOT_DIR),
         stdout=log_fp,
         stderr=subprocess.STDOUT,
-        creationflags=creationflags
+        creationflags=creationflags,
+        env=env
     )
     return proc
 
@@ -164,14 +185,12 @@ def main():
 
     try:
         while True:
-            if server_proc and server_proc.poll() is not None:
-                if not is_our_service(PORT):
-                    print("[!] 偵測到後端伺服器停止，正在自動重啟修復...", flush=True)
-                    server_proc = _spawn_uvicorn_server(PORT)
+            if not is_our_service(PORT):
+                print("[!] 偵測到後端伺服器未運作，正在自動重啟修復...", flush=True)
+                server_proc = _spawn_uvicorn_server(PORT)
             time.sleep(3)
     except KeyboardInterrupt:
         print("\n[*] 正在安全關閉 LINE 操盤服務與外網通道...", flush=True)
-    finally:
         if server_proc and server_proc.poll() is None:
             try:
                 server_proc.terminate()
@@ -180,7 +199,8 @@ def main():
                 server_proc.kill()
         stop_tunnel()
         print("[✓] 操盤助手服務已安全退出。")
+    except Exception as e:
+        print(f"[!] 守護監控迴圈異常: {e}", flush=True)
 
 if __name__ == "__main__":
     main()
-
