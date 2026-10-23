@@ -100,6 +100,7 @@ def evaluate_intraday_alert(
     tp1_p = float(target.get('tp1_price', target.get('停利TP1', price)))
     tp2_p = float(target.get('tp2_price', target.get('停利TP2', price)))
     sl_p = float(target.get('sl_price', target.get('停損價位', price)))
+    mc_p = float(target.get('margin_call_price', target.get('130%追繳價', 0.0)))
 
     if not state_code:
         state_code = "SHORT_BREAKDOWN" if sl_p > entry_p else "LONG_REVERSAL"
@@ -130,6 +131,12 @@ def evaluate_intraday_alert(
             event_title = "💰【斷頭停利・初段回補】"
             event_desc = f"現價 {price:.2f} 摜破第一目標 {tp1_p:.2f}，建議回補 1/2 保留勝果！"
             threshold_price = tp1_p
+        # 3.5. 融資 130% 追繳臨界線摜破 (多殺多賣壓加速)
+        elif mc_p > 0 and price <= mc_p and price > tp1_p:
+            raw_event = "MARGIN_CALL"
+            event_title = "🚨【融資追繳觸發・多殺多加速】"
+            event_desc = f"現價 {price:.2f} 摜破 130% 追繳警戒線 ({mc_p:.2f} 元)！融資追繳令引爆斷頭賣壓，空單續抱擴大戰果！"
+            threshold_price = mc_p
         # 4. 破底加空追擊
         elif price <= addon_p:
             raw_event = "ADDON"

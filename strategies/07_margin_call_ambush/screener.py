@@ -51,6 +51,13 @@ from line_sender import (
     format_clean_screener_text,
     format_screener_markdown_cards
 )
+try:
+    from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
+except ImportError:
+    def get_strategy_adaptive_params(strat_id):
+        return {}
+    def load_adaptive_config():
+        return {}
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -69,7 +76,7 @@ STRATEGY_NAME = "策略 07：高融資使用率×低維持率斷頭伏擊與浮�
 CSV_FILE = os.path.join(os.path.dirname(__file__), 'result.csv')
 MD_FILE = os.path.join(os.path.dirname(__file__), 'result.md')
 
-# docs/api-spec.json 規範之 40 個標準 CSV 欄位清單
+# docs/api-spec.json 規範之標準 CSV 欄位清單 (含 V2.0 擴充之 130% 追繳與量增比率指標)
 CSV_COLUMNS = [
     "證券代號",
     "證券名稱",
@@ -80,6 +87,9 @@ CSV_COLUMNS = [
     "融資使用率%",
     "融資維持率%",
     "預估融資均價",
+    "130%追繳價",
+    "距追繳空間%",
+    "追繳狀態",
     "融資餘額(張)",
     "融資1日增減%",
     "融資3日增減%",
@@ -87,6 +97,7 @@ CSV_COLUMNS = [
     "法人5日買賣超(張)",
     "當日成交量(張)",
     "5日均量(張)",
+    "量增比率",
     "20MA",
     "月線乖離%",
     "進場價位",
@@ -121,9 +132,10 @@ def calculate_margin_cost_and_maintenance(
 ) -> dict:
     """
     根據融資買賣現償流水帳遞推平均融資持倉成本 C_bar 與融資維持率 MR (%)
-    公式依據 docs/api-spec.json 規範：
+    公式依據 docs/api-spec.json 規範與 V2.0 旗艦升級：
       - 融資借款成數以 6 成計算 (融資金額 = C_bar * 0.6)
       - 維持率 MR = (close_price / (C_bar * 0.6)) * 100
+      - 130% 追繳臨界價 MarginCallPrice = C_bar * 0.6 * 1.30 = C_bar * 0.78
       - 保留部位 rem = max(prev_balance - sell_lots - cash_repay_lots, 0)
       - 動態成本遞推: C_bar = (rem * C_bar + buy_lots * typical_price) / (rem + buy_lots)
     """
@@ -135,7 +147,10 @@ def calculate_margin_cost_and_maintenance(
             "usage_ratio": 0.0,
             "balance_lots": 0,
             "margin_change_1d_pct": 0.0,
-            "margin_change_3d_pct": 0.0
+            "margin_change_3d_pct": 0.0,
+            "margin_call_price": 0.0,
+            "distance_to_margin_call_pct": 0.0,
+            "margin_call_status": "⚪ 無融資部位"
         }
 
     last_record = margin_history[-1]
@@ -148,7 +163,10 @@ def calculate_margin_cost_and_maintenance(
             "usage_ratio": 0.0,
             "balance_lots": last_balance,
             "margin_change_1d_pct": 0.0,
-            "margin_change_3d_pct": 0.0
+            "margin_change_3d_pct": 0.0,
+            "margin_call_price": 0.0,
+            "distance_to_margin_call_pct": 0.0,
+            "margin_call_status": "⚪ 無融資部位"
         }
 
     # 初始成本錨定
@@ -176,8 +194,24 @@ def calculate_margin_cost_and_maintenance(
     # 融資維持率估算 (以標準 6 成融資借款額為分母)
     if avg_cost > 0:
         maintenance_ratio = round((close_price / (avg_cost * 0.6)) * 100.0, 2)
+        margin_call_price = round(avg_cost * 0.78, 2)
     else:
         maintenance_ratio = 0.0
+        margin_call_price = 0.0
+
+    if close_price > 0 and margin_call_price > 0:
+        distance_to_margin_call_pct = round(((close_price - margin_call_price) / close_price) * 100.0, 2)
+    else:
+        distance_to_margin_call_pct = 0.0
+
+    if margin_call_price > 0 and close_price <= margin_call_price:
+        margin_call_status = "🚨 已深陷追繳斷頭區"
+    elif 0 < distance_to_margin_call_pct <= 5.0:
+        margin_call_status = "⚠️ 追繳高危臨界 (<5%)"
+    elif 5.0 < distance_to_margin_call_pct <= 10.0:
+        margin_call_status = "🟡 逼近追繳警戒 (5-10%)"
+    else:
+        margin_call_status = "🟢 距追繳相對安全 (>10%)"
 
     # 融資使用率
     quota = float(last_record.get('quota_lots', 0))
@@ -212,13 +246,16 @@ def calculate_margin_cost_and_maintenance(
         "usage_ratio": usage_ratio,
         "balance_lots": last_balance,
         "margin_change_1d_pct": margin_change_1d_pct,
-        "margin_change_3d_pct": margin_change_3d_pct
+        "margin_change_3d_pct": margin_change_3d_pct,
+        "margin_call_price": margin_call_price,
+        "distance_to_margin_call_pct": distance_to_margin_call_pct,
+        "margin_call_status": margin_call_status
     }
 
 
-def classify_dual_state_and_pricing(stock_info: dict) -> dict:
+def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None) -> dict:
     """
-    雙向狀態機分流與四大防線定價
+    雙向狀態機分流與四大防線定價 (支援大盤位階自適應參數)
     狀態分流：
       1. LONG_REVERSAL: 🟢【浮額清洗・逆勢抄底】
       2. SHORT_BREAKDOWN: 🔴【斷頭助跌・放空獵殺】
@@ -240,6 +277,14 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
     candle_range = max(high - low, 0.01)
     lower_shadow = min(open_p, close) - low
     lower_shadow_ratio = max(0.0, lower_shadow / candle_range)
+
+    # 130% 追繳臨界價
+    avg_cost = float(stock_info.get('avg_cost', stock_info.get('預估融資均價', 0.0)))
+    mc_price = float(stock_info.get('margin_call_price', stock_info.get('130%追繳價', 0.0)))
+    if mc_price <= 0 and avg_cost > 0:
+        mc_price = round(avg_cost * 0.78, 2)
+    dist_mc_pct = float(stock_info.get('distance_to_margin_call_pct', stock_info.get('距追繳空間%', 0.0)))
+    mc_status = str(stock_info.get('margin_call_status', stock_info.get('追繳狀態', '')))
 
     # 1. 多方清洗抄底判定 (浮額清洗、法人低接、長下影線或收紅)
     is_long = (
@@ -267,8 +312,16 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
         state_badge = "🟢【浮額清洗・逆勢抄底】"
         entry_p = round(close, 2)
         addon_p = round(max(high * 1.01, close * 1.025), 2)
-        tp1_p = round(max(ma20, close * 1.07), 2)
-        tp2_p = round(close * 1.14, 2)
+
+        if regime_params:
+            tp1_target_pct = float(regime_params.get('reversal_tp_pct', regime_params.get('tp1_pct', 7.0)))
+            tp2_target_pct = float(regime_params.get('tp2_pct', tp1_target_pct * 2.0))
+            tp1_p = round(max(ma20, close * (1.0 + tp1_target_pct / 100.0)), 2)
+            tp2_p = round(max(tp1_p * 1.05, close * (1.0 + tp2_target_pct / 100.0)), 2)
+        else:
+            tp1_p = round(max(ma20, close * 1.07), 2)
+            tp2_p = round(close * 1.14, 2)
+
         sl_p = round(min(low * 0.985, close * 0.96), 2)
 
         # 嚴格確保數學關係：sl_price < entry_price < addon_price < tp1_price < tp2_price
@@ -291,15 +344,26 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
             "tp1_price": tp1_p,
             "tp2_price": tp2_p,
             "sl_price": sl_p,
-            "lower_shadow_ratio": round(lower_shadow_ratio, 2)
+            "lower_shadow_ratio": round(lower_shadow_ratio, 2),
+            "margin_call_price": mc_price,
+            "distance_to_margin_call_pct": dist_mc_pct,
+            "margin_call_status": mc_status
         }
     elif is_short:
         state_code = "SHORT_BREAKDOWN"
         state_badge = "🔴【斷頭助跌・放空獵殺】"
         entry_p = round(close, 2)
         addon_p = round(min(low * 0.995, close * 0.975), 2)
-        tp1_p = round(close * 0.92, 2)
-        tp2_p = round(close * 0.85, 2)
+
+        if regime_params:
+            short_tp_pct = float(regime_params.get('short_tp_pct', regime_params.get('tp1_pct', 8.0)))
+            short_tp2_pct = float(regime_params.get('tp2_pct', short_tp_pct * 1.8))
+            tp1_p = round(close * (1.0 - short_tp_pct / 100.0), 2)
+            tp2_p = round(close * (1.0 - short_tp2_pct / 100.0), 2)
+        else:
+            tp1_p = round(close * 0.92, 2)
+            tp2_p = round(close * 0.85, 2)
+
         sl_p = round(max(min(ma20 * 1.01, close * 1.035), close * 1.025), 2)
 
         # 嚴格確保數學關係：tp2_price < tp1_price < addon_price < entry_price < sl_price
@@ -322,7 +386,10 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
             "tp1_price": tp1_p,
             "tp2_price": tp2_p,
             "sl_price": sl_p,
-            "lower_shadow_ratio": round(lower_shadow_ratio, 2)
+            "lower_shadow_ratio": round(lower_shadow_ratio, 2),
+            "margin_call_price": mc_price,
+            "distance_to_margin_call_pct": dist_mc_pct,
+            "margin_call_status": mc_status
         }
     else:
         return {
@@ -335,7 +402,10 @@ def classify_dual_state_and_pricing(stock_info: dict) -> dict:
             "tp1_price": round(close, 2),
             "tp2_price": round(close, 2),
             "sl_price": round(close, 2),
-            "lower_shadow_ratio": round(lower_shadow_ratio, 2)
+            "lower_shadow_ratio": round(lower_shadow_ratio, 2),
+            "margin_call_price": mc_price,
+            "distance_to_margin_call_pct": dist_mc_pct,
+            "margin_call_status": mc_status
         }
 
 
@@ -526,6 +596,72 @@ def fetch_twse_margin_history(dates: list) -> dict:
     return history_by_code
 
 
+def fetch_twse_multiday_chips(dates: list) -> dict:
+    """
+    批次抓取近 N 日的三大法人買賣超 (T86)，計算真實累積的 1日、3日與 5日買賣超張數 (消除概估)
+    回傳: {code: {'1d': int, '3d': int, '5d': int, 'dealer_lots': int, 'foreign_lots': int, 'trust_lots': int, 'total_lots': int}}
+    """
+    sorted_dates = sorted(dates, reverse=True) # 由新到舊
+    daily_chips = {}
+    print(f"[*] 正在抓取近 {min(len(sorted_dates), 5)} 日證交所真實三大法人歷史籌碼...")
+    for d_str in sorted_dates[:5]:
+        url_t86 = f'https://www.twse.com.tw/rwd/zh/fund/T86?date={d_str}&selectType=ALLBUT0999&response=json'
+        req_t86 = urllib.request.Request(url_t86, headers={'User-Agent': 'Mozilla/5.0'})
+        day_dict = {}
+        try:
+            with urllib.request.urlopen(req_t86, timeout=8) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data.get('stat') == 'OK':
+                    for row in data.get('data', []):
+                        code = str(row[0]).strip()
+                        if len(code) == 4 and code.isdigit():
+                            try:
+                                foreign = int(row[4].replace(',', '')) // 1000
+                                trust = int(row[10].replace(',', '')) // 1000
+                                dealer = int(row[11].replace(',', '')) // 1000
+                                total = int(row[18].replace(',', '')) // 1000
+                                day_dict[code] = {
+                                    'foreign': foreign,
+                                    'trust': trust,
+                                    'dealer': dealer,
+                                    'total': total
+                                }
+                            except (ValueError, IndexError):
+                                pass
+        except Exception:
+            pass
+        daily_chips[d_str] = day_dict
+
+    all_codes = set()
+    for d in daily_chips.values():
+        all_codes.update(d.keys())
+
+    res = {}
+    for c in all_codes:
+        tot_1d = 0
+        tot_3d = 0
+        tot_5d = 0
+        latest_d = sorted_dates[0] if sorted_dates else ""
+        latest_c = daily_chips.get(latest_d, {}).get(c, {'foreign': 0, 'trust': 0, 'dealer': 0, 'total': 0})
+        for i, d_str in enumerate(sorted_dates[:5]):
+            day_total = daily_chips.get(d_str, {}).get(c, {}).get('total', 0)
+            if i == 0:
+                tot_1d = day_total
+            if i < 3:
+                tot_3d += day_total
+            tot_5d += day_total
+        res[c] = {
+            '1d': tot_1d,
+            '3d': tot_3d,
+            '5d': tot_5d,
+            'foreign_lots': latest_c.get('foreign', 0),
+            'trust_lots': latest_c.get('trust', 0),
+            'dealer_lots': latest_c.get('dealer', 0),
+            'total_lots': tot_1d
+        }
+    return res
+
+
 def fetch_twse_quotes_and_chips(date_str: str) -> tuple:
     """抓取基準日的收盤行情 (MI_INDEX) 與三大法人 (T86)"""
     quotes = {}
@@ -598,7 +734,7 @@ def calculate_margin_soft_score(
     fut_pricing: dict
 ) -> tuple:
     """
-    二階段 100 分制軟評分矩陣
+    二階段 100 分制軟評分矩陣 (V2.0 旗艦版：整合 130% 追繳臨界加分與巨量換手止跌特徵)
     回傳: (score: int, stars: str)
     """
     base_score = 40
@@ -636,10 +772,21 @@ def calculate_margin_soft_score(
     else:
         score_oi = 0
 
+    # 4. V2.0 新增：爆量換手止跌 (多方清洗且主力出量承接) 或 追繳高危臨界加分
+    score_v2 = 0
+    st_code = item.get('state_code', '')
+    vol_ratio = float(item.get('volume_ratio', item.get('量增比率', 1.0)))
+    dist_mc = float(item.get('distance_to_margin_call_pct', item.get('距追繳空間%', 99.0)))
+
+    if st_code == "LONG_REVERSAL" and vol_ratio >= 1.3:
+        score_v2 += 5  # 爆量換手止跌，主力承接斷頭籌碼
+    elif st_code == "SHORT_BREAKDOWN" and (mr <= 140.0 or dist_mc <= 5.0):
+        score_v2 += 5  # 逼近或穿透 130% 斷頭追繳線，多殺多骨牌加速
+
     # 扣除隔日沖倒貨風險扣分
     penalty = overnight_guard.get('penalty_score', 0)
 
-    raw_total = base_score + score_mr + score_usage + score_oi - penalty
+    raw_total = base_score + score_mr + score_usage + score_oi + score_v2 - penalty
     final_score = max(40, min(100, raw_total))
 
     if final_score >= 85:
@@ -653,7 +800,7 @@ def calculate_margin_soft_score(
 
 
 def run_screening(date_str: str = None) -> list:
-    """執行策略 07 完整選股作業"""
+    """執行策略 07 完整選股作業 (V2.0 旗艦演化版)"""
     recent_dates = get_recent_trading_dates(n_days=5)
     if not recent_dates:
         print("[X] 無法取得近期交易日數據，請檢查網路連線。")
@@ -661,12 +808,21 @@ def run_screening(date_str: str = None) -> list:
 
     latest_date = date_str or recent_dates[0]
     print("=" * 70)
-    print(f"🚀 開始執行【{STRATEGY_NAME}】選股引擎 (基準日: {latest_date})")
+    print(f"🚀 開始執行【{STRATEGY_NAME}】V2.0 旗艦演化版 (基準日: {latest_date})")
     print("=" * 70)
 
-    # 抓取融資歷史 (5日) 與最新行情、法人
+    # 自適應市場位階動態掛載
+    regime_params = get_strategy_adaptive_params("07")
+    regime_cfg = load_adaptive_config()
+    market_regime_label = regime_cfg.get("market_regime", {}).get("label", "🟡【高檔震盪整理・箱型洗盤】")
+    print(f"[*] 自適應市場位階: {market_regime_label} (TP1多方: {regime_params.get('reversal_tp_pct', 7.0)}% ｜ 空方: {regime_params.get('short_tp_pct', 8.0)}%)")
+
+    # 抓取融資歷史 (5日) 與最新收盤行情
     margin_history_all = fetch_twse_margin_history(recent_dates)
-    quotes, chips = fetch_twse_quotes_and_chips(latest_date)
+    quotes, _ = fetch_twse_quotes_and_chips(latest_date)
+
+    # 抓取真實多日三大法人買賣超 (1日/3日/5日累積，消除概估)
+    chips_multi = fetch_twse_multiday_chips(recent_dates)
 
     if not quotes or not margin_history_all:
         print("[X] 行情或融資流水帳數據不齊全，結束選股。")
@@ -731,11 +887,12 @@ def run_screening(date_str: str = None) -> list:
             r_d = r.get('date', '')
             r['typical_price'] = typical_price_map.get(r_d, close_p)
 
-        # 呼叫核心融資成本與維持率引擎
+        # 呼叫核心融資成本與維持率引擎 (含 130% 追繳臨界價計算)
         m_metrics = calculate_margin_cost_and_maintenance(m_hist, close_p)
 
-        chip_info = chips.get(code, {'foreign_lots': 0, 'trust_lots': 0, 'dealer_lots': 0, 'total_lots': 0})
+        chip_info = chips_multi.get(code, {'1d': 0, '3d': 0, '5d': 0, 'foreign_lots': 0, 'trust_lots': 0, 'dealer_lots': 0, 'total_lots': 0})
         bias20 = round(((close_p - ma20) / ma20) * 100.0, 2) if ma20 > 0 else 0.0
+        vol_ratio = round(q['volume_lots'] / max(v5_avg, 1), 2)
 
         raw_candidates.append({
             'code': code,
@@ -755,17 +912,25 @@ def run_screening(date_str: str = None) -> list:
             '當日成交量(張)': q['volume_lots'],
             'vol_5d_lots': int(v5_avg),
             '5日均量(張)': int(v5_avg),
-            'inst_1d_lots': chip_info['total_lots'],
-            '法人當日買賣超(張)': chip_info['total_lots'],
-            'inst_3d_lots': chip_info['total_lots'] * 2,  # 概估
-            'inst_5d_lots': chip_info['total_lots'] * 3,
-            '法人5日買賣超(張)': chip_info['total_lots'] * 3,
+            'volume_ratio': vol_ratio,
+            '量增比率': vol_ratio,
+            'inst_1d_lots': chip_info['1d'],
+            '法人當日買賣超(張)': chip_info['1d'],
+            'inst_3d_lots': chip_info['3d'],
+            'inst_5d_lots': chip_info['5d'],
+            '法人5日買賣超(張)': chip_info['5d'],
             'usage_ratio': m_metrics['usage_ratio'],
             '融資使用率%': m_metrics['usage_ratio'],
             'maintenance_ratio': m_metrics['maintenance_ratio'],
             '融資維持率%': m_metrics['maintenance_ratio'],
             'avg_cost': m_metrics['avg_cost'],
             '預估融資均價': m_metrics['avg_cost'],
+            'margin_call_price': m_metrics['margin_call_price'],
+            '130%追繳價': m_metrics['margin_call_price'],
+            'distance_to_margin_call_pct': m_metrics['distance_to_margin_call_pct'],
+            '距追繳空間%': m_metrics['distance_to_margin_call_pct'],
+            'margin_call_status': m_metrics['margin_call_status'],
+            '追繳狀態': m_metrics['margin_call_status'],
             'balance_lots': m_metrics['balance_lots'],
             '融資餘額(張)': m_metrics['balance_lots'],
             'margin_change_1d_pct': m_metrics['margin_change_1d_pct'],
@@ -816,7 +981,7 @@ def run_screening(date_str: str = None) -> list:
             }
         )
 
-        # 軟評分系統
+        # 軟評分系統 (V2.0 換手與追繳加分)
         score, stars = calculate_margin_soft_score(item, broker_guard, fut_pricing)
 
         # 決定最終報價：若有期貨且具備真實報價則期貨優先
@@ -839,6 +1004,9 @@ def run_screening(date_str: str = None) -> list:
             "融資使用率%": item['融資使用率%'],
             "融資維持率%": item['融資維持率%'],
             "預估融資均價": item['預估融資均價'],
+            "130%追繳價": item.get('margin_call_price', 0.0),
+            "距追繳空間%": item.get('distance_to_margin_call_pct', 0.0),
+            "追繳狀態": item.get('margin_call_status', ''),
             "融資餘額(張)": item['融資餘額(張)'],
             "融資1日增減%": item['融資1日增減%'],
             "融資3日增減%": item['融資3日增減%'],
@@ -846,6 +1014,7 @@ def run_screening(date_str: str = None) -> list:
             "法人5日買賣超(張)": item['法人5日買賣超(張)'],
             "當日成交量(張)": item['當日成交量(張)'],
             "5日均量(張)": item['5日均量(張)'],
+            "量增比率": item.get('volume_ratio', 1.0),
             "20MA": item['20MA'],
             "月線乖離%": item['月線乖離%'],
             "進場價位": entry_final,

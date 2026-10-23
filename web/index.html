@@ -85,6 +85,10 @@
             <i data-lucide="globe" class="w-4 h-4 text-teal-400"></i>
             <span id="tunnelUrlText">🌐 外網專屬網址 (複製)</span>
           </button>
+          <a href="/api/lab/dashboard" class="px-3.5 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 transition" title="進入台股量化策略實驗室與回測戰情室">
+            <i data-lucide="flask-conical" class="w-4 h-4 text-indigo-400"></i>
+            <span>🔬 量化實驗室</span>
+          </a>
           <button onclick="openAddRadarModal()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>➕ 手動加入監控</span>
@@ -2119,11 +2123,14 @@
         // 可轉債特徵 (策略 04)
         const cbStage = r['進度狀態'] || '';
 
-        // 策略 07 專屬欄位
+        // 策略 07 專屬欄位 (V2.0 擴充 130% 追繳與斷頭梯隊指標)
         const marginState = r['多空狀態'] || '';
         const marginUsage = r['融資使用率%'] !== undefined ? r['融資使用率%'] : '';
         const marginMaint = r['融資維持率%'] !== undefined ? r['融資維持率%'] : '';
         const marginAvgCost = r['預估融資均價'] !== undefined ? r['預估融資均價'] : '';
+        const marginCallPrice = r['130%追繳價'] !== undefined ? r['130%追繳價'] : '';
+        const marginCallDist = r['距追繳空間%'] !== undefined ? r['距追繳空間%'] : '';
+        const marginCallStatus = r['追繳狀態'] || '';
         const tierLevel = r['門檻層級'] || '';
 
         // 策略 08 專屬欄位 (集團作帳母子伏擊)
@@ -2150,6 +2157,9 @@
             stateClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
           }
           badgesHtml += `<span class="px-1.5 py-0.5 rounded ${stateClass} font-bold text-[10px] border">${marginState}</span> `;
+        }
+        if (marginCallStatus && marginCallStatus.includes('🚨')) {
+          badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-rose-600/30 text-rose-200 font-extrabold text-[10px] border border-rose-500/50 animate-pulse">${marginCallStatus}</span> `;
         }
         if (groupName) {
           badgesHtml += `<span class="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px] border border-indigo-500/30">🏢 ${groupName}</span> `;
@@ -2202,10 +2212,16 @@
 
         let marginInfoHtml = '';
         if (marginUsage !== '' || marginMaint !== '') {
+          let distColor = "text-emerald-400";
+          if (marginCallDist !== '' && Number(marginCallDist) <= 0) {
+            distColor = "text-rose-400 font-extrabold";
+          } else if (marginCallDist !== '' && Number(marginCallDist) <= 5.0) {
+            distColor = "text-amber-400 font-bold";
+          }
           marginInfoHtml = `
             <div class="p-2.5 rounded-xl bg-purple-950/25 border border-purple-500/30 text-[11px] space-y-1.5 shadow-sm">
               <div class="flex items-center justify-between font-bold text-purple-200 border-b border-purple-500/20 pb-1">
-                <span class="flex items-center gap-1">⚖️ 融資籌碼雙高危指標</span>
+                <span class="flex items-center gap-1">⚖️ 融資籌碼雙高危指標 (V2.0)</span>
                 ${tierLevel ? `<span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] border border-purple-500/30 font-mono">${tierLevel}</span>` : ''}
               </div>
               <div class="grid grid-cols-2 gap-2 text-slate-300 font-mono">
@@ -2219,12 +2235,18 @@
                 </div>
                 <div class="col-span-2 flex items-center justify-between">
                   <span class="text-slate-400 font-sans">預估融資均價:</span>
-                  <span class="font-bold text-cyan-300">${marginAvgCost} 元</span>
+                  <span class="font-bold text-cyan-300">${marginAvgCost ? marginAvgCost + ' 元' : '--'}</span>
                 </div>
+                ${marginCallPrice ? `
+                <div class="col-span-2 flex items-center justify-between">
+                  <span class="text-slate-400 font-sans">130% 追繳價:</span>
+                  <span class="font-bold text-rose-300">${marginCallPrice} 元 <span class="text-[10px] font-sans ${distColor}">(距追繳: ${marginCallDist}%)</span></span>
+                </div>` : ''}
+                ${marginCallStatus ? `
                 <div class="col-span-2 flex items-center justify-between text-[10px]">
-                  <span class="text-slate-400 font-sans">門檻層級:</span>
-                  <span class="font-semibold text-purple-300 font-mono">${tierLevel}</span>
-                </div>
+                  <span class="text-slate-400 font-sans">追繳狀態:</span>
+                  <span class="font-semibold text-rose-300 font-mono">${marginCallStatus}</span>
+                </div>` : ''}
               </div>
             </div>
           `;
