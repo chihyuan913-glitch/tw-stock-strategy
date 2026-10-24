@@ -266,9 +266,15 @@
             <button onclick="setStrategyRollingFilter('tracking')" id="rf-tracking" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700">
               ⏳ 5日內追蹤 (<span id="rfCountTracking">0</span> 檔)
             </button>
+            <button onclick="setStrategyRollingFilter('pending')" id="rf-pending" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700">
+              ⚠️ 今日待剔除 (<span id="rfCountPending">0</span> 檔)
+            </button>
           </div>
-          <div class="text-[11px] text-slate-400 flex items-center gap-1">
-            <span>🛡️ 已啟用 5 日滾動保留機制，波段持股不漏接</span>
+          <div class="flex items-center gap-2">
+            <button onclick="openTradeHistoryModal()" class="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1 shadow-sm transition">
+              <span>🏆 操盤戰績結算庫</span>
+            </button>
+            <span class="text-[11px] text-slate-400">🛡️ 5日滾動＋除帳保留1天機制</span>
           </div>
         </div>
         
@@ -2038,7 +2044,8 @@
       const btns = {
         'all': document.getElementById('rf-all'),
         'today': document.getElementById('rf-today'),
-        'tracking': document.getElementById('rf-tracking')
+        'tracking': document.getElementById('rf-tracking'),
+        'pending': document.getElementById('rf-pending')
       };
       for (const [k, b] of Object.entries(btns)) {
         if (!b) continue;
@@ -2070,7 +2077,14 @@
           const d = String(r['選股日期'] || '').trim();
           const days = String(r['入選天數'] || '').trim();
           const st = String(r['狀態標註'] || '').trim();
-          return !st.includes('今日') && !days.includes('T+0') && (!latestDate || d !== latestDate);
+          const lc = String(r['生命週期狀態'] || r['lifecycle'] || '').trim();
+          return !st.includes('今日') && !days.includes('T+0') && (!latestDate || d !== latestDate) && lc !== 'PENDING_REMOVAL' && !st.includes('待剔除');
+        });
+      } else if (currentRollingFilter === 'pending') {
+        filteredRows = rawRows.filter(r => {
+          const st = String(r['狀態標註'] || '').trim();
+          const lc = String(r['生命週期狀態'] || r['lifecycle'] || '').trim();
+          return lc === 'PENDING_REMOVAL' || st.includes('待剔除') || st.includes('待除');
         });
       }
 
@@ -2124,9 +2138,11 @@
         const trackCnt = total - todayCnt;
 
         document.getElementById('currentStrategyCount').innerText = `${total} 檔追蹤中（今日新選 ${todayCnt} 檔 ｜ 5日累計） ${dateTag}`;
+        const pendingCnt = data.pending_removal_count !== undefined ? data.pending_removal_count : (data.rows ? data.rows.filter(r => String(r['生命週期狀態']||r['lifecycle']||'').includes('PENDING') || String(r['狀態標註']||'').includes('待剔除')).length : 0);
         if (document.getElementById('rfCountAll')) document.getElementById('rfCountAll').innerText = total;
         if (document.getElementById('rfCountToday')) document.getElementById('rfCountToday').innerText = todayCnt;
         if (document.getElementById('rfCountTracking')) document.getElementById('rfCountTracking').innerText = trackCnt;
+        if (document.getElementById('rfCountPending')) document.getElementById('rfCountPending').innerText = pendingCnt;
 
         applyRollingFilterAndRender();
       } catch (e) {
@@ -2165,7 +2181,18 @@
         const addon = r['動能加碼價'] || r['加碼價位'] || r['續強加碼價'] || r['突破加碼'] || r['加空價位'] || r['現貨加碼'] || '--';
         const tp1 = r['停利TP1'] || r['目標停利TP1'] || r['現貨TP1'] || '--';
         const tp2 = r['停利TP2'] || r['目標停利TP2'] || r['現貨TP2'] || '';
-        const sl = r['嚴格停損價'] || r['停損價位'] || r['停損防守'] || r['停損回補'] || r['現貨停損'] || '--';
+        const sl = r['嚴格停損價'] || r['停損價位'] || r['停損防守'] || r['停損回補'] || r['現貨停損'] || '--';
+
+        // 多階段梯隊操盤歷程與生命週期
+        const ent1 = r['第一次進場價位'] || r['first_entry_price'] || entry;
+        const tp1_val = r['第一次停利價位'] || r['first_tp_price'] || tp1;
+        const ent2 = r['第二次進場價位'] || r['second_entry_price'] || addon;
+        const tp2_val = r['第二次停利價位'] || r['second_tp_price'] || (tp2 || '--');
+        const stage = r['操盤階段'] || r['stage'] || '第 1 階段 (初次建倉)';
+        const lifecycle = r['生命週期狀態'] || r['lifecycle'] || 'ACTIVE';
+        const remReason = r['剔除原因'] || r['removal_reason'] || '';
+        const pnlPct = (r['操作損益率%'] !== undefined && r['操作損益率%'] !== '') ? r['操作損益率%'] : (r['return_pct'] !== undefined ? r['return_pct'] : '');
+        const isPendingRemoval = lifecycle === 'PENDING_REMOVAL' || String(r['狀態標註']||'').includes('待剔除');
 
         // 策略 09 專屬欄位 (庫藏股宣告與低估值護盤)
         const buybackMin = r['預定買回區間下限'] || '';
@@ -2460,7 +2487,35 @@
               </div>
             </div>
 
+            ${isPendingRemoval ? `
+            <div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 space-y-1 text-xs shadow-md">
+              <div class="flex items-center justify-between font-bold text-rose-300">
+                <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>⚠️ 今日觸發退場・保留展示1天</span>
+                <span class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 text-[10px] border border-rose-500/30">明日正式除帳</span>
+              </div>
+              <div class="text-[11px] text-slate-300 flex items-center justify-between">
+                <span>退場原因: <strong class="text-rose-200">${remReason || '達成退場條件'}</strong></span>
+                ${pnlPct !== '' ? `<span class="font-mono font-bold ${Number(pnlPct) >= 0 ? 'text-emerald-400' : 'text-rose-400'}">波段損益: ${Number(pnlPct) >= 0 ? '+' : ''}${pnlPct}%</span>` : ''}
+              </div>
+            </div>` : ''}
+
             ${diffStripHtml}
+
+            <!-- 🎯 梯隊操盤進場與停利歷程 -->
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between font-sans text-[11px] font-bold text-slate-300 border-b border-slate-800/80 pb-1">
+                <span class="flex items-center gap-1 text-teal-300">🎯 梯隊操盤歷程</span>
+                <span class="px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 text-[10px] border border-teal-500/30 font-mono">${stage}</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 font-mono">
+                <span class="text-emerald-400 font-sans font-semibold">① 第 1 次進場: <strong class="text-white">${ent1}</strong></span>
+                <span class="text-rose-400 font-sans font-semibold">第 1 次停利: <strong class="text-rose-300">${tp1_val || '--'}</strong></span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] p-1.5 rounded-lg ${stage.includes('2') || stage.includes('加碼') ? 'bg-sky-950/30 border border-sky-500/30 font-bold' : 'bg-slate-900/40 border border-slate-800/60 opacity-80'} font-mono">
+                <span class="text-sky-400 font-sans font-semibold">② 第 2 次進場: <strong class="text-white">${ent2 || '--'}</strong></span>
+                <span class="text-rose-400 font-sans font-semibold">第 2 次停利: <strong class="text-rose-300">${tp2_val || '--'}</strong></span>
+              </div>
+            </div>
 
             <!-- 四大防線 -->
             <div class="grid grid-cols-2 gap-2 text-xs">
@@ -2799,5 +2854,153 @@
       initBrowserLifecycleWatcher();
     });
   </script>
-</body>
+
+  <!-- 🏆 歷史操盤戰績結算庫模態視窗 -->
+  <div id="tradeHistoryModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- 頂部標題列 -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🏆</span>
+          <div>
+            <h3 class="text-base font-bold text-white">歷史操盤戰績結算庫 (Trade Performance Ledger)</h3>
+            <p class="text-xs text-slate-400">已結案標的操作損益、梯隊進場歷程與波段勝率統計</p>
+          </div>
+        </div>
+        <button onclick="closeTradeHistoryModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- KPI 統計看板 -->
+      <div id="thKpiGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-900/60 border-b border-slate-800 text-xs">
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+          <div class="text-slate-400">總結案標的</div>
+          <div id="kpiTotalTrades" class="text-xl font-bold font-mono text-white mt-0.5">0 筆</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+          <div class="text-slate-400">歷史整體勝率</div>
+          <div id="kpiWinRate" class="text-xl font-bold font-mono text-emerald-400 mt-0.5">0.0%</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+          <div class="text-slate-400">平均單筆報酬率</div>
+          <div id="kpiAvgReturn" class="text-xl font-bold font-mono text-sky-400 mt-0.5">0.0%</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+          <div class="text-slate-400">累計總報酬率</div>
+          <div id="kpiTotalReturn" class="text-xl font-bold font-mono text-amber-400 mt-0.5">0.0%</div>
+        </div>
+      </div>
+
+      <!-- 戰績列表容器 -->
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+        <div id="tradeHistoryList" class="space-y-2">
+          <!-- 動態載入記錄 -->
+        </div>
+      </div>
+
+      <!-- 底部關閉按鈕 -->
+      <div class="px-6 py-3 border-t border-slate-800 bg-slate-950/50 flex justify-end">
+        <button onclick="closeTradeHistoryModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition">
+          關閉
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function openTradeHistoryModal() {
+      const modal = document.getElementById('tradeHistoryModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      await loadTradeHistory();
+      lucide.createIcons();
+    }
+
+    function closeTradeHistoryModal() {
+      const modal = document.getElementById('tradeHistoryModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function loadTradeHistory() {
+      try {
+        const resp = await fetch('/api/trade_history');
+        const data = await resp.json();
+        
+        document.getElementById('kpiTotalTrades').innerText = `${data.total_trades || 0} 筆`;
+        document.getElementById('kpiWinRate').innerText = `${data.win_rate_pct || 0.0}% (${data.winning_trades || 0}勝 / ${data.losing_trades || 0}負)`;
+        document.getElementById('kpiAvgReturn').innerText = `${(data.avg_return_pct || 0.0) >= 0 ? '+' : ''}${data.avg_return_pct || 0.0}%`;
+        document.getElementById('kpiTotalReturn').innerText = `${(data.total_return_pct || 0.0) >= 0 ? '+' : ''}${data.total_return_pct || 0.0}%`;
+
+        const listContainer = document.getElementById('tradeHistoryList');
+        listContainer.innerHTML = '';
+
+        if (!data.trades || data.trades.length === 0) {
+          listContainer.innerHTML = `
+            <div class="p-8 text-center text-slate-500 text-xs">
+              目前尚無已除帳之結案操盤記錄。標的除帳時將自動歸檔於此。
+            </div>
+          `;
+          return;
+        }
+
+        data.trades.forEach(t => {
+          const isWin = t.pnl_status === 'WIN';
+          const badgeClass = isWin ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+          const pnlColor = isWin ? 'text-emerald-400' : 'text-rose-400';
+          const pnlSign = Number(t.return_pct) >= 0 ? '+' : '';
+
+          const item = document.createElement('div');
+          item.className = "p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/60 hover:border-slate-600 space-y-2 text-xs transition";
+          item.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-bold text-white text-sm">${t.code}</span>
+                <span class="font-bold text-slate-200">${t.name}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+                  ${isWin ? '🟢 獲利了結' : '🔴 停損離場'} (${pnlSign}${t.return_pct}%)
+                </span>
+                <span class="text-slate-400 text-[11px]">｜ ${t.strategy_name || t.strategy_id}</span>
+              </div>
+              <div class="font-mono font-bold ${pnlColor} text-sm">
+                ${Number(t.return_amount) >= 0 ? '+' : ''}${Number(t.return_amount).toLocaleString()} 元
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 font-mono bg-slate-900/50 p-2 rounded-lg">
+              <div>
+                <span class="text-slate-500 font-sans">首次進場:</span>
+                <span class="text-white">${t.first_entry_date} (${t.first_entry_price}元)</span>
+              </div>
+              <div>
+                <span class="text-slate-500 font-sans">結案退場:</span>
+                <span class="text-white">${t.exit_date} (${t.exit_price}元)</span>
+              </div>
+              <div>
+                <span class="text-slate-500 font-sans">持有天數:</span>
+                <span class="text-cyan-300">${t.holding_days} 天</span>
+              </div>
+              <div>
+                <span class="text-slate-500 font-sans">退場原因:</span>
+                <span class="text-amber-300 font-sans truncate" title="${t.exit_reason}">${t.exit_reason}</span>
+              </div>
+            </div>
+
+            ${(t.second_entry_price || t.stages_history) ? `
+            <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+              <span class="text-slate-500 font-sans">梯隊操盤歷程:</span>
+              <span>① 第 1 次進場 ${t.first_entry_price}元 / 停利 ${t.first_tp_price || '--'}元</span>
+              ${t.second_entry_price ? `<span>➔ ② 第 2 次進場 ${t.second_entry_price}元 / 停利 ${t.second_tp_price || '--'}元</span>` : ''}
+              ${t.third_entry_price ? `<span>➔ ③ 第 3 次進場 ${t.third_entry_price}元</span>` : ''}
+            </div>` : ''}
+          `;
+          listContainer.appendChild(item);
+        });
+      } catch (e) {
+        console.error("載入歷史操盤失敗:", e);
+      }
+    }
+  </script>
+</body>
+
 </html>

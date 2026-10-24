@@ -1,0 +1,1001 @@
+[
+  {
+    "trade_id": "08_group_window_dressing_2421_2026-10-23",
+    "code": "2421",
+    "name": "建準",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 158.0,
+    "first_tp_price": 145.36,
+    "second_entry_price": 159.5,
+    "second_tp_price": 146.74,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 158.0,
+        "tp": 145.36
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 159.5,
+        "tp": 146.74
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 159.5,
+    "exit_reason": "跌破嚴格停損 (現價 159.5 <= 停損防線 167.46)",
+    "holding_days": 3,
+    "avg_entry_price": 158.75,
+    "return_pct": 0.47,
+    "return_amount": 750.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2327_2026-10-23",
+    "code": "2327",
+    "name": "國巨*",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 542.0,
+    "first_tp_price": 498.64,
+    "second_entry_price": 528.45,
+    "second_tp_price": 460.7,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 542.0,
+        "tp": 498.64
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 528.45,
+        "tp": 460.7
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 542.0,
+    "exit_reason": "跌破嚴格停損 (現價 542.0 <= 停損防線 592.82)",
+    "holding_days": 3,
+    "avg_entry_price": 542.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2383_2026-10-23",
+    "code": "2383",
+    "name": "台光電",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 4945.0,
+    "first_tp_price": 4549.4,
+    "second_entry_price": 4990.0,
+    "second_tp_price": 4590.8,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 4945.0,
+        "tp": 4549.4
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 4990.0,
+        "tp": 4590.8
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 4990.0,
+    "exit_reason": "跌破嚴格停損 (現價 4990.0 <= 停損防線 5355.27)",
+    "holding_days": 3,
+    "avg_entry_price": 4967.5,
+    "return_pct": 0.45,
+    "return_amount": 22500.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_6257_2026-10-23",
+    "code": "6257",
+    "name": "矽格",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 248.0,
+    "first_tp_price": 228.16,
+    "second_entry_price": 240.79,
+    "second_tp_price": 210.8,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 248.0,
+        "tp": 228.16
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 240.79,
+        "tp": 210.8
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 248.0,
+    "exit_reason": "跌破嚴格停損 (現價 248.0 <= 停損防線 261.94)",
+    "holding_days": 3,
+    "avg_entry_price": 248.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2344_2026-10-23",
+    "code": "2344",
+    "name": "華邦電",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 159.5,
+    "first_tp_price": 146.74,
+    "second_entry_price": 155.22,
+    "second_tp_price": 135.57,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 159.5,
+        "tp": 146.74
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 155.22,
+        "tp": 135.57
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 159.5,
+    "exit_reason": "跌破嚴格停損 (現價 159.5 <= 停損防線 171.75)",
+    "holding_days": 3,
+    "avg_entry_price": 159.5,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_4915_2026-10-23",
+    "code": "4915",
+    "name": "致伸",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 61.6,
+    "first_tp_price": 56.67,
+    "second_entry_price": 60.06,
+    "second_tp_price": 52.36,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 61.6,
+        "tp": 56.67
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 60.06,
+        "tp": 52.36
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 61.59999847412109,
+    "exit_reason": "跌破嚴格停損 (現價 61.59999847412109 <= 停損防線 64.15)",
+    "holding_days": 3,
+    "avg_entry_price": 61.6,
+    "return_pct": -0.0,
+    "return_amount": -0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_3017_2026-10-23",
+    "code": "3017",
+    "name": "奇鋐",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 3325.0,
+    "first_tp_price": 3059.0,
+    "second_entry_price": 3235.0,
+    "second_tp_price": 2976.2,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 3325.0,
+        "tp": 3059.0
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 3235.0,
+        "tp": 2976.2
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 3235.0,
+    "exit_reason": "跌破嚴格停損 (現價 3235.0 <= 停損防線 3484.5)",
+    "holding_days": 3,
+    "avg_entry_price": 3280.0,
+    "return_pct": -1.37,
+    "return_amount": -45000.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_5328_2026-10-23",
+    "code": "5328",
+    "name": "華容",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 52.2,
+    "first_tp_price": 48.02,
+    "second_entry_price": 52.8,
+    "second_tp_price": 48.58,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 52.2,
+        "tp": 48.02
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 52.8,
+        "tp": 48.58
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 52.79999923706055,
+    "exit_reason": "跌破嚴格停損 (現價 52.79999923706055 <= 停損防線 55.66)",
+    "holding_days": 3,
+    "avg_entry_price": 52.5,
+    "return_pct": 0.57,
+    "return_amount": 300.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_1907_2026-10-23",
+    "code": "1907",
+    "name": "永豐餘",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 28.1,
+    "first_tp_price": 25.85,
+    "second_entry_price": 27.4,
+    "second_tp_price": 23.89,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 28.1,
+        "tp": 25.85
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 27.4,
+        "tp": 23.89
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 28.100000381469727,
+    "exit_reason": "跌破嚴格停損 (現價 28.100000381469727 <= 停損防線 29.08)",
+    "holding_days": 3,
+    "avg_entry_price": 28.1,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2345_2026-10-23",
+    "code": "2345",
+    "name": "智邦",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 1815.0,
+    "first_tp_price": 1669.8,
+    "second_entry_price": 1769.62,
+    "second_tp_price": 1542.75,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 1815.0,
+        "tp": 1669.8
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 1769.62,
+        "tp": 1542.75
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 1815.0,
+    "exit_reason": "跌破嚴格停損 (現價 1815.0 <= 停損防線 2070.5)",
+    "holding_days": 3,
+    "avg_entry_price": 1815.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_3037_2026-10-23",
+    "code": "3037",
+    "name": "欣興",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 1100.0,
+    "first_tp_price": 1012.0,
+    "second_entry_price": 1072.5,
+    "second_tp_price": 935.0,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 1100.0,
+        "tp": 1012.0
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 1072.5,
+        "tp": 935.0
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 1100.0,
+    "exit_reason": "跌破嚴格停損 (現價 1100.0 <= 停損防線 1192.56)",
+    "holding_days": 3,
+    "avg_entry_price": 1100.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2618_2026-10-23",
+    "code": "2618",
+    "name": "長榮航",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 42.35,
+    "first_tp_price": 38.96,
+    "second_entry_price": 42.05,
+    "second_tp_price": 38.69,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 42.35,
+        "tp": 38.96
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 42.05,
+        "tp": 38.69
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 42.04999923706055,
+    "exit_reason": "跌破嚴格停損 (現價 42.04999923706055 <= 停損防線 43.52)",
+    "holding_days": 3,
+    "avg_entry_price": 42.2,
+    "return_pct": -0.36,
+    "return_amount": -150.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2301_2026-10-23",
+    "code": "2301",
+    "name": "光寶科",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 262.0,
+    "first_tp_price": 241.04,
+    "second_entry_price": 263.5,
+    "second_tp_price": 242.42,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 262.0,
+        "tp": 241.04
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 263.5,
+        "tp": 242.42
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 263.5,
+    "exit_reason": "跌破嚴格停損 (現價 263.5 <= 停損防線 284.49)",
+    "holding_days": 3,
+    "avg_entry_price": 262.75,
+    "return_pct": 0.29,
+    "return_amount": 750.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_2903_2026-10-23",
+    "code": "2903",
+    "name": "遠百",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 22.05,
+    "first_tp_price": 20.29,
+    "second_entry_price": 21.95,
+    "second_tp_price": 20.19,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 22.05,
+        "tp": 20.29
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 21.95,
+        "tp": 20.19
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 21.950000762939453,
+    "exit_reason": "跌破嚴格停損 (現價 21.950000762939453 <= 停損防線 22.72)",
+    "holding_days": 3,
+    "avg_entry_price": 22.0,
+    "return_pct": -0.23,
+    "return_amount": -50.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-24 20:51:44"
+  },
+  {
+    "trade_id": "08_group_window_dressing_3036_2026-10-22",
+    "code": "3036",
+    "name": "文曄",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 207.5,
+    "first_tp_price": 190.9,
+    "second_entry_price": 202.31,
+    "second_tp_price": 176.38,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 207.5,
+        "tp": 190.9
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 202.31,
+        "tp": 176.38
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 207.5,
+    "exit_reason": "跌破嚴格停損 (現價 207.5 <= 停損防線 214.76)",
+    "holding_days": 3,
+    "avg_entry_price": 207.5,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "08_group_window_dressing_1710_2026-10-22",
+    "code": "1710",
+    "name": "東聯",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 17.45,
+    "first_tp_price": 16.05,
+    "second_entry_price": 16.95,
+    "second_tp_price": 14.83,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 17.45,
+        "tp": 16.05
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 16.95,
+        "tp": 14.83
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 17.450000762939453,
+    "exit_reason": "跌破嚴格停損 (現價 17.450000762939453 <= 停損防線 18.06)",
+    "holding_days": 3,
+    "avg_entry_price": 17.45,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "08_group_window_dressing_5483_2026-10-22",
+    "code": "5483",
+    "name": "中美晶",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 191.5,
+    "first_tp_price": 176.18,
+    "second_entry_price": 186.71,
+    "second_tp_price": 162.78,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 191.5,
+        "tp": 176.18
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 186.71,
+        "tp": 162.78
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 191.5,
+    "exit_reason": "跌破嚴格停損 (現價 191.5 <= 停損防線 205.38)",
+    "holding_days": 3,
+    "avg_entry_price": 191.5,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "08_group_window_dressing_3481_2026-10-22",
+    "code": "3481",
+    "name": "群創",
+    "strategy_id": "08_group_window_dressing",
+    "strategy_name": "08_group_window_dressing",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 46.8,
+    "first_tp_price": 43.06,
+    "second_entry_price": 45.63,
+    "second_tp_price": 39.78,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 46.8,
+        "tp": 43.06
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 45.63,
+        "tp": 39.78
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 46.79999923706055,
+    "exit_reason": "跌破嚴格停損 (現價 46.79999923706055 <= 停損防線 50.98)",
+    "holding_days": 3,
+    "avg_entry_price": 46.8,
+    "return_pct": -0.0,
+    "return_amount": -0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_6197_2026-10-23",
+    "code": "6197",
+    "name": "佳必琪",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 337.0,
+    "first_tp_price": 310.04,
+    "second_entry_price": 327.36,
+    "second_tp_price": 286.45,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 337.0,
+        "tp": 310.04
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 327.36,
+        "tp": 286.45
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 337.0,
+    "exit_reason": "跌破嚴格停損 (現價 337.0 <= 停損防線 346.91)",
+    "holding_days": 3,
+    "avg_entry_price": 337.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_3094_2026-10-23",
+    "code": "3094",
+    "name": "聯傑",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 55.6,
+    "first_tp_price": 51.15,
+    "second_entry_price": 56.0,
+    "second_tp_price": 51.52,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 55.6,
+        "tp": 51.15
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 56.0,
+        "tp": 51.52
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 56.0,
+    "exit_reason": "跌破嚴格停損 (現價 56.0 <= 停損防線 57.96)",
+    "holding_days": 3,
+    "avg_entry_price": 55.8,
+    "return_pct": 0.36,
+    "return_amount": 200.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_2484_2026-10-23",
+    "code": "2484",
+    "name": "希華",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-21",
+    "first_entry_price": 82.4,
+    "first_tp_price": 75.81,
+    "second_entry_price": 80.34,
+    "second_tp_price": 70.04,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-21",
+        "entry": 82.4,
+        "tp": 75.81
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-23",
+        "entry": 80.34,
+        "tp": 70.04
+      }
+    ],
+    "exit_date": "2026-10-23",
+    "exit_price": 82.4,
+    "exit_reason": "跌破嚴格停損 (現價 82.4 <= 停損防線 84.46)",
+    "holding_days": 3,
+    "avg_entry_price": 82.4,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_2493_2026-10-22",
+    "code": "2493",
+    "name": "揚博",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 183.5,
+    "first_tp_price": 168.82,
+    "second_entry_price": 178.91,
+    "second_tp_price": 155.97,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 183.5,
+        "tp": 168.82
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 178.91,
+        "tp": 155.97
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 183.5,
+    "exit_reason": "跌破嚴格停損 (現價 183.5 <= 停損防線 189.92)",
+    "holding_days": 3,
+    "avg_entry_price": 183.5,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_3518_2026-10-22",
+    "code": "3518",
+    "name": "柏騰",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 39.35,
+    "first_tp_price": 36.2,
+    "second_entry_price": 38.37,
+    "second_tp_price": 33.45,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 39.35,
+        "tp": 36.2
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 38.37,
+        "tp": 33.45
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 39.35,
+    "exit_reason": "跌破嚴格停損 (現價 39.35 <= 停損防線 40.73)",
+    "holding_days": 3,
+    "avg_entry_price": 39.35,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "07_margin_call_ambush_6834_2026-10-22",
+    "code": "6834",
+    "name": "天二科技",
+    "strategy_id": "07_margin_call_ambush",
+    "strategy_name": "07_margin_call_ambush",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 131.0,
+    "first_tp_price": 120.52,
+    "second_entry_price": 127.72,
+    "second_tp_price": 111.35,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 131.0,
+        "tp": 120.52
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 127.72,
+        "tp": 111.35
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 131.0,
+    "exit_reason": "跌破嚴格停損 (現價 131.0 <= 停損防線 134.27)",
+    "holding_days": 3,
+    "avg_entry_price": 131.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:51:43"
+  },
+  {
+    "trade_id": "03_short_momentum_1609_2026-10-22",
+    "code": "1609",
+    "name": "大亞",
+    "strategy_id": "03_short_momentum",
+    "strategy_name": "03_short_momentum",
+    "first_entry_date": "2026-10-20",
+    "first_entry_price": 35.12,
+    "first_tp_price": 32.46,
+    "second_entry_price": 34.0,
+    "second_tp_price": 30.15,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-20",
+        "entry": 35.12,
+        "tp": 32.46
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 34.0,
+        "tp": 30.15
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 37.25,
+    "exit_reason": "觸發停損回補 (現價 37.25 >= 停損防線 36.69)",
+    "holding_days": 3,
+    "avg_entry_price": 35.12,
+    "return_pct": -6.06,
+    "return_amount": -2130.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-24 20:51:40"
+  },
+  {
+    "trade_id": "_1000_2026-10-22",
+    "code": "1000",
+    "name": "股0",
+    "strategy_id": "",
+    "strategy_name": "",
+    "first_entry_date": "2026-10-15",
+    "first_entry_price": 10.0,
+    "first_tp_price": 0.0,
+    "second_entry_price": 10.3,
+    "second_tp_price": 11.0,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-15",
+        "entry": 10.0,
+        "tp": 0.0
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-22",
+        "entry": 10.3,
+        "tp": 11.0
+      }
+    ],
+    "exit_date": "2026-10-22",
+    "exit_price": 10.0,
+    "exit_reason": "5 交易日週期屆滿出清 (入選日 2026-10-15)",
+    "holding_days": 8,
+    "avg_entry_price": 10.0,
+    "return_pct": 0.0,
+    "return_amount": 0.0,
+    "pnl_status": "FLAT",
+    "archived_at": "2026-10-24 20:48:30"
+  },
+  {
+    "trade_id": "01_bollinger_reversal_2330_2026-10-24",
+    "code": "2330",
+    "name": "台積電",
+    "strategy_id": "01_bollinger_reversal",
+    "strategy_name": "01_bollinger_reversal",
+    "first_entry_date": "2026-10-24",
+    "first_entry_price": 1000.0,
+    "first_tp_price": 1080.0,
+    "second_entry_price": 1040.0,
+    "second_tp_price": 1120.0,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-24",
+        "entry": 1000.0,
+        "tp": 1080.0
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-24",
+        "entry": 1040.0,
+        "tp": 1120.0
+      }
+    ],
+    "exit_date": "2026-10-24",
+    "exit_price": 1100.0,
+    "exit_reason": "達標第2次停利目標",
+    "holding_days": 1,
+    "avg_entry_price": 1020.0,
+    "return_pct": 7.84,
+    "return_amount": 80000.0,
+    "pnl_status": "WIN",
+    "archived_at": "2026-10-24 20:44:55"
+  }
+]

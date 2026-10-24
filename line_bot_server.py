@@ -940,6 +940,25 @@ async def get_strategy_data(strat_id: str):
                     r['position_badge'] = '⚠️ 高於進場價'
                     r['position_desc'] = f'溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)'
 
+            # 注入多階段梯隊操盤歷程與生命週期欄位 (向後相容補全)
+            ent1 = r.get('第一次進場價位') or ep
+            tp1_val = r.get('第一次停利價位') or r.get('停利TP1') or r.get('目標停利TP1') or r.get('現貨TP1') or ''
+            ent2 = r.get('第二次進場價位') or r.get('動能加碼價') or r.get('加碼價位') or r.get('續強加碼價') or ''
+            tp2_val = r.get('第二次停利價位') or r.get('停利TP2') or r.get('目標停利TP2') or r.get('現貨TP2') or ''
+            stg = r.get('操盤階段') or ('第 2 階段 (續強加碼)' if '續強' in str(r.get('狀態標註', '')) else '第 1 階段 (初次建倉)')
+            lifecycle = r.get('生命週期狀態') or ('PENDING_REMOVAL' if '待剔除' in str(r.get('狀態標註', '')) else 'ACTIVE')
+
+            r['first_entry_price'] = ent1
+            r['first_tp_price'] = tp1_val
+            r['second_entry_price'] = ent2
+            r['second_tp_price'] = tp2_val
+            r['stage'] = stg
+            r['lifecycle'] = lifecycle
+            r['removal_reason'] = r.get('剔除原因', '')
+            r['removal_trigger_date'] = r.get('剔除觸發日期', '')
+            r['return_pct'] = r.get('操作損益率%', '')
+            r['pnl_status'] = r.get('損益狀態', '')
+
         # 解析戰報交易日期與 5 日滾動統計
         date_str = ""
         if "選股日期" in df.columns and not df["選股日期"].dropna().empty:
@@ -967,7 +986,9 @@ async def get_strategy_data(strat_id: str):
             date_str = mtime.strftime('%Y-%m-%d')
 
         today_rows = [r for r in rows if str(r.get('選股日期', '')).strip() == date_str or 'T+0' in str(r.get('入選天數', '')) or '今日' in str(r.get('狀態標註', ''))]
+        pending_rows = [r for r in rows if str(r.get('lifecycle')) == 'PENDING_REMOVAL' or '待剔除' in str(r.get('狀態標註', ''))]
         today_count = len(today_rows)
+        pending_count = len(pending_rows)
         tracking_count = len(rows) - today_count
 
         return {
@@ -977,6 +998,7 @@ async def get_strategy_data(strat_id: str):
             "total_count": len(rows),
             "today_count": today_count,
             "tracking_count": tracking_count,
+            "pending_removal_count": pending_count,
             "columns": cols,
             "rows": rows
         }
@@ -989,6 +1011,29 @@ async def get_strategy_data(strat_id: str):
             "rows": []
         }
 
+@app.get("/api/trade_history")
+async def get_trade_history_api(strategy: Optional[str] = None):
+    """取得歷史已結案操盤戰績與 KPI 統計總覽"""
+    try:
+        from trade_history_manager import GLOBAL_TRADE_HISTORY
+        return GLOBAL_TRADE_HISTORY.get_performance_summary(strategy)
+    except Exception as e:
+        return {
+            "error": str(e),
+            "total_trades": 0,
+            "winning_trades": 0,
+            "losing_trades": 0,
+            "flat_trades": 0,
+            "win_rate_pct": 0.0,
+            "avg_return_pct": 0.0,
+            "total_return_pct": 0.0,
+            "max_win_pct": 0.0,
+            "max_loss_pct": 0.0,
+            "avg_holding_days": 0.0,
+            "total_pnl_amount": 0.0,
+            "trades": []
+        }
+
 @app.get("/api/weekly_report")
 async def get_weekly_report():
     """取得每週總體戰略週報內容"""
