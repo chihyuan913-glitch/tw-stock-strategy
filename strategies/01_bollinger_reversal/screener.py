@@ -37,6 +37,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from four_price_engine import calculate_four_prices_long
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -374,31 +375,19 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
             high_val = meta.get('high', curr_close * 1.02)
             low_val = meta.get('low', curr_close * 0.98)
 
-            # === V3.0 實戰四大防線幾何單調性錨定模型 ===
-            # 1. 停利價位 (分段停利架構)：
-            #    TP1: 反彈半中軌 (Close + (MA20 - Close) * 0.5) - 422日回測實證勝率 60.10%
-            #    TP2: 20MA 月線反壓回歸
-            half_mb = curr_close + (ma20 - curr_close) * 0.5
-            tp1_val = round(half_mb, 2)
-            tp2_val = ma20_val
-
-            # 2. 進場價位：現價或回測下軌時建倉，嚴防追在反彈半山腰
-            entry_val = round(min(curr_close * 1.015, tp1_val * 0.98), 2)
-            if entry_val < close_val:
-                entry_val = close_val
-
-            # 3. 動能加碼價位：突破當日高點，且嚴格限制在進場價與 TP1 之間的 60% 區間，徹底根除加碼價高於 TP1 的矛盾
-            raw_addon = max(high_val, round(curr_close * 1.01, 2))
-            addon_ceiling = round(curr_close + (tp1_val - curr_close) * 0.60, 2)
-            addon_val = round(min(raw_addon, addon_ceiling), 2)
-            if addon_val <= entry_val:
-                addon_val = round(entry_val + 0.05, 2)
-
-            # 4. 防禦型前低動態停損：取下軌96折與當日低點99折之較高者
-            sl_val = round(max(float(lower_band * 0.96), float(low_val * 0.99)), 2)
-            # 單調性防呆安全閥：停損必須嚴格小於現價
-            if sl_val >= close_val:
-                sl_val = round(close_val * 0.95, 2)
+            # === V4.0 實戰四大防線幾何單調性與 TWSE 法定檔位合規引擎 ===
+            fp_calc = calculate_four_prices_long(
+                curr_price=curr_close,
+                high=high_val,
+                low=low_val,
+                ma20=ma20,
+                lower_band=lower_band
+            )
+            entry_val = fp_calc['entry_price']
+            addon_val = fp_calc['addon_price']
+            tp1_val = fp_calc['tp1_price']
+            tp2_val = fp_calc['tp2_price']
+            sl_val = fp_calc['sl_price']
 
             # === Tier-1 條件檢定 (極致超跌轉折，V3.0 精選) ===
             is_tier1 = (

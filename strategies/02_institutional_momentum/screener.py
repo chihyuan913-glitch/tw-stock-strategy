@@ -34,6 +34,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from four_price_engine import calculate_four_prices_long
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -326,15 +327,19 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
                 continue
 
             # -------------------------------------------------------------
-            # 策略實戰操盤四大價位試算 (依 114~115 年回測優化旗艦版)
+            # 策略實戰操盤四大價位試算 (V4.0 TWSE 法定檔位合規引擎)
             # -------------------------------------------------------------
-            entry_p = round(curr_close, 2)
-            addon_raw = max(q['high'] * 1.005, curr_close * 1.03)
-            addon_p = round(min(addon_raw, ma20_curr * 1.10), 2)
-            tp1_p = round(curr_close * 1.15, 2)  # TP1 (+15% 獲利減半 50% 並上移成本保本)
-            tp2_p = round(curr_close * 1.20, 2)  # TP2 (+20% 達標全數落袋，或 10MA 移動停利)
-            sl_hard = round(curr_close * 0.95, 2)  # 盤中硬停損 -5.0%
-            sl_p = round(ma20_curr * 0.98, 2)    # 收盤波段停損 (跌破月線 2%)
+            fp_calc = calculate_four_prices_long(
+                curr_price=curr_close,
+                high=q.get('high'),
+                low=q.get('low'),
+                ma20=ma20_curr
+            )
+            entry_p = fp_calc['entry_price']
+            addon_p = fp_calc['addon_price']
+            tp1_p = fp_calc['tp1_price']
+            tp2_p = fp_calc['tp2_price']
+            sl_p = fp_calc['sl_price']
 
             c_today_info = chips_history.get(code, {}).get(latest_date, {})
             og_risk = evaluate_overnight_broker_risk(

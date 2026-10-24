@@ -47,6 +47,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from trade_history_manager import GLOBAL_TRADE_HISTORY, _ensure_float, _calc_pnl
+from four_price_engine import apply_four_prices_to_record, normalize_to_tick
 
 DEFAULT_RETENTION_DAYS = 5
 
@@ -339,19 +340,19 @@ def merge_rolling_records(
             second_tp = _ensure_float(old_record.get("第二次停利價位"))
             old_stage = str(old_record.get("操盤階段") or "")
 
-            row_dict["第一次進場價位"] = first_entry if first_entry > 0 else entry_p
-            row_dict["第一次停利價位"] = first_tp if first_tp > 0 else tp1_p
+            row_dict["第一次進場價位"] = normalize_to_tick(first_entry if first_entry > 0 else entry_p)
+            row_dict["第一次停利價位"] = normalize_to_tick(first_tp if first_tp > 0 else tp1_p)
 
             # 若前次為第 1 階段 (初次建倉)，今日續強正式觸發第 2 階段加碼
             if "第 2 階段" not in old_stage and "第 3 階段" not in old_stage:
-                row_dict["第二次進場價位"] = entry_p if entry_p > 0 else addon_p
-                row_dict["第二次停利價位"] = tp1_p if tp1_p > 0 else tp2_p
+                row_dict["第二次進場價位"] = normalize_to_tick(entry_p if entry_p > 0 else addon_p)
+                row_dict["第二次停利價位"] = normalize_to_tick(tp1_p if tp1_p > 0 else tp2_p)
                 row_dict["操盤階段"] = "第 2 階段 (續強加碼)"
             else:
-                row_dict["第二次進場價位"] = second_entry
-                row_dict["第二次停利價位"] = second_tp
-                row_dict["第三次進場價位"] = addon_p if addon_p > 0 else entry_p
-                row_dict["第三次停利價位"] = tp2_p if tp2_p > 0 else (tp1_p * 1.05)
+                row_dict["第二次進場價位"] = normalize_to_tick(second_entry if second_entry > 0 else addon_p)
+                row_dict["第二次停利價位"] = normalize_to_tick(second_tp if second_tp > 0 else tp2_p)
+                row_dict["第三次進場價位"] = normalize_to_tick(addon_p if addon_p > 0 else entry_p)
+                row_dict["第三次停利價位"] = normalize_to_tick(tp2_p if tp2_p > 0 else (tp1_p * 1.05))
                 row_dict["操盤階段"] = "第 3 階段 (二次加碼)"
 
             row_dict["狀態標註"] = "🔥 續強觸發"
@@ -359,15 +360,17 @@ def merge_rolling_records(
             row_dict["選股日期"] = today_norm
         else:
             # 這是【🟢 今日新選】全新標的！初始化第 1 階段進場與停利，並展示第 2 階段加碼防線點位
-            row_dict["第一次進場價位"] = entry_p
-            row_dict["第一次停利價位"] = tp1_p
-            row_dict["第二次進場價位"] = addon_p if addon_p > 0 else (entry_p * 1.03 if not is_short else entry_p * 0.97)
-            row_dict["第二次停利價位"] = tp2_p if tp2_p > 0 else (tp1_p * 1.05 if tp1_p > 0 else entry_p * 1.1)
+            row_dict["第一次進場價位"] = normalize_to_tick(entry_p)
+            row_dict["第一次停利價位"] = normalize_to_tick(tp1_p)
+            row_dict["第二次進場價位"] = normalize_to_tick(addon_p if addon_p > 0 else (entry_p * 1.03 if not is_short else entry_p * 0.97))
+            row_dict["第二次停利價位"] = normalize_to_tick(tp2_p if tp2_p > 0 else (tp1_p * 1.05 if tp1_p > 0 else entry_p * 1.1))
             row_dict["操盤階段"] = "第 1 階段 (初次建倉)"
             row_dict["狀態標註"] = "🟢 今日新選"
             row_dict["生命週期狀態"] = "ACTIVE"
             row_dict["選股日期"] = today_norm
 
+        # 透過四大防線標準定價引擎 V4.0 全面校準
+        row_dict = apply_four_prices_to_record(row_dict, is_short=is_short)
         processed_new_rows.append(row_dict)
 
     # --------------------------------------------------------------------------
