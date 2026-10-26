@@ -345,14 +345,26 @@ def send_line_notify(token: str, message: str) -> bool:
         return False
     return False
 
-def send_to_line(message: str, strategy: str = None, target_id: str = None) -> bool:
+def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False) -> bool:
     """
     通用即時推播發送入口 (多軌分流・支援無限制推播)：
     1. 支援 Telegram Bot (100% 永久免費・無每月則數限制・手機即時秒推)
     2. 支援 Discord Webhook (100% 永久免費・無每月則數限制)
     3. 支援多策略獨立 LINE 視窗/群組定向投遞 (strategy="01", "02", "03", "04"...)
     4. 支援多 Token 自動容錯輪替 (主 Token 額度超額自動切換至備援 Token)
+    5. 內建台股未開盤日不推送守門員 (Non-Trading Day Push Suppression)
     """
+    # --------------------------------------------------------------------------
+    # 台股休市日不推送守衛 (Non-Trading Day Push Suppression Guard)
+    # --------------------------------------------------------------------------
+    try:
+        from market_schedule import should_suppress_push
+        suppress, suppress_reason = should_suppress_push(force=force, task_type="戰報推播")
+        if suppress:
+            print(f"[⏸️ 推播攔截] {suppress_reason}")
+            return False
+    except ImportError:
+        pass
     env = load_env()
     sid = str(strategy).strip() if strategy else ""
 

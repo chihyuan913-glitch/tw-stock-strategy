@@ -388,6 +388,44 @@ def generate_weekly_report(dict_info, market_info, cb_info, group_info, candidat
         report_lines.append(format_adaptive_report_section(adaptive_config))
         report_lines.append("")
 
+    # 嵌入第五章：量化策略實驗室 V3.0 橫向 PK 與明日 (T+1) 回測精選買賣建議
+    try:
+        from lab.data.storage import MarketStorage
+        from lab.data.loader import MarketDataLoader
+        from lab.engine.fusion import ScreenerFusionBridge
+
+        lab_storage = MarketStorage()
+        lab_loader = MarketDataLoader(storage=lab_storage)
+        lb = ScreenerFusionBridge.generate_strategy_leaderboard(storage=lab_storage, loader=lab_loader)
+        adv = ScreenerFusionBridge.generate_next_day_advisor_report(storage=lab_storage, loader=lab_loader, top_n_per_strategy=2)
+
+        report_lines.extend([
+            "---",
+            "",
+            "## 🔬 五、量化策略實驗室 (V3.0) 全策略 PK 排行與明日 (T+1) 買賣決策",
+            "### 1. 🏆 實驗室 14 支核心與複合因子策略 PK 前五強",
+            "| 排名 | 機構評級 | 策略名稱 | 回測報酬率 | 勝率 | 夏普值 | Calmar 風報比 |",
+            "| :---: | :---: | :--- | :---: | :---: | :---: | :---: |",
+        ])
+        for row in lb.get("leaderboard", [])[:5]:
+            report_lines.append(
+                f"| #{row['rank']} | {row['grade']} | {row['name']} | {row['total_return_pct']:+.2f}% | {row['win_rate_pct']:.1f}% | {row['sharpe_ratio']:.2f} | {row['calmar_ratio']:.2f} |"
+            )
+
+        report_lines.extend([
+            "",
+            f"### 2. 🔮 今日選股池回測驗證 ➔ 明日 (T+1) 首選操作清單（共體檢 {adv.get('total_evaluated', 0)} 檔）",
+            "| 明日建議 | 代號與名稱 | 來源策略 | 歷史回測報酬 / 勝率 | 盈虧比 / 期望值 | 🟢進場上限 | 🔴停利 TP1 | 🛑嚴格停損 | 建議部位 |",
+            "| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
+        ])
+        for r in adv.get("recommendations", [])[:8]:
+            report_lines.append(
+                f"| {r['tomorrow_action']} | **{r['symbol']} {r['name']}** | {r['source_strategy']} | {r['hist_return_pct']:+.2f}% ({r['hist_win_rate_pct']:.0f}%) | 1:{r.get('rr_ratio', 2.0)} ({r.get('expectancy_pct', 0):+.1f}%) | ${r['entry_price']} | ${r['tp1_price']} | ${r['stop_loss_price']} | {r['recommended_shares']:,} 股 |"
+            )
+        report_lines.append("")
+    except Exception as e:
+        print(f"[!] 嵌入量化實驗室章節略過: {e}")
+
     report_lines.extend([
         "---",
         "💡 *本報告由最高指揮中心 GitHub Actions 雲端工作流於每週日 20:00 自動執行產出。*",
@@ -443,12 +481,13 @@ def generate_weekly_report(dict_info, market_info, cb_info, group_info, candidat
         ])
 
         push_text = "\n".join(line_msg)
-        send_to_line(push_text, strategy=None)
+        send_to_line(push_text, strategy=None, force=True)
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="台股每週日全策略動態優化與升級總引擎")
     parser.add_argument("--line", action="store_true", help="執行後推播每週戰報摘要至 LINE")
+    parser.add_argument("--skip-screener", action="store_true", help="當日已執行過選股時，略過重跑 screener 直接執行位階校準、實驗室回測與週報升級")
     args = parser.parse_args()
 
     print("=" * 70)
@@ -457,6 +496,14 @@ def main():
 
     # 1. 股票字典同步
     dict_info = sync_stock_dictionary()
+
+    # 1.5 官方法定開休市行事曆同步 (自動守護未開盤日不推送)
+    try:
+        from market_schedule import sync_market_holidays
+        holiday_info = sync_market_holidays()
+        print(f"[✓] 官方法定開休市日曆同步完成，共記錄 {holiday_info.get('total_holidays', 0)} 個休市日程。")
+    except Exception as e:
+        print(f"[!] 同步法定開休市日曆失敗或略過: {e}")
 
     # 2. 大盤位階動態校準
     market_info = calibrate_market_regime()
@@ -472,7 +519,10 @@ def main():
     adaptive_config = generate_adaptive_regime_config(market_info, group_info)
 
     # 4. 全策略盤前自動選股
-    run_strategies_premarket()
+    if not args.skip_screener:
+        run_strategies_premarket()
+    else:
+        print("\n[*] 【任務四/五】使用今日最新產出之 01~09 result.csv 報表，直接進入實驗室回測與校準...")
 
     # 4.5 雷達監控池跨日動態滾動校準與自動移動停利 (Auto Trailing Stop)
     try:

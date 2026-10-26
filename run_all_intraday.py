@@ -118,6 +118,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="執行單次快篩巡邏後結束")
     parser.add_argument("--test-push", "--force-test", dest="test_push", action="store_true", help="一鍵發送全策略模擬到價快訊至 LINE 測試連線")
     parser.add_argument("--strategy", type=str, default=None, help="指定單一策略 (01, 02, 03, 04)")
+    parser.add_argument("--force", action="store_true", help="強制啟動雷達，忽略台股休市守衛檢查")
     args = parser.parse_args()
 
     now_tw = datetime.datetime.now(TZ_TW)
@@ -125,6 +126,12 @@ def main():
     print(f" 🎯 台股量化策略總指揮中心 - 全策略盤中到價即時雷達")
     print(f" 🕒 啟動時間: {now_tw.strftime('%Y-%m-%d %H:%M:%S')} (台灣時間)")
     print(f"============================================================")
+
+    # 休市守衛攔截：若非測試推播且未帶強制旗標，遇休市自動跳過
+    if not args.test_push and not args.force:
+        from market_schedule import check_market_open_or_exit
+        if not check_market_open_or_exit(context_name="全策略盤中到價即時雷達", allow_force=False):
+            return
 
     targets = INTRADAY_STRATEGIES
     if args.strategy:

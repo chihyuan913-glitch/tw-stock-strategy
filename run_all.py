@@ -78,7 +78,7 @@ STRATEGIES = [
     },
 ]
 
-def run_strategy(strat_info, line=False):
+def run_strategy(strat_info, line=False, force=False):
     print("\n" + "=" * 70)
     print(f"🚀 [執行策略] {strat_info['name']}")
     print(f"📁 腳本位置: {strat_info['script']}")
@@ -96,6 +96,8 @@ def run_strategy(strat_info, line=False):
     ]
     if line:
         cmd.append("--line")
+    if force:
+        cmd.append("--force")
 
     try:
         # 在策略所在目錄內執行，確保相對路徑正常
@@ -114,6 +116,7 @@ def main():
     parser = argparse.ArgumentParser(description="台股選股策略總指揮 - 一鍵執行所有策略")
     parser.add_argument("--line", action="store_true", help="執行後推播各策略結果至 LINE")
     parser.add_argument("--strategy", type=str, default=None, help="指定單一策略執行 (01, 02, 03, 04)")
+    parser.add_argument("--force", action="store_true", help="強制執行策略，忽略台股休市守衛檢查")
     args = parser.parse_args()
 
     print(f"============================================================")
@@ -121,16 +124,33 @@ def main():
     print(f" 🕒 啟動時間: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"============================================================")
 
-    targets = STRATEGIES
+    from market_schedule import check_market_open_or_exit
+    if not check_market_open_or_exit(context_name="全策略盤後選股排程", allow_force=True):
+        return
+
+    targets = list(STRATEGIES)
+    known_ids = {s["id"] for s in targets}
+    strat_root = ROOT_DIR / "strategies"
+    if strat_root.is_dir():
+        for child in sorted(strat_root.iterdir()):
+            if child.is_dir() and child.name not in known_ids and not child.name.startswith(".") and child.name != "legacy":
+                screener_py = child / "screener.py"
+                if screener_py.exists():
+                    targets.append({
+                        "id": child.name,
+                        "name": f"動態載入策略 ({child.name})",
+                        "script": screener_py,
+                        "export": "result.csv",
+                    })
     if args.strategy:
-        targets = [s for s in STRATEGIES if args.strategy in s['id']]
+        targets = [s for s in targets if args.strategy in s['id']]
         if not targets:
             print(f"[!] 找不到符合 '{args.strategy}' 的策略！")
             return
 
     success_count = 0
     for strat in targets:
-        if run_strategy(strat, line=args.line):
+        if run_strategy(strat, line=args.line, force=args.force):
             success_count += 1
 
     print("\n" + "=" * 70)
@@ -143,6 +163,29 @@ def main():
         rollover_watchlist_defense(verbose=True)
     except Exception as e:
         print(f"[!] 雷達監控池跨日滾動校準跳過或失敗: {e}")
+
+    # 自動同步至量化策略實驗室：執行盤後選股池自動回測體檢並更新明日 (T+1) 買賣建議
+    try:
+        from lab.data.storage import MarketStorage
+        from lab.data.loader import MarketDataLoader
+        from lab.engine.fusion import ScreenerFusionBridge
+
+        lab_storage = MarketStorage()
+        lab_loader = MarketDataLoader(storage=lab_storage)
+        adv_report = ScreenerFusionBridge.generate_next_day_advisor_report(
+            storage=lab_storage,
+            loader=lab_loader,
+            top_n_per_strategy=2,
+        )
+        out_csv = ROOT_DIR / "lab" / "data" / "tomorrow_trading_advisor.csv"
+        out_csv.parent.mkdir(parents=True, exist_ok=True)
+        out_csv.write_text(adv_report["csv_content"], encoding="utf-8-sig")
+        print(
+            f"[✓] 量化實驗室自動回測完成：共檢驗 {adv_report['total_evaluated']} 檔，"
+            f"🟢明日優先買進 {adv_report['strong_buy_count']} 檔，已寫入 {out_csv}"
+        )
+    except Exception as e:
+        print(f"[!] 量化實驗室自動回測同步跳過或失敗: {e}")
 
 if __name__ == '__main__':
     main()
