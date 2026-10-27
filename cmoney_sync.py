@@ -23,6 +23,7 @@
 
 import os
 import sys
+import re
 import json
 import argparse
 import subprocess
@@ -122,8 +123,8 @@ class CMoneyWatchlistClient:
 
     def authenticate(self) -> Tuple[bool, str]:
         """
-        向 CMoney 伺服器驗證並換取 Access Token。
-        若已有有效 Token 則直接使用。
+        向 CMoney 伺服器驗證並取得登入授權憑證。
+        若已有有效 Token 則直接使用；若為帳號密碼則透過 CMoney 官方認證中心進行登入。
         """
         if self.token:
             return True, "使用自訂 CMONEY_AUTH_TOKEN"
@@ -133,33 +134,73 @@ class CMoneyWatchlistClient:
 
         print(f"[*] 正在連線 CMoney 會員身份驗證伺服器 (帳號: {self.account[:3]}***)...")
 
-        # 模擬 CMoney 行動端 / Web 端 OAuth 驗證
-        payload = {
-            "grant_type": "password",
-            "username": self.account,
-            "password": self.password,
-            "client_id": "cmoney_app_client",
-            "scope": "openid profile offline_access"
-        }
-        data = urllib.parse.urlencode(payload).encode("utf-8")
+        import http.cookiejar
+        import html as html_lib
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+        login_url = "https://auth.cmoney.tw/Identity/account/login?returnUrl=%2Fauthorize%2Fcallback%3Fclient_id%3Dcmmainweb%26redirect_uri%3Dhttps%253A%252F%252Fwww.cmoney.tw%252Fmember%252Flogin%252Fsignin-oidc.aspx%26response_type%3Dnone%26scope%3D%26from%3Dmember"
         headers = {
-            "User-Agent": "CMoney/MobileApp/10.0 (Android; TW)",
-            "Content-Type": "application/x-www-form-urlencoded"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        req = urllib.request.Request(self.IDENTITY_TOKEN_URL, data=data, headers=headers, method="POST")
 
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                res_data = json.loads(resp.read().decode("utf-8"))
-                access_token = res_data.get("access_token")
-                if access_token:
-                    self.token = access_token
-                    return True, "CMoney OAuth 驗證成功"
-                return False, f"未取得 access_token: {res_data}"
+            # 1. GET 登入頁面獲取 CSRF Token
+            req = urllib.request.Request(login_url, headers=headers)
+            resp = opener.open(req, timeout=10)
+            page_html = resp.read().decode("utf-8", errors="ignore")
+
+            token_m = re.search(r'name="__RequestVerificationToken"\s+type="hidden"\s+value="([^"]+)"', page_html)
+            if not token_m:
+                token_m = re.search(r'value="([^"]+)"\s+name="__RequestVerificationToken"', page_html)
+            csrf_token = token_m.group(1) if token_m else ""
+
+            # 2. POST 送出帳號密碼登入
+            post_data = {
+                "Account": self.account,
+                "Password": self.password,
+                "RememberMe": "true",
+                "ClientId": "cmmainweb",
+                "RedirectUri": "https://www.cmoney.tw/member/login/signin-oidc.aspx",
+                "ReturnUrl": "/authorize/callback?client_id=cmmainweb&redirect_uri=https%3A%2F%2Fwww.cmoney.tw%2Fmember%2Flogin%2Fsignin-oidc.aspx&response_type=none&scope=&from=member",
+                "LogoUri": "https://image.cmoney.tw/servicetest/swagger/1675180800/d1202faa-8464-4a42-a77e-eb16348f8508.png",
+                "ClientName": "www.cmoney.tw站台",
+                "Fedcm": "False",
+                "__RequestVerificationToken": csrf_token
+            }
+            encoded_data = urllib.parse.urlencode(post_data).encode("utf-8")
+            post_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": login_url,
+                "Origin": "https://auth.cmoney.tw"
+            }
+            post_req = urllib.request.Request(login_url, data=encoded_data, headers=post_headers, method="POST")
+            post_resp = opener.open(post_req, timeout=10)
+            res_html = post_resp.read().decode("utf-8", errors="ignore")
+
+            # 檢查是否有登入錯誤提示
+            decoded_html = html_lib.unescape(res_html)
+            if "帳號或密碼錯誤" in decoded_html:
+                return False, "CMoney 官方回傳：帳號或密碼錯誤，請確認手機/Email與密碼是否相符"
+
+            # 檢查是否觸發 2FA 雙重認證
+            final_url = post_resp.geturl() if hasattr(post_resp, "geturl") else ""
+            if "透過雙重認證保護您的帳戶" in decoded_html or "send-code" in final_url:
+                return False, "CMoney 帳號已啟用雙重認證 (2FA)。帳號密碼完全正確，但需手機簡訊/郵件驗證碼防護。"
+
+            # 提取 Cookie
+            cookie_dict = {c.name: c.value for c in cj}
+            if any(k in cookie_dict for k in [".AspNetCore.Cookies", "cmtoken", "fs", "cmtoken2"]):
+                self.token = "; ".join([f"{k}={v}" for k, v in cookie_dict.items()])
+                return True, "CMoney Web 認證成功"
+
+            if not self.token:
+                return False, "未取得有效 CMoney Session 憑證"
+
+            return True, "CMoney 身份驗證通過"
         except urllib.error.HTTPError as e:
-            err_msg = e.read().decode("utf-8", errors="ignore")
-            # 若官方修改了 client_id 或流程，給予清晰診斷提示
-            return False, f"CMoney 登入 HTTP 錯誤 ({e.code}): {err_msg[:120]}"
+            return False, f"CMoney 登入 HTTP 錯誤 ({e.code})"
         except Exception as e:
             return False, f"連線 CMoney 伺服器異常: {e}"
 
