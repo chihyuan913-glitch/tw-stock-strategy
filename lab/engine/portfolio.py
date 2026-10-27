@@ -109,7 +109,12 @@ class Portfolio:
         tax = math.floor(price * shares * self.tax_rate)
         return fee, tax
 
+    def can_buy(self, price: float, shares: int) -> bool:
+        return self.can_open(price, shares, direction="LONG")
+
     def can_open(self, price: float, shares: int, direction: str = "LONG") -> bool:
+        if shares <= 0:
+            return False
         if direction == "LONG":
             fee = self.calc_buy_fee(price, shares)
             return self.cash >= (price * shares + fee)
@@ -117,6 +122,65 @@ class Portfolio:
             fee, tax = self.calc_sell_cost(price, shares)
             margin_required = price * shares * self.short_margin_rate
             return self.cash >= (margin_required + fee)
+
+    def calculate_position_size(
+        self,
+        sizing_mode: str,
+        price: float,
+        default_shares: int = 1000,
+        stop_loss_price: float = 0.0,
+        atr_value: float = 0.0,
+        fixed_amount: float = 200_000.0,
+        equity_pct: float = 0.20,
+        atr_risk_pct: float = 0.015,
+        max_single_loss_pct: float = 0.05,
+    ) -> int:
+        """
+        動態資金部位控管模型：
+        - fixed_shares: 固定股數 (預設 1000 股)
+        - fixed_amount: 固定金額 (如每筆 20 萬)
+        - equity_pct: 總權益比例 (如每筆佔總資金 20%)
+        - atr_risk: ATR 風險定額分配 (依單筆可承受風險金額與 ATR/停損距離決定股數)
+        並強制執行單筆最大虧損上限 (max_single_loss_pct) 檢核。
+        """
+        if price <= 0:
+            return 0
+
+        current_equity = self.equity_curve[-1]["total_equity"] if self.equity_curve else self.initial_cash
+        mode = (sizing_mode or "fixed_shares").lower()
+
+        if mode == "fixed_amount":
+            raw_shares = int(fixed_amount / price)
+            shares = max(100, (raw_shares // 100) * 100)
+        elif mode == "equity_pct":
+            budget = current_equity * equity_pct
+            raw_shares = int(budget / price)
+            shares = max(100, (raw_shares // 100) * 100)
+        elif mode == "atr_risk":
+            risk_budget = current_equity * atr_risk_pct
+            stop_dist = abs(price - stop_loss_price) if stop_loss_price > 0 else 0.0
+            atr_dist = atr_value * 2.0 if atr_value > 0 else 0.0
+            per_share_risk = max(stop_dist, atr_dist, price * 0.015)
+            raw_shares = int(risk_budget / per_share_risk)
+            shares = max(100, (raw_shares // 100) * 100)
+        else:
+            shares = default_shares
+
+        # 強制檢核單筆最大虧損上限 (Risk Cap Guard)
+        if stop_loss_price > 0 and max_single_loss_pct > 0:
+            unit_loss = abs(price - stop_loss_price)
+            if unit_loss > 0:
+                max_allowed_loss = current_equity * max_single_loss_pct
+                if shares * unit_loss > max_allowed_loss:
+                    capped_shares = int(max_allowed_loss / unit_loss)
+                    shares = max(100, (capped_shares // 100) * 100)
+
+        # 不超過可用現金上限
+        max_affordable = int((self.cash * 0.98) / price)
+        if shares > max_affordable and mode != "fixed_shares":
+            shares = max(0, (max_affordable // 100) * 100)
+
+        return shares
 
     def open_position(
         self,
@@ -327,6 +391,8 @@ class Portfolio:
                 pos.tp1_done = True
             elif "TP2" in reason:
                 action_name = "SELL_TP2"
+            elif "TRAILING_STOP" in reason:
+                action_name = "SELL_TRAILING_STOP"
             elif "STOP" in reason:
                 action_name = "SELL_STOP_LOSS"
 

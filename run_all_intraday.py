@@ -85,6 +85,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "09_treasury_stock_buyback" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "09_treasury_stock_buyback"
     },
+    {
+        "id": "10_investment_trust_sprint",
+        "name": "策略 10：投信認養集中度爆發到價雷達",
+        "script": ROOT_DIR / "strategies" / "10_investment_trust_sprint" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "10_investment_trust_sprint"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):

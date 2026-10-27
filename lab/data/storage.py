@@ -5,6 +5,7 @@ MarketStorage: 台股量化實驗室嵌入式資料庫驅動 (SQLite WAL Mode)
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from typing import List, Dict, Any, Optional, Union
 import pandas as pd
 
@@ -29,14 +30,18 @@ class MarketStorage:
         """清除記憶體快取"""
         self._cache.clear()
 
-    def _get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_connection(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        # 開啟 WAL 模式與效能調校
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA cache_size=-64000;")  # 64MB Cache
-        return conn
+        try:
+            # 開啟 WAL 模式與效能調校
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA cache_size=-64000;")  # 64MB Cache
+            yield conn
+        finally:
+            conn.close()
 
     def _init_database(self):
         """建立核心表格結構與索引"""
@@ -99,6 +104,30 @@ class MarketStorage:
                 updated_at TEXT
             );
             """)
+
+            # 5. 月營收資料表 (強制錨定發布日為次月 10 日)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS monthly_revenues (
+                symbol TEXT NOT NULL,
+                year_month TEXT NOT NULL,
+                announce_date TEXT NOT NULL,
+                revenue REAL DEFAULT 0.0,
+                mom_pct REAL DEFAULT 0.0,
+                yoy_pct REAL DEFAULT 0.0,
+                PRIMARY KEY (symbol, year_month)
+            );
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rev_symbol_announce ON monthly_revenues (symbol, announce_date);")
+
+            # 6. 處置股與特殊交易狀態表
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS disposal_dates (
+                symbol TEXT NOT NULL,
+                date TEXT NOT NULL,
+                reason TEXT DEFAULT 'DISPOSAL',
+                PRIMARY KEY (symbol, date)
+            );
+            """)
             conn.commit()
 
     def save_daily_bars(self, symbol: str, data: Union[pd.DataFrame, List[Dict[str, Any]]]):
@@ -107,8 +136,11 @@ class MarketStorage:
         """
         if isinstance(data, pd.DataFrame):
             df = data.copy()
-            if "date" not in df.columns and isinstance(df.index, pd.DatetimeIndex):
-                df["date"] = df.index.strftime("%Y-%m-%d")
+            if "date" not in df.columns:
+                if isinstance(df.index, pd.DatetimeIndex):
+                    df["date"] = df.index.strftime("%Y-%m-%d")
+                else:
+                    df["date"] = df.index.astype(str)
             records = df.to_dict(orient="records")
         else:
             records = data
@@ -139,6 +171,18 @@ class MarketStorage:
             conn.commit()
 
         # 失效該標的之快取
+        keys_to_del = [k for k in self._cache if k.startswith(f"bars_{symbol}_")]
+        for k in keys_to_del:
+            self._cache.pop(k, None)
+        return len(rows)
+
+    def clear_symbol_bars(self, symbol: str):
+        """清除指定標的之舊日 K、籌碼與融資快取，確保切換為真實歷史資料時不殘留模擬數據"""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM daily_bars WHERE symbol = ?", (symbol,))
+            conn.execute("DELETE FROM chips WHERE symbol = ?", (symbol,))
+            conn.execute("DELETE FROM margin_balances WHERE symbol = ?", (symbol,))
+            conn.commit()
         keys_to_del = [k for k in self._cache if k.startswith(f"bars_{symbol}_")]
         for k in keys_to_del:
             self._cache.pop(k, None)
@@ -198,8 +242,11 @@ class MarketStorage:
         """
         if isinstance(data, pd.DataFrame):
             df = data.copy()
-            if "date" not in df.columns and isinstance(df.index, pd.DatetimeIndex):
-                df["date"] = df.index.strftime("%Y-%m-%d")
+            if "date" not in df.columns:
+                if isinstance(df.index, pd.DatetimeIndex):
+                    df["date"] = df.index.strftime("%Y-%m-%d")
+                else:
+                    df["date"] = df.index.astype(str)
             records = df.to_dict(orient="records")
         else:
             records = data
@@ -223,6 +270,7 @@ class MarketStorage:
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
             conn.commit()
+        return len(rows)
 
     def get_chips(
         self,
@@ -262,8 +310,11 @@ class MarketStorage:
         """
         if isinstance(data, pd.DataFrame):
             df = data.copy()
-            if "date" not in df.columns and isinstance(df.index, pd.DatetimeIndex):
-                df["date"] = df.index.strftime("%Y-%m-%d")
+            if "date" not in df.columns:
+                if isinstance(df.index, pd.DatetimeIndex):
+                    df["date"] = df.index.strftime("%Y-%m-%d")
+                else:
+                    df["date"] = df.index.astype(str)
             records = df.to_dict(orient="records")
         else:
             records = data
@@ -293,6 +344,7 @@ class MarketStorage:
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
             conn.commit()
+        return len(rows)
 
     def get_margin(
         self,
@@ -353,3 +405,114 @@ class MarketStorage:
             cursor.execute("SELECT MAX(date) FROM daily_bars WHERE symbol = ?", (symbol,))
             res = cursor.fetchone()
             return res[0] if res and res[0] else None
+
+    @staticmethod
+    def compute_revenue_announce_date(year_month: str) -> str:
+        """
+        將上市櫃公司月營收發布日強制錨定為「次月 10 日」。
+        例如: '2024-03' -> '2024-04-10', '2024-12' -> '2025-01-10'
+        """
+        ym = str(year_month).strip()[:7]
+        parts = ym.split("-")
+        year = int(parts[0])
+        month = int(parts[1])
+        if month == 12:
+            next_year = year + 1
+            next_month = 1
+        else:
+            next_year = year
+            next_month = month + 1
+        return f"{next_year:04d}-{next_month:02d}-10"
+
+    def save_monthly_revenues(self, symbol: str, data: Union[pd.DataFrame, List[Dict[str, Any]]]):
+        """
+        批次寫入月營收數據，強制將 announce_date 錨定為次月 10 日。
+        """
+        if isinstance(data, pd.DataFrame):
+            records = data.to_dict(orient="records")
+        else:
+            records = data
+
+        if not records:
+            return
+
+        insert_sql = """
+        INSERT OR REPLACE INTO monthly_revenues (
+            symbol, year_month, announce_date, revenue, mom_pct, yoy_pct
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        rows = []
+        for r in records:
+            ym = str(r.get("year_month") or r.get("date", ""))[:7]
+            ann_date = self.compute_revenue_announce_date(ym)
+            rows.append((
+                symbol,
+                ym,
+                ann_date,
+                float(r.get("revenue", 0.0)),
+                float(r.get("mom_pct", 0.0)),
+                float(r.get("yoy_pct", 0.0)),
+            ))
+
+        with self._get_connection() as conn:
+            conn.executemany(insert_sql, rows)
+            conn.commit()
+        return len(rows)
+
+    def get_available_revenue_as_of(self, symbol: str, query_date: str) -> Optional[Dict[str, Any]]:
+        """
+        取得在 query_date 當下已發布之最新月營收（嚴格遵守次月 10 日錨定，杜絕未來函數）。
+        若 query_date < 次月 10 日，自動回傳上上個月之舊資料。
+        """
+        q_date = str(query_date)[:10]
+        query = """
+        SELECT symbol, year_month, announce_date, revenue, mom_pct, yoy_pct
+        FROM monthly_revenues
+        WHERE symbol = ? AND announce_date <= ?
+        ORDER BY year_month DESC
+        LIMIT 1
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (symbol, q_date))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_revenue_history_as_of(self, symbol: str, query_date: str, limit: int = 12) -> pd.DataFrame:
+        """
+        取得截至 query_date 當下可見的歷史月營收序列（按月份由舊到新排序）
+        """
+        q_date = str(query_date)[:10]
+        query = """
+        SELECT year_month, announce_date, revenue, mom_pct, yoy_pct
+        FROM (
+            SELECT year_month, announce_date, revenue, mom_pct, yoy_pct
+            FROM monthly_revenues
+            WHERE symbol = ? AND announce_date <= ?
+            ORDER BY year_month DESC
+            LIMIT ?
+        )
+        ORDER BY year_month ASC
+        """
+        with self._get_connection() as conn:
+            df = pd.read_sql_query(query, conn, params=[symbol, q_date, limit])
+        return df
+
+    def save_disposal_dates(self, symbol: str, dates: List[str], reason: str = "DISPOSAL"):
+        """標記處置股日期"""
+        if not dates:
+            return
+        rows = [(symbol, str(d)[:10], reason) for d in dates]
+        with self._get_connection() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO disposal_dates (symbol, date, reason) VALUES (?, ?, ?)",
+                rows,
+            )
+            conn.commit()
+
+    def get_disposal_dates(self, symbol: str) -> set:
+        """取得該標的被列為處置股的所有日期集合"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT date FROM disposal_dates WHERE symbol = ?", (symbol,))
+            return {row[0] for row in cursor.fetchall()}

@@ -297,7 +297,7 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
         if q['volume'] >= min_vol_shares:
             # 檢查收紅與初階漲幅
             chg_pct = ((q['close'] - q['open']) / q['open']) * 100.0 if q['open'] > 0 else 0.0
-            if q['close'] >= q['open'] and chg_pct >= 1.5:
+            if q['close'] > q['open'] and chg_pct >= 1.5:  # 強制實體紅K，排除平盤/假陽線
                 candle_m = calculate_candle_metrics(q['open'], q['high'], q['low'], q['close'])
                 # 上影線不可過長 (上影線比例 < 40%)
                 if candle_m['solid_ratio'] >= 0.60:
@@ -373,6 +373,10 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
             f_lots = c_info['foreign'] // 1000
             t_lots = c_info['trust'] // 1000
             inst_lots = c_info['total'] // 1000
+
+            # 硬性風控防倒貨：三大法人（外資+投信）嚴禁淨賣超，徹底封殺拉高倒貨給散戶之惡性出貨陷阱！
+            if (f_lots + t_lots) < 0:
+                continue
 
             broker_guard = evaluate_overnight_broker_risk(
                 code=code,

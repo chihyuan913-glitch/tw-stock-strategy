@@ -286,6 +286,24 @@ def build_regime_matrix(regime_key: str, market_info: Dict[str, Any], group_info
             "tp1_pct": long_strategies["tp1_pct"],
             "stop_loss_pct": long_strategies["stop_loss_pct"],
             "recommendation_limit": 4 if is_q_end_season else 2
+        },
+        "09_treasury_stock_buyback": {
+            "name": "庫藏股宣告護盤與低估值事件",
+            "active_mode": "BUYBACK_AMBUSH",
+            "pb_max": 1.25,
+            "tp1_pct": long_strategies["tp1_pct"],
+            "stop_loss_pct": long_strategies["stop_loss_pct"],
+            "recommendation_limit": 3
+        },
+        "10_investment_trust_sprint": {
+            "name": "投信認養集中度爆發飆股",
+            "active_mode": "TRUST_SPRINT",
+            "min_trust_consec_days": 3 if regime_key == REGIME_BULL_MOMENTUM else 2,
+            "bias_max_pct": 6.5 if regime_key == REGIME_BULL_MOMENTUM else 5.0,
+            "tp1_pct": 7.0 if regime_key == REGIME_BULL_MOMENTUM else 5.5,
+            "tp2_pct": 14.0 if regime_key == REGIME_BULL_MOMENTUM else 10.0,
+            "stop_loss_pct": long_strategies["stop_loss_pct"],
+            "recommendation_limit": 4 if regime_key == REGIME_BULL_MOMENTUM else 2
         }
     }
 

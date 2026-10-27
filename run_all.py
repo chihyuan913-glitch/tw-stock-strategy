@@ -76,6 +76,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "09_treasury_stock_buyback" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "10_investment_trust_sprint",
+        "name": "投信認養集中度爆發飆股策略",
+        "script": ROOT_DIR / "strategies" / "10_investment_trust_sprint" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False, force=False):

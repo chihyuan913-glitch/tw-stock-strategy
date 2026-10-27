@@ -8,6 +8,13 @@ from .adapters import (
     InstitutionalMomentumStrategy,
     ShortMomentumStrategy,
     VolumeSurgeStrategy,
+    KDGoldenCrossStrategy,
+    MABullishAlignmentStrategy,
+    GapUpMomentumStrategy,
+    RevenueNewHighStrategy,
+    MarginReductionStrategy,
+    CustomBlockStrategy,
+    PRESET_COMPOSITE_TEMPLATES,
     StrategyRegistry,
 )
 
@@ -17,5 +24,12 @@ __all__ = [
     "InstitutionalMomentumStrategy",
     "ShortMomentumStrategy",
     "VolumeSurgeStrategy",
+    "KDGoldenCrossStrategy",
+    "MABullishAlignmentStrategy",
+    "GapUpMomentumStrategy",
+    "RevenueNewHighStrategy",
+    "MarginReductionStrategy",
+    "CustomBlockStrategy",
+    "PRESET_COMPOSITE_TEMPLATES",
     "StrategyRegistry",
 ]

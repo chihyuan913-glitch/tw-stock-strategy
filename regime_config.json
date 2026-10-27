@@ -1,95 +1,98 @@
 {
   "version": "1.0.0",
-  "updated_at": "2026-10-18 21:27:11",
+  "updated_at": "2026-10-25 22:50:41",
   "market_regime": {
-    "key": "SIDEWAYS_CONSOLIDATION",
-    "label": "🟡【高檔震盪整理・箱型洗盤】",
-    "close": 47111.26,
-    "bias_ma20": -2.1,
-    "ma20": 48121.22,
-    "ma60": 46055.78,
-    "trend": "箱型震盪",
-    "risk_advice": "指數跌破月線但守穩季線，類股快速輪動。採高出低進策略，重視布林下軌超跌反彈（策略 01）。"
+    "key": "BEAR_DEFENSIVE",
+    "label": "🟣【空頭回檔修正・防禦避險】",
+    "close": 46041.43,
+    "bias_ma20": -4.22,
+    "ma20": 48071.61,
+    "ma60": 46207.09,
+    "trend": "弱勢破線",
+    "risk_advice": "指數跌破雙均線，以保守防守為最高原則。提高現金水位至 7 成以上，善用策略 03 個股期放空避險。"
   },
   "global_controls": {
-    "mode": "高出低進箱型型",
-    "cash_target_pct": 45.0,
-    "max_recommendations_per_strategy": 3,
-    "trailing_stop_activation_pct": 4.0,
-    "trailing_stop_pullback_pct": 2.0,
-    "tactical_guidance": "指數處於箱型區間整理，重視支撐低接與布林下軌超跌反彈；快進快出，不戀棧。"
+    "mode": "防禦避險型",
+    "cash_target_pct": 70.0,
+    "max_recommendations_per_strategy": 2,
+    "trailing_stop_activation_pct": 3.0,
+    "trailing_stop_pullback_pct": 1.5,
+    "tactical_guidance": "指數失守均線，保留高現金水位。多方僅做高防守超跌反彈，多利用股期空單避險。"
   },
   "long_strategies": {
-    "bias_max_pct": 3.5,
-    "tp1_pct": 4.0,
-    "tp2_pct": 7.0,
-    "stop_loss_pct": -5.0,
+    "bias_max_pct": 2.0,
+    "tp1_pct": 3.5,
+    "tp2_pct": 6.0,
+    "stop_loss_pct": -4.0,
     "min_volume": 1200,
-    "priority_weight": 1.0
+    "priority_weight": 0.4
   },
   "short_strategies": {
-    "bias_min_pct": -3.5,
-    "tp1_pct": 4.5,
-    "stop_loss_pct": 4.5,
+    "bias_min_pct": -2.0,
+    "tp1_pct": 7.0,
+    "stop_loss_pct": 4.0,
     "min_volume": 1000,
-    "priority_weight": 1.0
+    "priority_weight": 1.5
   },
   "strategy_specific": {
     "01_bollinger_reversal": {
       "name": "布林通道超跌反轉",
       "active_mode": "LONG_REVERSAL",
-      "bb_lower_band_offset_pct": 0.5,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
-      "recommendation_limit": 3
+      "bb_lower_band_offset_pct": 1.0,
+      "bb_tier2_offset_pct": 2.5,
+      "tp1_pct": 3.5,
+      "stop_loss_pct": -4.0,
+      "recommendation_limit": 2
     },
     "02_institutional_momentum": {
       "name": "法人籌碼集中起漲",
       "active_mode": "LONG_MOMENTUM",
       "institutional_buy_days_min": 3,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
-      "recommendation_limit": 3
+      "tp1_pct": 3.5,
+      "stop_loss_pct": -4.0,
+      "recommendation_limit": 2
     },
     "03_short_momentum": {
       "name": "弱勢破線做空避險",
       "active_mode": "SHORT_BREAKDOWN",
       "short_breakdown_ma_trigger": "MA20",
-      "tp1_pct": 4.5,
-      "stop_loss_pct": 4.5,
-      "recommendation_limit": 2
+      "tp1_pct": 7.0,
+      "stop_loss_pct": 4.0,
+      "recommendation_limit": 4
     },
     "04_cb_pricing_ambush": {
       "name": "可轉債定價伏擊",
       "active_mode": "LONG_AMBUSH",
       "cb_premium_upper_bound_pct": 15.0,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
+      "tp1_pct": 3.5,
+      "stop_loss_pct": -4.0,
       "recommendation_limit": 3
     },
     "05_stock_futures_long": {
       "name": "股票期貨波段多方",
       "active_mode": "FUTURES_LONG",
       "futures_basis_min": -0.5,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
-      "recommendation_limit": 3
+      "tp1_pct": 3.5,
+      "stop_loss_pct": -4.0,
+      "recommendation_limit": 2
     },
     "06_volume_surge": {
       "name": "動能爆量突破",
       "active_mode": "VOLUME_BREAKOUT",
       "volume_surge_multiplier": 2.5,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
+      "bias_max_pct": 8.0,
+      "tp1_pct": 6.0,
+      "tp2_pct": 12.0,
+      "stop_loss_pct": -4.0,
       "recommendation_limit": 3
     },
     "07_margin_call_ambush": {
       "name": "高融資斷頭與浮額清洗",
       "active_mode": "DUAL_STATE_MACHINE",
       "margin_maintenance_critical_pct": 135.0,
-      "short_tp_pct": 4.5,
-      "reversal_tp_pct": 4.0,
-      "stop_loss_pct": -5.0,
+      "short_tp_pct": 7.0,
+      "reversal_tp_pct": 3.5,
+      "stop_loss_pct": -4.0,
       "recommendation_limit": 3
     },
     "08_group_window_dressing": {
@@ -98,8 +101,8 @@
       "is_season_climax": false,
       "group_resonance_threshold": 0.5,
       "season_focus_weight": 1.0,
-      "tp1_pct": 4.0,
-      "stop_loss_pct": -5.0,
+      "tp1_pct": 3.5,
+      "stop_loss_pct": -4.0,
       "recommendation_limit": 2
     }
   }

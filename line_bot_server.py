@@ -811,7 +811,8 @@ async def get_overview():
         "06_volume_surge",
         "07_margin_call_ambush",
         "08_group_window_dressing",
-        "09_treasury_stock_buyback"
+        "09_treasury_stock_buyback",
+        "10_investment_trust_sprint"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -875,6 +876,10 @@ async def get_strategy_data(strat_id: str):
             "name": "策略 09：庫藏股宣告護盤與低估值事件策略",
             "desc": "鎖定 MOPS 法定庫藏股申報、過往 3 年執行率誠信檢核、4+1 維度低估值護盤與法人防對倒共振，三層動態降級容錯。"
         },
+        "10_investment_trust_sprint": {
+            "name": "策略 10：投信認養集中度爆發飆股策略",
+            "desc": "鎖定投信連續重金吃貨認養、籌碼高度集中鎖碼、均線多頭起漲且嚴守乖離防追高之中小型爆發飆股。"
+        }
     }
 
     meta = strat_meta.get(strat_id, {"name": strat_id, "desc": ""})
@@ -1011,29 +1016,52 @@ async def get_strategy_data(strat_id: str):
             "rows": []
         }
 
-@app.get("/api/trade_history")
-async def get_trade_history_api(strategy: Optional[str] = None):
-    """取得歷史已結案操盤戰績與 KPI 統計總覽"""
-    try:
-        from trade_history_manager import GLOBAL_TRADE_HISTORY
-        return GLOBAL_TRADE_HISTORY.get_performance_summary(strategy)
-    except Exception as e:
-        return {
-            "error": str(e),
-            "total_trades": 0,
-            "winning_trades": 0,
-            "losing_trades": 0,
-            "flat_trades": 0,
-            "win_rate_pct": 0.0,
-            "avg_return_pct": 0.0,
-            "total_return_pct": 0.0,
-            "max_win_pct": 0.0,
-            "max_loss_pct": 0.0,
-            "avg_holding_days": 0.0,
-            "total_pnl_amount": 0.0,
-            "trades": []
-        }
-
+@app.get("/api/trade_history")
+
+async def get_trade_history_api(strategy: Optional[str] = None):
+
+    """取得歷史已結案操盤戰績與 KPI 統計總覽"""
+
+    try:
+
+        from trade_history_manager import GLOBAL_TRADE_HISTORY
+
+        return GLOBAL_TRADE_HISTORY.get_performance_summary(strategy)
+
+    except Exception as e:
+
+        return {
+
+            "error": str(e),
+
+            "total_trades": 0,
+
+            "winning_trades": 0,
+
+            "losing_trades": 0,
+
+            "flat_trades": 0,
+
+            "win_rate_pct": 0.0,
+
+            "avg_return_pct": 0.0,
+
+            "total_return_pct": 0.0,
+
+            "max_win_pct": 0.0,
+
+            "max_loss_pct": 0.0,
+
+            "avg_holding_days": 0.0,
+
+            "total_pnl_amount": 0.0,
+
+            "trades": []
+
+        }
+
+
+
 @app.get("/api/weekly_report")
 async def get_weekly_report():
     """取得每週總體戰略週報內容"""

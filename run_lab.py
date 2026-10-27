@@ -32,6 +32,7 @@ from lab import (
     MarketDataLoader,
     BacktestEngine,
     StrategyRegistry,
+    ScreenerFusionBridge,
 )
 
 
@@ -43,7 +44,78 @@ def main():
     parser.add_argument("--scenario", type=str, default="bb_reversal", help="測試行情情境 (bb_reversal / trend_up / chop)")
     parser.add_argument("--days", type=int, default=100, help="模擬天數 (預設: 100天)")
     parser.add_argument("--list", action="store_true", help="列出實驗室所有可用策略")
+    parser.add_argument("--daily-advisor", action="store_true", help="自動讀取今日 01~09 實盤選股池執行回測，產出明日建議買賣清單")
+    parser.add_argument("--leaderboard", action="store_true", help="執行 14 支核心與複合因子策略橫向 PK 排行榜評比")
+    parser.add_argument("--line", action="store_true", help="將實驗室產出之明日買賣建議戰報推播至 LINE")
+    parser.add_argument("--top-n", type=int, default=2, help="每支實盤策略抽取前 N 檔個股回測 (預設: 2)")
     args = parser.parse_args()
+
+    if args.leaderboard:
+        storage = MarketStorage()
+        loader = MarketDataLoader(storage)
+        lb = ScreenerFusionBridge.generate_strategy_leaderboard(
+            storage=storage,
+            loader=loader,
+            initial_cash=args.cash,
+        )
+        print("\n================ 🏆 量化策略實驗室・14 支策略橫向 PK 排行榜 ================")
+        for r in lb["leaderboard"]:
+            print(
+                f"  #{r['rank']:02d} | {r['grade']} | {r['name']:<32} | "
+                f"報酬 {r['total_return_pct']:+6.2f}% | 勝率 {r['win_rate_pct']:5.1f}% | "
+                f"夏普 {r['sharpe_ratio']:5.2f} | Calmar {r['calmar_ratio']:5.2f} | 總分 {r['score']:5.1f}"
+            )
+        print("============================================================================\n")
+        return
+
+    if args.daily_advisor:
+        storage = MarketStorage()
+        loader = MarketDataLoader(storage)
+        report = ScreenerFusionBridge.generate_next_day_advisor_report(
+            storage=storage,
+            loader=loader,
+            top_n_per_strategy=args.top_n,
+            initial_cash=args.cash,
+        )
+        mr = report.get("market_regime", {})
+        print("\n================ 🔮 今日盤後選股池自動回測 ➔ 明日 (T+1) 買賣決策清單 (V3.0) ================")
+        print(
+            f"  🧭 大盤位階: {mr.get('label', '震盪偏多')} | 建議現金保留: {mr.get('cash_target_pct', 30)}% | "
+            f"可動用資金: NT${report.get('effective_capital', args.cash):,.0f}"
+        )
+        print(
+            f"  📊 共評估 {report['total_evaluated']} 檔 | "
+            f"🟢優先買進: {report['strong_buy_count']} | "
+            f"🟡拉回低接: {report['buy_on_dip_count']} | "
+            f"🔴建議放空: {report['short_sell_count']} | "
+            f"🛑淘汰剔除: {report['filtered_out_count']}"
+        )
+        print("-" * 92)
+        for r in report["recommendations"]:
+            print(
+                f"  {r['tomorrow_action']:<18} | {r['symbol']} {r['name']:<6} | 來源: {r['source_strategy']} ({r['verdict']})"
+            )
+            print(
+                f"     ↳ 歷史回測: 報酬 {r['hist_return_pct']:+.2f}%, 勝率 {r['hist_win_rate_pct']:.1f}%, 夏普 {r['hist_sharpe']:.2f}, 盈虧比 1:{r['rr_ratio']}, 期望值 {r['expectancy_pct']:+.2f}%"
+            )
+            fut_str = f" / 或股期 {r['recommended_futures_lots']} 口" if r.get("recommended_futures_lots", 0) > 0 else ""
+            print(
+                f"     ↳ 明日四防線: 🟢進場 ${r['entry_price']} | 🔵加碼 ${r['addon_price']} | 🔴TP1 ${r['tp1_price']} / TP2 ${r['tp2_price']} | 🛑停損 ${r['stop_loss_price']} (建議 {r['recommended_shares']:,} 股{fut_str})"
+            )
+        out_csv = os.path.join(ROOT_DIR, "lab", "data", "tomorrow_trading_advisor.csv")
+        with open(out_csv, "w", encoding="utf-8-sig") as f:
+            f.write(report["csv_content"])
+        print("-" * 92)
+        print(f"[✓] 明日買賣建議清單已匯出至: {out_csv}\n")
+        if args.line:
+            line_text = ScreenerFusionBridge.format_advisor_line_text(report)
+            try:
+                from line_sender import send_to_line
+                send_to_line(line_text, strategy="01")
+                print("[✓] 已推播明日買賣建議戰報至 LINE！")
+            except Exception as e:
+                print(f"[!] LINE 推播略過: {e}")
+        return
 
     if args.list:
         print("\n================== 🔬 台股量化策略實驗室 - 策略庫 ==================")
@@ -59,11 +131,16 @@ def main():
     storage = MarketStorage()
     loader = MarketDataLoader(storage)
 
-    # 準備回測數據
-    df = storage.get_daily_bars(args.symbol)
-    if df.empty or len(df) < 30:
-        print(f"[*] 生成標準測試行情序列 (情境: {args.scenario}, 天數: {args.days})...")
-        df = loader.generate_mock_series(symbol=args.symbol, scenario=args.scenario, days=args.days)
+    # 準備回測數據 (優先採用 yfinance 真實歷史行情)
+    print(f"[*] 載入標的行情 [{args.symbol}] (優先使用 yfinance 真實日 K)...")
+    df = loader.ensure_real_or_fallback_series(
+        symbol=args.symbol,
+        scenario=args.scenario,
+        days=args.days,
+    )
+    meta = storage.get_stock_meta(args.symbol)
+    src_tag = "yfinance 真實歷史行情" if (meta and meta.get("market") == "REAL_YFINANCE") else f"情境模擬序列 ({args.scenario})"
+    print(f"[✓] 標的行情載入完成：共 {len(df)} 根 K 棒 (來源: {src_tag})")
 
     market_data = {args.symbol: df}
     strategy = StrategyRegistry.get(args.strategy)

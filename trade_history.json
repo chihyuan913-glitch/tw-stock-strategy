@@ -1,5 +1,85 @@
 [
   {
+    "trade_id": "03_short_momentum_1609_2026-10-27",
+    "code": "1609",
+    "name": "大亞",
+    "strategy_id": "03_short_momentum",
+    "strategy_name": "03_short_momentum",
+    "first_entry_date": "2026-10-24",
+    "first_entry_price": 35.12,
+    "first_tp_price": 32.46,
+    "second_entry_price": 34.0,
+    "second_tp_price": 30.15,
+    "third_entry_price": null,
+    "third_tp_price": null,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-24",
+        "entry": 35.12,
+        "tp": 32.46
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-27",
+        "entry": 34.0,
+        "tp": 30.15
+      }
+    ],
+    "exit_date": "2026-10-27",
+    "exit_price": 37.25,
+    "exit_reason": "觸發停損回補 (現價 37.25 >= 停損防線 36.69)",
+    "holding_days": 4,
+    "avg_entry_price": 35.12,
+    "return_pct": -6.06,
+    "return_amount": -2130.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-27 17:35:21"
+  },
+  {
+    "trade_id": "03_short_momentum_50_2026-10-27",
+    "code": "50",
+    "name": "元大台灣50",
+    "strategy_id": "03_short_momentum",
+    "strategy_name": "03_short_momentum",
+    "first_entry_date": "2026-10-24",
+    "first_entry_price": 32.66,
+    "first_tp_price": 26.46,
+    "second_entry_price": 32.35,
+    "second_tp_price": 26.15,
+    "third_entry_price": 29.14,
+    "third_tp_price": 19.44,
+    "stages_history": [
+      {
+        "stage": 1,
+        "date": "2026-10-24",
+        "entry": 32.66,
+        "tp": 26.46
+      },
+      {
+        "stage": 2,
+        "date": "2026-10-27",
+        "entry": 32.35,
+        "tp": 26.15
+      },
+      {
+        "stage": 3,
+        "date": "2026-10-27",
+        "entry": 29.14,
+        "tp": 19.44
+      }
+    ],
+    "exit_date": "2026-10-27",
+    "exit_price": 106.9,
+    "exit_reason": "觸發停損回補 (現價 106.9 >= 停損防線 38.46)",
+    "holding_days": 4,
+    "avg_entry_price": 32.5,
+    "return_pct": -228.92,
+    "return_amount": -74400.0,
+    "pnl_status": "LOSS",
+    "archived_at": "2026-10-27 17:35:21"
+  },
+  {
     "trade_id": "08_group_window_dressing_2421_2026-10-23",
     "code": "2421",
     "name": "建準",
@@ -932,7 +1012,7 @@
     "strategy_name": "",
     "first_entry_date": "2026-10-15",
     "first_entry_price": 10.0,
-    "first_tp_price": 0.0,
+    "first_tp_price": 10.4,
     "second_entry_price": 10.3,
     "second_tp_price": 11.0,
     "third_entry_price": null,
@@ -942,7 +1022,7 @@
         "stage": 1,
         "date": "2026-10-15",
         "entry": 10.0,
-        "tp": 0.0
+        "tp": 10.4
       },
       {
         "stage": 2,
@@ -959,7 +1039,7 @@
     "return_pct": 0.0,
     "return_amount": 0.0,
     "pnl_status": "FLAT",
-    "archived_at": "2026-10-24 20:48:30"
+    "archived_at": "2026-10-27 20:18:04"
   },
   {
     "trade_id": "01_bollinger_reversal_2330_2026-10-24",

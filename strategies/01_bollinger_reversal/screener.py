@@ -535,8 +535,15 @@ def main():
 
     # 自動載入全域市場自適應操盤參數 (Adaptive Regime Parameters)
     try:
-        from adaptive_regime_manager import get_strategy_adaptive_params
+        from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
         adap_p = get_strategy_adaptive_params("01")
+        reg_cfg = load_adaptive_config()
+        market_reg = reg_cfg.get("market_regime", {})
+        is_defensive = (market_reg.get("key") in ("BEAR_DEFENSIVE", "HIGH_VOLATILITY")) or ("空頭" in market_reg.get("label", ""))
+        if is_defensive:
+            args.max_dist = min(args.max_dist, 0.5)
+            args.strict_candle = True
+            print(f"[*] 📡 偵測大盤位階為【{market_reg.get('label', '防禦避險')}】：自動收緊下軌上限至 +{args.max_dist}% 並啟用實質止跌K線硬濾網！")
         if adap_p:
             if args.min_vol == 1000 and "min_volume" in adap_p:
                 args.min_vol = int(adap_p["min_volume"])

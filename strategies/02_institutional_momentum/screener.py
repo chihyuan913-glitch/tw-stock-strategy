@@ -35,6 +35,7 @@ if ROOT_DIR not in sys.path:
 
 from algo_guards import evaluate_overnight_broker_risk
 from four_price_engine import calculate_four_prices_long
+from futures_helper import load_stock_futures_pool, fetch_taifex_futures_quotes, calculate_futures_pricing
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -192,6 +193,8 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
     # 2. 獲取籌碼與行情
     chips_history = fetch_institutional_data(dates_5d)
     quotes = fetch_daily_quotes(latest_date)
+    futures_map = load_stock_futures_pool()
+    taifex_quotes = fetch_taifex_futures_quotes()
     
     if not quotes or not chips_history:
         print("[X] 資料獲取不完整，終止篩選。")
@@ -352,6 +355,22 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
                 }
             )
 
+            # 股票期貨價位優先計算與四大防線換算 (Futures Pricing Priority)
+            f_info = futures_map.get(code, {'contract': '--', 'name': q['name']})
+            contract_base = f_info.get('contract', '--')
+            fut_q = taifex_quotes.get(contract_base)
+            fut_pricing = calculate_futures_pricing(
+                spot_close=curr_close,
+                futures_quote=fut_q,
+                entry_spot=entry_p,
+                addon_spot=addon_p,
+                tp1_spot=tp1_p,
+                tp2_spot=tp2_p,
+                sl_spot=sl_p,
+                contract_base=contract_base,
+                is_long=True
+            )
+
             results.append({
                 '證券代號': code,
                 '證券名稱': q['name'],
@@ -362,6 +381,17 @@ def screen_institutional_momentum(date_str=None, min_vol_lots=1000,
                 '停利TP1': tp1_p,
                 '停利TP2': tp2_p,
                 '停損價位': sl_p,
+                '期貨合約': fut_pricing['contract_sym'],
+                '期貨收盤': fut_pricing['futures_close'] if fut_pricing['has_contract'] else '--',
+                '價差': fut_pricing['basis_desc'] if fut_pricing['has_contract'] else '--',
+                '1口保證金': fut_pricing['margin_1lot'] if fut_pricing['has_contract'] else '--',
+                '期貨OI': fut_pricing['futures_oi'] if fut_pricing['has_contract'] else 0,
+                '期貨進場': fut_pricing['futures_entry'] if fut_pricing['has_contract'] else entry_p,
+                '期貨加碼': fut_pricing['futures_addon'] if fut_pricing['has_contract'] else addon_p,
+                '期貨TP1': fut_pricing['futures_tp1'] if fut_pricing['has_contract'] else tp1_p,
+                '期貨TP2': fut_pricing['futures_tp2'] if fut_pricing['has_contract'] else tp2_p,
+                '期貨停損': fut_pricing['futures_sl'] if fut_pricing['has_contract'] else sl_p,
+                '結算提醒': fut_pricing.get('settlement_tag', ''),
                 '隔日沖風控': og_risk['tag'],
                 '月線(20MA)': round(ma20_curr, 2),
                 '月線乖離%': round(bias_ma20_pct, 2),

@@ -114,6 +114,10 @@ def score_and_analyze_cb(cb_item, market_data):
         
     price_to_conv_ratio = round(price / conv_price, 3)
 
+    # 硬性風控防追高：轉換溢價率嚴格限制 <= 15% (現價/轉換價 <= 1.15)，排除已大幅脫離轉換價之追高接刀風險
+    if price_to_conv_ratio > 1.15:
+        return None
+
     # 1. 募資規模與稀釋度 (25 分) - 回測證實規模>=10億勝率54.5% vs <5億僅+0.82%
     est_amount = float(cb_item.get('est_amount', 5.0))
     if est_amount >= 10.0:
@@ -286,7 +290,8 @@ def run_screener(date_str=None, export_path=None, send_line=False):
         m_data = fetch_stock_market_data(code, market)
         if m_data:
             analysis = score_and_analyze_cb(item, m_data)
-            results.append(analysis)
+            if analysis:
+                results.append(analysis)
         else:
             print(f"[!] 無法獲取 {code} {item['name']} 之行情數據，跳過。")
 
