@@ -288,3 +288,14 @@ un_all_intraday.py)**：遇休市自動跳過盯盤輪詢，節省虛擬機運�
    - 🛡️ **底層通訊守門員 (line_sender.py)**：send_to_line 發送前自動檢核 should_suppress_push()，休市日一律取消推送並印出日誌。
 3. **強制模式相容性**：
    - 所有命令列工具均支援 --force 旗標，方便於非交易日進行開發除錯與特定功能驗證。
+
+---
+
+## 二十二、籌碼K線 (CMoney) 自選股雲端與本地雙軌自動同步規範 (CMoney Watchlist Sync Standard)
+為使每日盤後量化選股成果能無縫對接至操盤看盤介面，全策略總調度器一律強制套用根目錄之 [cmoney_sync.py](file:///cmoney_sync.py)：
+1. **雲端 API 全自動同步 (手機 APP ＋ 電腦版雙端同步)**：
+   - 每日 17:35 盤後選股完成後，自動將當日選出之高勝率精選個股代碼，透過 CMoney 雲端 API 寫入指定自選股群組（預設名稱：「量化策略精選」）。
+   - 帳密憑證嚴格自 .env 讀取 (CMONEY_ACCOUNT, CMONEY_PASSWORD 或 CMONEY_AUTH_TOKEN)，絕不硬編碼。
+2. **本地剪貼簿與文字檔雙保險 (Fallback & Instant Import)**：
+   - 每次執行自動產生標準格式之 籌碼K線_自選股匯入.txt，並在 Windows 環境下自動將代碼載入系統剪貼簿。
+   - 電腦版打開按下「自選股匯入」或 Ctrl+V，1 秒內完成手動載入，雙重防線零死角。

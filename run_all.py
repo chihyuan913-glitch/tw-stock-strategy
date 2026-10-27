@@ -187,5 +187,12 @@ def main():
     except Exception as e:
         print(f"[!] 量化實驗室自動回測同步跳過或失敗: {e}")
 
+    # 自動同步每日精選標的至籌碼K線 (CMoney) 自選股
+    try:
+        from cmoney_sync import sync_stocks_to_cmoney
+        sync_stocks_to_cmoney(verbose=True)
+    except Exception as e:
+        print(f"[!] 籌碼K線自選股同步跳過或失敗: {e}")
+
 if __name__ == '__main__':
     main()

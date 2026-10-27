@@ -98,12 +98,19 @@ def test_should_suppress_push():
 
 def test_check_market_open_or_exit_guard(monkeypatch):
     """驗證執行器開盤檢查與強制旗標"""
-    # 預設無強制旗標時，休市日應回傳 False
+    # 模擬休市情境
+    monkeypatch.setattr("market_schedule.is_market_open_today", lambda: (False, "模擬休市日"))
     monkeypatch.setattr(sys, "argv", ["run_all.py"])
     res = check_market_open_or_exit(context_name="測試任務", allow_force=True)
     assert res is False
 
-    # 帶有 --force 旗標時應放行
+    # 模擬休市情境但帶有 --force 旗標時應放行
     monkeypatch.setattr(sys, "argv", ["run_all.py", "--force"])
     res_force = check_market_open_or_exit(context_name="測試任務", allow_force=True)
     assert res_force is True
+
+    # 模擬正常交易日且無強制旗標
+    monkeypatch.setattr("market_schedule.is_market_open_today", lambda: (True, "正常交易日"))
+    monkeypatch.setattr(sys, "argv", ["run_all.py"])
+    res_open = check_market_open_or_exit(context_name="測試任務", allow_force=True)
+    assert res_open is True
