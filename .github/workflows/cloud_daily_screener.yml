@@ -2,8 +2,8 @@ name: ☁️ 雲端全策略盤後選股與 LINE 推播
 
 on:
   schedule:
-    # 台灣時間週一至週五 17:35 (UTC 09:35) 證交所結算後自動執行
-    - cron: '35 9 * * 1-5'
+    # 台灣時間週一至週五 21:15 (UTC 13:15) 官方籌碼 (三大法人/融資融券/可轉債) 全沉澱終極版
+    - cron: '15 13 * * 1-5'
   workflow_dispatch: # 支援在 GitHub 網頁上隨時手動一鍵執行
 
 # 允許 Actions 提交更新後的選股報表回 Git 倉庫
@@ -44,6 +44,8 @@ jobs:
           LINE_TARGET_STRATEGY_06: ${{ secrets.LINE_TARGET_STRATEGY_06 }}
           LINE_TARGET_STRATEGY_07: ${{ secrets.LINE_TARGET_STRATEGY_07 }}
           LINE_TARGET_STRATEGY_08: ${{ secrets.LINE_TARGET_STRATEGY_08 }}
+          LINE_TARGET_STRATEGY_09: ${{ secrets.LINE_TARGET_STRATEGY_09 }}
+          LINE_TARGET_STRATEGY_10: ${{ secrets.LINE_TARGET_STRATEGY_10 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CMONEY_ACCOUNT: ${{ secrets.CMONEY_ACCOUNT }}
@@ -52,17 +54,17 @@ jobs:
         run: |
           python run_all.py --line
 
-      - name: 自動同步最新選股報表回 Git 倉庫
+      - name: 自動同步最新選股報表與明日買賣建議回 Git 倉庫
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add strategies/**/result.csv strategies/**/result.md || true
+          git add strategies/**/result.csv strategies/**/result.md lab/data/tomorrow_trading_advisor.csv || true
           if git diff --staged --quiet; then
-            echo "[*] 選股報表無變更，無需提交。"
+            echo "[*] 選股報表與決策清單無變更，無需提交。"
           else
-            git commit -m "chore(cloud): 自動更新全策略盤後選股報表 [skip ci]"
+            git commit -m "chore(cloud): 自動更新全策略盤後選股與明日買賣建議表 [skip ci]"
             git push
-            echo "[✓] 已成功同步最新選股報表至 GitHub 倉庫！"
+            echo "[✓] 已成功同步最新選股報表與決策清單至 GitHub 倉庫！"
           fi
 
       - name: 封存選股報表 Artifact
@@ -70,5 +72,7 @@ jobs:
         if: always()
         with:
           name: daily-screener-results
-          path: strategies/**/result.*
+          path: |
+            strategies/**/result.*
+            lab/data/tomorrow_trading_advisor.csv
           retention-days: 14

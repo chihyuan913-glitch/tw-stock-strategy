@@ -1,12 +1,12 @@
-# =====================================================================
+﻿# =====================================================================
 # 一鍵建立 Windows 工作排程器：台股選股策略最高總指揮排程
-# 1. 每日盤後全策略自動巡邏 (週一至週五 17:35 執行 run_all.bat)
+# 1. 每日夜間官方籌碼全沉澱終極選股 (週一至週五 21:15 執行 run_nightly_final.bat)
 # 2. 盤中全策略即時到價雷達 (週一至週五 08:55 啟動 run_all_intraday.py)
 # 3. 每週日全策略動態優化與再升級 (每週日 20:00 執行 optimize_all.py)
 # =====================================================================
 
 $WorkingDir = "g:\我的雲端硬碟\台股選股策略"
-$DailyRunner = "$WorkingDir\run_all.bat"
+$NightlyRunner = "$WorkingDir\run_nightly_final.bat"
 $IntradayScript = "$WorkingDir\run_all_intraday.py"
 $WeeklyOptimizer = "$WorkingDir\optimize_all.py"
 
@@ -14,19 +14,28 @@ Write-Host "==========================================================" -Foregro
 Write-Host " 正在設定 Windows 工作排程器：台股量化選股策略總指揮排程" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 任務一：每日盤後全策略自動巡邏 (17:35)
-$TaskDaily = "TWStock_Daily_Master_Runner"
-if (Test-Path $DailyRunner) {
-    $ActionDaily = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$DailyRunner`"" -WorkingDirectory $WorkingDir
-    $TriggerDaily = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday -At 05:35PM
-    $SettingsDaily = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+# 清理舊版 17:35 盤後排程與歷史個別單一策略排程（全面移轉至 21:15 官方籌碼全沉澱終極版）
+$LegacyTasks = @("TWStock_Daily_Master_Runner", "TWStock_BB_Intraday_Radar", "TWStock_BB_Reversal_Daily")
+foreach ($t in $LegacyTasks) {
+    try {
+        Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
+        Write-Host "[*] 已清理歷史舊排程：$t" -ForegroundColor DarkGray
+    } catch { }
+}
+
+# 任務一：每日夜間官方籌碼全沉澱終極版 (21:15)
+$TaskNightly = "TWStock_Nightly_Final_Master_Runner"
+if (Test-Path $NightlyRunner) {
+    $ActionNightly = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$NightlyRunner`" --no-pause" -WorkingDirectory $WorkingDir
+    $TriggerNightly = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday -At 09:15PM
+    $SettingsNightly = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 1)
 
     try {
-        Unregister-ScheduledTask -TaskName $TaskDaily -Confirm:$false -ErrorAction SilentlyContinue
-        Register-ScheduledTask -TaskName $TaskDaily -Action $ActionDaily -Trigger $TriggerDaily -Settings $SettingsDaily -Description "台股每日盤後全策略自動選股與 LINE 推播日報" | Out-Null
-        Write-Host "[✓] 成功註冊盤後排程工作：$TaskDaily (每週一至週五 17:35 執行)" -ForegroundColor Green
+        Unregister-ScheduledTask -TaskName $TaskNightly -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $TaskNightly -Action $ActionNightly -Trigger $TriggerNightly -Settings $SettingsNightly -Description "台股每日夜間官方籌碼全沉澱終極版選股與明日買賣決策表" | Out-Null
+        Write-Host "[✓] 成功註冊夜間終極版排程工作：$TaskNightly (每週一至週五 21:15 執行)" -ForegroundColor Green
     } catch {
-        Write-Host "[!] 註冊 $TaskDaily 失敗: $_" -ForegroundColor Red
+        Write-Host "[!] 註冊 $TaskNightly 失敗: $_" -ForegroundColor Red
     }
 }
 
@@ -67,4 +76,4 @@ if (Test-Path $WeeklyOptimizer) {
     }
 }
 
-Write-Host "`n[完成] 排程設定已全面升級為三大總指揮工作！" -ForegroundColor Cyan
+Write-Host "`n[完成] 排程設定已全面升級為三大精準排程（已全面清理 17:35 與舊排程）！" -ForegroundColor Cyan

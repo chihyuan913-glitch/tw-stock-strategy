@@ -186,6 +186,16 @@ def main():
         out_csv = ROOT_DIR / "lab" / "data" / "tomorrow_trading_advisor.csv"
         out_csv.parent.mkdir(parents=True, exist_ok=True)
         out_csv.write_text(adv_report["csv_content"], encoding="utf-8-sig")
+
+        # 若啟用 --line 則同步將明日 (T+1) 買賣建議戰報推播至 LINE
+        if args.line:
+            try:
+                line_text = ScreenerFusionBridge.format_advisor_line_text(adv_report)
+                from line_sender import send_to_line
+                send_to_line(line_text, strategy="01")
+                print("[✓] 已成功推播量化實驗室明日買賣建議決策戰報至 LINE！")
+            except Exception as e_push:
+                print(f"[!] 量化實驗室明日買賣建議 LINE 推播跳過或失敗: {e_push}")
         print(
             f"[✓] 量化實驗室自動回測完成：共檢驗 {adv_report['total_evaluated']} 檔，"
             f"🟢明日優先買進 {adv_report['strong_buy_count']} 檔，已寫入 {out_csv}"

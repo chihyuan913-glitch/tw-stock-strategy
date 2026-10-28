@@ -2,322 +2,323 @@
   "5328": {
     "code": "5328",
     "name": "華容",
-    "base_price": 48.8,
-    "entry_price": 48.8,
-    "entry_low": 48.21,
-    "entry_high": 48.8,
-    "addon_price": 52.12,
+    "base_price": 50.3,
+    "entry_price": 50.3,
+    "entry_low": 49.04,
+    "entry_high": 50.3,
+    "addon_price": 51.56,
     "tp1_price": 55.0,
     "tp2_price": 63.84,
     "sl_price": 54.12,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 22:06:52",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "STOP_LOSS"
       ]
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26",
-    "last_push_at": "2026-10-27 08:58:31",
+    "last_push_at": "2026-10-28 08:58:22",
     "last_push_event": "STOP_LOSS"
   },
   "2476": {
     "code": "2476",
     "name": "鉅祥",
-    "base_price": 110.0,
-    "entry_price": 110.0,
-    "entry_low": 112.14,
-    "entry_high": 110.0,
-    "addon_price": 116.15,
-    "tp1_price": 124.0,
+    "base_price": 114.0,
+    "entry_price": 114.0,
+    "entry_low": 111.15,
+    "entry_high": 114.0,
+    "addon_price": 116.85,
+    "tp1_price": 123.5,
     "tp2_price": 141.22,
     "sl_price": 122.72,
     "target_id": "test",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "STOP_LOSS"
       ]
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58",
-    "last_push_at": "2026-10-27 08:58:32",
+    "last_push_at": "2026-10-28 08:58:23",
     "last_push_event": "STOP_LOSS"
   },
   "3221": {
     "code": "3221",
     "name": "台嘉碩",
-    "base_price": 46.65,
-    "entry_price": 46.65,
-    "entry_low": 46.47,
-    "entry_high": 46.65,
-    "addon_price": 49.54,
+    "base_price": 48.05,
+    "entry_price": 48.05,
+    "entry_low": 46.85,
+    "entry_high": 48.05,
+    "addon_price": 49.25,
     "tp1_price": 52.4,
     "tp2_price": 62.05,
     "sl_price": 51.34,
     "target_id": "U6493304a3c342ce4208d05996826ac73",
     "added_at": "2026-10-14 21:46:59",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "STOP_LOSS"
       ]
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 15:26:49",
-    "last_push_at": "2026-10-27 08:58:33",
+    "last_push_at": "2026-10-28 08:58:24",
     "last_push_event": "STOP_LOSS"
   },
   "2603": {
     "code": "2603",
     "name": "長榮",
-    "base_price": 261.5,
-    "entry_low": 257.58,
-    "entry_high": 261.5,
-    "addon_price": 268.04,
-    "tp1_price": 279.81,
-    "tp2_price": 300.72,
-    "sl_price": 249.73,
+    "base_price": 263.0,
+    "entry_low": 259.06,
+    "entry_high": 263.0,
+    "addon_price": 269.57,
+    "tp1_price": 281.41,
+    "tp2_price": 302.45,
+    "sl_price": 251.16,
     "target_id": "test",
     "added_at": "2026-10-11 00:30:38",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY"
       ]
     },
-    "entry_price": 261.5,
-    "last_rollover": "2026-10-27",
+    "entry_price": 263.0,
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 5,
     "has_entered": true,
-    "last_push_at": "2026-10-27 08:59:33",
+    "last_push_at": "2026-10-28 08:59:23",
     "last_push_event": "ENTRY",
     "first_entered_at": "2026-10-19"
   },
   "3034": {
     "code": "3034",
     "name": "聯詠[布林超跌]",
-    "base_price": 599.0,
-    "entry_price": 599.0,
-    "entry_low": 584.02,
-    "entry_high": 599.0,
-    "addon_price": 614.08,
-    "tp1_price": 640.93,
-    "tp2_price": 688.85,
-    "sl_price": 560.18,
+    "base_price": 598.0,
+    "entry_price": 598.0,
+    "entry_low": 583.05,
+    "entry_high": 598.0,
+    "addon_price": 612.95,
+    "tp1_price": 639.86,
+    "tp2_price": 687.7,
+    "sl_price": 569.14,
     "target_id": "test",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": [
-        "ENTRY",
-        "ADDON"
+      "2026-10-28": [
+        "ENTRY"
       ]
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27",
-    "last_push_at": "2026-10-27 13:06:16",
-    "last_push_event": "ADDON"
+    "last_rollover": "2026-10-28",
+    "last_push_at": "2026-10-28 08:59:24",
+    "last_push_event": "ENTRY"
   },
   "1102": {
     "code": "1102",
     "name": "亞泥[法人起漲]",
-    "base_price": 38.5,
-    "entry_low": 37.92,
-    "entry_high": 38.5,
-    "addon_price": 39.46,
-    "tp1_price": 41.2,
-    "tp2_price": 44.27,
+    "base_price": 37.7,
+    "entry_low": 36.76,
+    "entry_high": 37.7,
+    "addon_price": 38.83,
+    "tp1_price": 40.34,
+    "tp2_price": 43.35,
     "sl_price": 36.82,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY"
       ]
     },
-    "entry_price": 38.5,
-    "last_rollover": "2026-10-27",
+    "entry_price": 37.7,
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 5,
     "has_entered": true,
-    "last_push_at": "2026-10-27 08:59:36",
+    "last_push_at": "2026-10-28 08:59:26",
     "last_push_event": "ENTRY",
     "first_entered_at": "2026-10-19"
   },
   "2855": {
     "code": "2855",
     "name": "統一證[法人起漲]",
-    "base_price": 54.6,
-    "entry_low": 53.23,
-    "entry_high": 54.6,
-    "addon_price": 55.96,
-    "tp1_price": 58.42,
-    "tp2_price": 63.21,
+    "base_price": 55.9,
+    "entry_low": 54.5,
+    "entry_high": 55.9,
+    "addon_price": 57.3,
+    "tp1_price": 59.81,
+    "tp2_price": 64.28,
     "sl_price": 56.71,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
     "alerted_today": {
-      "2026-10-27": [
-        "STOP_LOSS"
+      "2026-10-28": [
+        "STOP_LOSS",
+        "ADDON"
       ]
     },
-    "entry_price": 54.6,
-    "last_rollover": "2026-10-27",
+    "entry_price": 55.9,
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 5,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26",
-    "last_push_at": "2026-10-27 08:58:35",
-    "last_push_event": "STOP_LOSS"
+    "last_push_at": "2026-10-28 09:16:44",
+    "last_push_event": "ADDON"
   },
   "1319": {
     "code": "1319",
     "name": "東陽[法人起漲]",
-    "base_price": 80.9,
-    "entry_low": 78.88,
-    "entry_high": 80.9,
-    "addon_price": 82.92,
-    "tp1_price": 86.56,
-    "tp2_price": 93.03,
+    "base_price": 81.5,
+    "entry_low": 79.46,
+    "entry_high": 81.5,
+    "addon_price": 83.54,
+    "tp1_price": 87.2,
+    "tp2_price": 93.72,
     "sl_price": 79.74,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY"
       ]
     },
-    "entry_price": 80.9,
-    "last_rollover": "2026-10-27",
+    "entry_price": 81.5,
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 5,
     "has_entered": true,
-    "last_push_at": "2026-10-27 08:59:37",
+    "last_push_at": "2026-10-28 08:59:27",
     "last_push_event": "ENTRY",
     "first_entered_at": "2026-10-19"
   },
   "2317": {
     "code": "2317",
     "name": "鴻海[弱勢破線]",
-    "base_price": 247.5,
-    "entry_price": 247.5,
-    "entry_low": 243.5,
-    "entry_high": 247.5,
-    "addon_price": 253.69,
-    "tp1_price": 264.82,
-    "tp2_price": 284.62,
-    "sl_price": 238.75,
+    "base_price": 251.5,
+    "entry_price": 251.5,
+    "entry_low": 245.21,
+    "entry_high": 251.5,
+    "addon_price": 257.79,
+    "tp1_price": 269.11,
+    "tp2_price": 289.22,
+    "sl_price": 240.18,
     "target_id": "test",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY"
       ]
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
-    "last_push_at": "2026-10-27 08:59:39",
+    "last_push_at": "2026-10-28 08:59:29",
     "last_push_event": "ENTRY",
     "first_entered_at": "2026-10-19"
   },
   "2352": {
     "code": "2352",
     "name": "佳世達[弱勢破線]",
-    "base_price": 29.6,
-    "entry_low": 29.16,
-    "entry_high": 29.6,
-    "addon_price": 30.34,
-    "tp1_price": 31.67,
-    "tp2_price": 34.04,
-    "sl_price": 28.27,
+    "base_price": 29.85,
+    "entry_low": 29.34,
+    "entry_high": 29.85,
+    "addon_price": 30.6,
+    "tp1_price": 31.94,
+    "tp2_price": 34.33,
+    "sl_price": 28.51,
     "target_id": "test",
     "added_at": "2026-10-11 01:18:38",
     "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY"
       ]
     },
-    "entry_price": 29.6,
-    "last_rollover": "2026-10-27",
+    "entry_price": 29.85,
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 5,
     "has_entered": true,
-    "last_push_at": "2026-10-27 08:59:40",
+    "last_push_at": "2026-10-28 08:59:31",
     "last_push_event": "ENTRY",
     "first_entered_at": "2026-10-19"
   },
   "4916": {
     "code": "4916",
     "name": "事欣科[可轉債伏擊]",
-    "base_price": 100.5,
-    "entry_price": 100.5,
-    "entry_low": 97.99,
-    "entry_high": 100.5,
-    "addon_price": 103.01,
-    "tp1_price": 107.54,
+    "base_price": 103.5,
+    "entry_price": 103.5,
+    "entry_low": 100.98,
+    "entry_high": 103.5,
+    "addon_price": 106.09,
+    "tp1_price": 110.75,
     "tp2_price": 119.18,
     "sl_price": 98.84,
     "target_id": "test",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": [
-        "ENTRY"
-      ]
-    },
-    "trading_days_waiting": 0,
-    "has_entered": true,
-    "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27",
-    "last_push_at": "2026-10-27 08:59:41",
-    "last_push_event": "ENTRY"
-  },
-  "2344": {
-    "code": "2344",
-    "name": "華邦電[可轉債伏擊]",
-    "base_price": 163.0,
-    "entry_price": 163.0,
-    "entry_low": 158.92,
-    "entry_high": 163.0,
-    "addon_price": 167.07,
-    "tp1_price": 174.41,
-    "tp2_price": 193.2,
-    "sl_price": 150.7,
-    "target_id": "test",
-    "added_at": "2026-10-16 10:06:05",
-    "alerted_today": {
-      "2026-10-27": [
+      "2026-10-28": [
         "ENTRY",
         "ADDON"
       ]
     },
     "trading_days_waiting": 0,
-    "last_rollover": "2026-10-27",
+    "has_entered": true,
+    "first_entered_at": "2026-10-17 22:49:51",
+    "last_rollover": "2026-10-28",
+    "last_push_at": "2026-10-28 11:34:11",
+    "last_push_event": "ADDON"
+  },
+  "2344": {
+    "code": "2344",
+    "name": "華邦電[可轉債伏擊]",
+    "base_price": 172.0,
+    "entry_price": 172.0,
+    "entry_low": 167.7,
+    "entry_high": 172.0,
+    "addon_price": 176.3,
+    "tp1_price": 184.04,
+    "tp2_price": 197.8,
+    "sl_price": 164.26,
+    "target_id": "test",
+    "added_at": "2026-10-16 10:06:05",
+    "alerted_today": {
+      "2026-10-28": [
+        "ENTRY",
+        "ADDON"
+      ]
+    },
+    "trading_days_waiting": 0,
+    "last_rollover": "2026-10-28",
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58",
-    "last_push_at": "2026-10-27 09:03:02",
+    "last_push_at": "2026-10-28 09:01:40",
     "last_push_event": "ADDON"
   },
   "8103": {
     "code": "8103",
     "name": "瀚荃",
-    "base_price": 103.0,
-    "entry_price": 103.0,
-    "entry_low": 100.94,
-    "entry_high": 103.0,
-    "addon_price": 107.56,
-    "tp1_price": 113.0,
+    "base_price": 108.0,
+    "entry_price": 108.0,
+    "entry_low": 105.7,
+    "entry_high": 108.0,
+    "addon_price": 110.7,
+    "tp1_price": 115.56,
     "tp2_price": 132.83,
     "sl_price": 107.82,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -325,20 +326,20 @@
   "6588": {
     "code": "6588",
     "name": "東典光電",
-    "base_price": 88.3,
-    "entry_price": 88.3,
-    "entry_low": 86.53,
-    "entry_high": 88.3,
-    "addon_price": 91.91,
-    "tp1_price": 95.3,
+    "base_price": 90.4,
+    "entry_price": 90.4,
+    "entry_low": 88.59,
+    "entry_high": 90.4,
+    "addon_price": 92.92,
+    "tp1_price": 96.73,
     "tp2_price": 121.8,
     "sl_price": 97.38,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -346,20 +347,20 @@
   "4961": {
     "code": "4961",
     "name": "天鈺",
-    "base_price": 187.0,
-    "entry_price": 187.0,
-    "entry_low": 184.19,
-    "entry_high": 187.0,
-    "addon_price": 191.9,
-    "tp1_price": 200.09,
-    "tp2_price": 215.05,
-    "sl_price": 179.54,
+    "base_price": 192.0,
+    "entry_price": 192.0,
+    "entry_low": 187.2,
+    "entry_high": 192.0,
+    "addon_price": 196.8,
+    "tp1_price": 205.44,
+    "tp2_price": 220.8,
+    "sl_price": 181.63,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -367,20 +368,20 @@
   "2382": {
     "code": "2382",
     "name": "廣達",
-    "base_price": 327.5,
-    "entry_price": 327.5,
-    "entry_low": 321.95,
-    "entry_high": 327.5,
-    "addon_price": 341.38,
-    "tp1_price": 350.43,
-    "tp2_price": 376.62,
-    "sl_price": 312.76,
+    "base_price": 330.0,
+    "entry_price": 330.0,
+    "entry_low": 322.65,
+    "entry_high": 330.0,
+    "addon_price": 338.25,
+    "tp1_price": 353.1,
+    "tp2_price": 379.5,
+    "sl_price": 315.15,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -388,20 +389,20 @@
   "3717": {
     "code": "3717",
     "name": "聯嘉投控",
-    "base_price": 26.2,
-    "entry_price": 26.2,
-    "entry_low": 25.54,
-    "entry_high": 26.2,
-    "addon_price": 28.08,
-    "tp1_price": 30.35,
+    "base_price": 27.5,
+    "entry_price": 27.5,
+    "entry_low": 26.81,
+    "entry_high": 27.5,
+    "addon_price": 28.19,
+    "tp1_price": 29.43,
     "tp2_price": 32.44,
     "sl_price": 27.06,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -409,20 +410,20 @@
   "3630": {
     "code": "3630",
     "name": "新鉅科",
-    "base_price": 27.7,
-    "entry_price": 27.7,
-    "entry_low": 27.01,
-    "entry_high": 27.7,
-    "addon_price": 28.73,
-    "tp1_price": 31.3,
-    "tp2_price": 32.86,
-    "sl_price": 27.4,
+    "base_price": 28.7,
+    "entry_price": 28.7,
+    "entry_low": 28.27,
+    "entry_high": 28.7,
+    "addon_price": 29.54,
+    "tp1_price": 30.71,
+    "tp2_price": 33.0,
+    "sl_price": 27.41,
     "target_id": "",
     "added_at": "2026-10-12 23:25:45",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 4,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -441,30 +442,30 @@
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "1229": {
     "code": "1229",
     "name": "聯華[法人起漲]",
-    "base_price": 39.9,
-    "entry_price": 39.9,
-    "entry_low": 38.9,
-    "entry_high": 39.9,
-    "addon_price": 40.9,
-    "tp1_price": 42.69,
-    "tp2_price": 45.88,
+    "base_price": 39.7,
+    "entry_price": 39.7,
+    "entry_low": 38.71,
+    "entry_high": 39.7,
+    "addon_price": 40.69,
+    "tp1_price": 42.48,
+    "tp2_price": 45.66,
     "sl_price": 39.54,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -472,20 +473,20 @@
   "1216": {
     "code": "1216",
     "name": "統一[法人起漲]",
-    "base_price": 80.2,
-    "entry_price": 80.2,
-    "entry_low": 79.0,
-    "entry_high": 80.2,
-    "addon_price": 83.83,
-    "tp1_price": 85.81,
-    "tp2_price": 92.23,
+    "base_price": 78.7,
+    "entry_price": 78.7,
+    "entry_low": 76.73,
+    "entry_high": 78.7,
+    "addon_price": 80.67,
+    "tp1_price": 84.21,
+    "tp2_price": 90.5,
     "sl_price": 76.59,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26"
@@ -493,20 +494,20 @@
   "2308": {
     "code": "2308",
     "name": "台達電[弱勢破線]",
-    "base_price": 1510.0,
-    "entry_price": 1510.0,
-    "entry_low": 1479.8,
-    "entry_high": 1510.0,
-    "addon_price": 1585.7,
+    "base_price": 1550.0,
+    "entry_price": 1550.0,
+    "entry_low": 1519.0,
+    "entry_high": 1550.0,
+    "addon_price": 1590.75,
     "tp1_price": 1660.0,
     "tp2_price": 2220.75,
     "sl_price": 1695.75,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -514,20 +515,20 @@
   "2408": {
     "code": "2408",
     "name": "南亞科[弱勢破線]",
-    "base_price": 441.0,
-    "entry_price": 441.0,
-    "entry_low": 432.18,
-    "entry_high": 441.0,
-    "addon_price": 453.49,
-    "tp1_price": 471.87,
+    "base_price": 477.0,
+    "entry_price": 477.0,
+    "entry_low": 465.07,
+    "entry_high": 477.0,
+    "addon_price": 488.92,
+    "tp1_price": 510.39,
     "tp2_price": 563.85,
     "sl_price": 456.47,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -535,62 +536,62 @@
   "8996": {
     "code": "8996",
     "name": "高力[可轉債伏擊]",
-    "base_price": 1465.0,
-    "entry_price": 1465.0,
-    "entry_low": 1445.81,
-    "entry_high": 1465.0,
-    "addon_price": 1636.2,
+    "base_price": 1585.0,
+    "entry_price": 1585.0,
+    "entry_low": 1561.22,
+    "entry_high": 1585.0,
+    "addon_price": 1624.62,
     "tp1_price": 1770.0,
     "tp2_price": 1890.0,
     "sl_price": 1575.26,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "3706": {
     "code": "3706",
     "name": "神達[可轉債伏擊]",
-    "base_price": 80.4,
-    "entry_price": 80.4,
-    "entry_low": 78.39,
-    "entry_high": 80.4,
-    "addon_price": 82.82,
-    "tp1_price": 86.03,
-    "tp2_price": 92.46,
+    "base_price": 81.0,
+    "entry_price": 81.0,
+    "entry_low": 78.97,
+    "entry_high": 81.0,
+    "addon_price": 83.02,
+    "tp1_price": 86.67,
+    "tp2_price": 93.15,
     "sl_price": 77.74,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2379": {
     "code": "2379",
     "name": "瑞昱[05_stock_futures_long]",
-    "base_price": 793.0,
-    "entry_price": 793.0,
-    "entry_low": 776.0,
-    "entry_high": 793.0,
-    "addon_price": 812.82,
-    "tp1_price": 848.51,
-    "tp2_price": 911.95,
-    "sl_price": 753.08,
+    "base_price": 791.0,
+    "entry_price": 791.0,
+    "entry_low": 779.13,
+    "entry_high": 791.0,
+    "addon_price": 810.77,
+    "tp1_price": 846.37,
+    "tp2_price": 909.65,
+    "sl_price": 755.15,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -598,20 +599,20 @@
   "6116": {
     "code": "6116",
     "name": "彩晶[05_stock_futures_long]",
-    "base_price": 14.05,
-    "entry_price": 14.05,
-    "entry_low": 13.7,
-    "entry_high": 14.05,
-    "addon_price": 14.85,
-    "tp1_price": 15.1,
+    "base_price": 14.3,
+    "entry_price": 14.3,
+    "entry_low": 13.94,
+    "entry_high": 14.3,
+    "addon_price": 14.66,
+    "tp1_price": 15.3,
     "tp2_price": 18.38,
     "sl_price": 14.66,
     "target_id": "",
     "added_at": "2026-10-14 22:49:47",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "trading_days_waiting": 2,
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
@@ -619,211 +620,211 @@
   "2903": {
     "code": "2903",
     "name": "遠百[法人起漲]",
-    "base_price": 21.9,
-    "entry_price": 21.9,
-    "entry_low": 21.35,
-    "entry_high": 21.9,
-    "addon_price": 22.45,
-    "tp1_price": 23.43,
-    "tp2_price": 25.18,
+    "base_price": 21.95,
+    "entry_price": 21.95,
+    "entry_low": 21.4,
+    "entry_high": 21.95,
+    "addon_price": 22.5,
+    "tp1_price": 23.49,
+    "tp2_price": 25.24,
     "sl_price": 21.54,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2912": {
     "code": "2912",
     "name": "統一超[法人起漲]",
-    "base_price": 225.5,
-    "entry_price": 225.5,
-    "entry_low": 222.12,
-    "entry_high": 225.5,
-    "addon_price": 231.8,
-    "tp1_price": 241.29,
-    "tp2_price": 259.32,
+    "base_price": 224.0,
+    "entry_price": 224.0,
+    "entry_low": 218.4,
+    "entry_high": 224.0,
+    "addon_price": 229.6,
+    "tp1_price": 239.68,
+    "tp2_price": 257.6,
     "sl_price": 215.83,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:06:26",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "5880": {
     "code": "5880",
     "name": "合庫金[05_stock_futures_long]",
-    "base_price": 28.8,
-    "entry_price": 28.8,
-    "entry_low": 28.08,
-    "entry_high": 28.8,
-    "addon_price": 29.52,
-    "tp1_price": 30.82,
-    "tp2_price": 33.12,
-    "sl_price": 27.16,
+    "base_price": 28.45,
+    "entry_price": 28.45,
+    "entry_low": 28.0,
+    "entry_high": 28.45,
+    "addon_price": 29.29,
+    "tp1_price": 30.44,
+    "tp2_price": 32.72,
+    "sl_price": 27.17,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
-    "last_rollover": "2026-10-27",
+    "last_rollover": "2026-10-28",
     "has_entered": true,
     "first_entered_at": "2026-10-16 17:35:58"
   },
   "1536": {
     "code": "1536",
     "name": "和大[弱勢破線]",
-    "base_price": 45.45,
-    "entry_price": 45.45,
-    "entry_low": 44.52,
-    "entry_high": 45.45,
-    "addon_price": 46.59,
-    "tp1_price": 48.63,
-    "tp2_price": 52.27,
-    "sl_price": 43.14,
+    "base_price": 45.9,
+    "entry_price": 45.9,
+    "entry_low": 44.75,
+    "entry_high": 45.9,
+    "addon_price": 47.05,
+    "tp1_price": 49.11,
+    "tp2_price": 52.78,
+    "sl_price": 43.83,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2890": {
     "code": "2890",
     "name": "永豐金[05_stock_futures_long]",
-    "base_price": 46.25,
-    "entry_price": 46.25,
-    "entry_low": 45.4,
-    "entry_high": 46.25,
-    "addon_price": 47.98,
-    "tp1_price": 49.49,
-    "tp2_price": 53.19,
-    "sl_price": 44.15,
+    "base_price": 46.3,
+    "entry_price": 46.3,
+    "entry_low": 45.55,
+    "entry_high": 46.3,
+    "addon_price": 47.46,
+    "tp1_price": 49.54,
+    "tp2_price": 53.24,
+    "sl_price": 44.2,
     "target_id": "",
     "added_at": "2026-10-16 10:06:05",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-16 13:10:17",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2014": {
     "code": "2014",
     "name": "中鴻[法人起漲]",
-    "base_price": 17.05,
-    "entry_price": 17.05,
-    "entry_low": 16.79,
-    "entry_high": 17.05,
-    "addon_price": 17.48,
-    "tp1_price": 18.24,
-    "tp2_price": 19.61,
+    "base_price": 17.0,
+    "entry_price": 17.0,
+    "entry_low": 16.57,
+    "entry_high": 17.0,
+    "addon_price": 17.42,
+    "tp1_price": 18.19,
+    "tp2_price": 19.55,
     "sl_price": 16.38,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2313": {
     "code": "2313",
     "name": "華通[股期多方]",
-    "base_price": 216.0,
-    "entry_price": 216.0,
-    "entry_low": 212.42,
-    "entry_high": 216.0,
-    "addon_price": 231.29,
+    "base_price": 224.0,
+    "entry_price": 224.0,
+    "entry_low": 218.4,
+    "entry_high": 224.0,
+    "addon_price": 229.78,
     "tp1_price": 266.0,
     "tp2_price": 279.3,
     "sl_price": 232.54,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2610": {
     "code": "2610",
     "name": "華航[股期多方]",
-    "base_price": 20.45,
-    "entry_price": 20.45,
-    "entry_low": 19.94,
-    "entry_high": 20.45,
-    "addon_price": 20.96,
-    "tp1_price": 21.88,
-    "tp2_price": 23.52,
+    "base_price": 20.25,
+    "entry_price": 20.25,
+    "entry_low": 19.74,
+    "entry_high": 20.25,
+    "addon_price": 20.76,
+    "tp1_price": 21.67,
+    "tp2_price": 23.29,
     "sl_price": 20.04,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "6112": {
     "code": "6112",
     "name": "邁達特[爆量動能]",
-    "base_price": 50.0,
-    "entry_price": 50.0,
-    "entry_low": 48.75,
-    "entry_high": 50.0,
-    "addon_price": 51.25,
-    "tp1_price": 53.5,
-    "tp2_price": 57.5,
-    "sl_price": 47.01,
+    "base_price": 49.95,
+    "entry_price": 49.95,
+    "entry_low": 48.7,
+    "entry_high": 49.95,
+    "addon_price": 51.21,
+    "tp1_price": 53.45,
+    "tp2_price": 57.44,
+    "sl_price": 47.46,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   },
   "2332": {
     "code": "2332",
     "name": "友訊[爆量動能]",
-    "base_price": 20.4,
-    "entry_price": 20.4,
-    "entry_low": 19.89,
-    "entry_high": 20.4,
-    "addon_price": 21.26,
+    "base_price": 20.55,
+    "entry_price": 20.55,
+    "entry_low": 20.04,
+    "entry_high": 20.55,
+    "addon_price": 21.11,
     "tp1_price": 22.0,
-    "tp2_price": 23.46,
+    "tp2_price": 23.63,
     "sl_price": 20.25,
     "target_id": "",
     "added_at": "2026-10-17 01:30:36",
     "alerted_today": {
-      "2026-10-27": []
+      "2026-10-28": []
     },
     "trading_days_waiting": 0,
     "has_entered": true,
     "first_entered_at": "2026-10-17 22:49:51",
-    "last_rollover": "2026-10-27"
+    "last_rollover": "2026-10-28"
   }
 }

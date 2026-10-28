@@ -114,7 +114,7 @@ egime_config.json 參數（多頭主升期放大波段空間、高檔震盪期�
    - 本地電腦無需開機或維持聯網，所有盤後選股與盤中即時雷達由 GitHub Actions 雲端虛擬機全權託管。
 2. **兩大雲端標準工作流**：
    - 📅 **雲端盤後選股 (`cloud_daily_screener.yml`)**：
-     * 每週一至週五台灣時間 17:35 自動喚醒執行 `run_all.py --line`。
+     * 每週一至週五台灣時間 21:15 自動喚醒執行 `run_all.py --line`（官方籌碼全沉澱終極版）。
      * 自動推播最新戰報至各策略獨立 LINE 視窗，並自動將更新後的 `result.csv` / `result.md` 提交回 Git 倉庫備份。
    - 🚨 **雲端盤中到價雷達 (`cloud_intraday_radar.yml`)**：
      * 每週一至週五台灣時間 08:58 自動喚醒執行 `run_all_intraday.py --interval 60`。
@@ -294,7 +294,7 @@ un_all_intraday.py)**：遇休市自動跳過盯盤輪詢，節省虛擬機運�
 ## 二十二、籌碼K線 (CMoney) 自選股雲端與本地雙軌自動同步規範 (CMoney Watchlist Sync Standard)
 為使每日盤後量化選股成果能無縫對接至操盤看盤介面，全策略總調度器一律強制套用根目錄之 [cmoney_sync.py](file:///cmoney_sync.py)：
 1. **雲端 API 全自動同步 (手機 APP ＋ 電腦版雙端同步)**：
-   - 每日 17:35 盤後選股完成後，自動將當日選出之高勝率精選個股代碼，透過 CMoney 雲端 API 寫入指定自選股群組（預設名稱：「量化策略精選」）。
+   - 每日 21:15 盤後選股完成後，自動將當日選出之高勝率精選個股代碼，透過 CMoney 雲端 API 寫入指定自選股群組（預設名稱：「量化策略精選」）。
    - 帳密憑證嚴格自 .env 讀取 (CMONEY_ACCOUNT, CMONEY_PASSWORD 或 CMONEY_AUTH_TOKEN)，絕不硬編碼。
 2. **本地剪貼簿與文字檔雙保險 (Fallback & Instant Import)**：
    - 每次執行自動產生標準格式之 籌碼K線_自選股匯入.txt，並在 Windows 環境下自動將代碼載入系統剪貼簿。
