@@ -47,8 +47,11 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 ROOT_DIR = Path(__file__).resolve().parent
 ENV_PATH = ROOT_DIR / ".env"
-DEFAULT_GROUP_NAME = "量化策略精選"
+DEFAULT_GROUP_NAME = "量化策略全池"
+DEFAULT_PRIORITY_GROUP_NAME = "🏆量化明日首選"
 EXPORT_TXT_PATH = ROOT_DIR / "籌碼K線_自選股匯入.txt"
+EXPORT_ALL_TXT_PATH = ROOT_DIR / "籌碼K線_自選股匯入_全量.txt"
+EXPORT_PRIORITY_TXT_PATH = ROOT_DIR / "籌碼K線_自選股匯入_明日首選.txt"
 
 
 def load_env() -> Dict[str, str]:
@@ -85,23 +88,35 @@ def copy_to_windows_clipboard(text: str) -> bool:
             return False
 
 
-def export_local_cmoney_file(stock_codes: List[str], group_name: str = DEFAULT_GROUP_NAME) -> Path:
+def export_local_cmoney_file(
+    stock_codes: List[str],
+    priority_codes: Optional[List[str]] = None,
+    group_name: str = DEFAULT_GROUP_NAME
+) -> Path:
     """
     匯出符合籌碼K線 PC 版標準匯入格式之自選股文字檔，並自動複製至 Windows 剪貼簿。
-    標準格式：一行一檔股票代碼（純代碼或 代碼,名稱）
+    支援全量池與【🏆量化明日首選】雙檔分流產出。
     """
-    codes = [str(c).strip() for c in stock_codes if str(c).strip()]
-    content = "\n".join(codes)
+    all_clean = [str(c).strip() for c in stock_codes if str(c).strip()]
+    pri_clean = [str(c).strip() for c in (priority_codes or []) if str(c).strip()]
 
-    EXPORT_TXT_PATH.write_text(content, encoding="utf-8")
-    print(f"[✓] 已產生籌碼K線本地匯入檔: {EXPORT_TXT_PATH} (共 {len(codes)} 檔)")
+    # 1. 寫入全量檔
+    EXPORT_ALL_TXT_PATH.write_text("\n".join(all_clean), encoding="utf-8")
+    print(f"[✓] 已產生籌碼K線本地匯入檔 (全量池): {EXPORT_ALL_TXT_PATH} (共 {len(all_clean)} 檔)")
 
-    # 自動複製到系統剪貼簿 (以逗號隔開與換行，方便直接貼上)
-    clip_text = ",".join(codes)
+    # 2. 寫入明日首選檔 (若無則使用全量)
+    target_priority = pri_clean if pri_clean else all_clean
+    EXPORT_PRIORITY_TXT_PATH.write_text("\n".join(target_priority), encoding="utf-8")
+    EXPORT_TXT_PATH.write_text("\n".join(target_priority), encoding="utf-8")
+    print(f"[✓] 已產生籌碼K線本地匯入檔 (🏆明日首選): {EXPORT_PRIORITY_TXT_PATH} (共 {len(target_priority)} 檔)")
+
+    # 3. 優先將【明日首選】代碼自動載入 Windows 剪貼簿 (以逗號隔開，打開電腦版按 Ctrl+V 或直接匯入)
+    clip_text = ",".join(target_priority)
     if copy_to_windows_clipboard(clip_text):
-        print(f"[✓] 最新選股代碼已自動複製至 Windows 剪貼簿 ({clip_text})！")
+        tag = "🏆 明日決策首選" if pri_clean else "全量選股"
+        print(f"[✓] 最新【{tag}】代碼已自動複製至 Windows 剪貼簿 ({clip_text})！")
 
-    return EXPORT_TXT_PATH
+    return EXPORT_PRIORITY_TXT_PATH
 
 
 class CMoneyWatchlistClient:
@@ -245,6 +260,32 @@ class CMoneyWatchlistClient:
             return False, f"同步至 CMoney 自選股時發生異常: {e}"
 
 
+def collect_priority_advisor_codes() -> List[str]:
+    """
+    從明日買賣建議表 (tomorrow_trading_advisor.csv) 提煉通過回測體檢之核心優先標的 (🟢 優先買進 / 🟡 拉回低接)
+    """
+    advisor_csv = ROOT_DIR / "lab" / "data" / "tomorrow_trading_advisor.csv"
+    if not advisor_csv.exists():
+        return []
+    import pandas as pd
+    try:
+        df = pd.read_csv(advisor_csv, encoding="utf-8-sig", dtype=str)
+        if "tomorrow_action" in df.columns and "symbol" in df.columns:
+            strong_buys = df[df["tomorrow_action"].str.contains("優先買進|STRONG BUY", na=False, case=False)]["symbol"].tolist()
+            dips = df[df["tomorrow_action"].str.contains("拉回低接|BUY ON DIP", na=False, case=False)]["symbol"].tolist()
+            res = []
+            for s in strong_buys + dips:
+                c = str(s).strip()
+                if c.endswith(".0"):
+                    c = c[:-2]
+                if c and c not in res:
+                    res.append(c)
+            return res[:6]
+    except Exception:
+        pass
+    return []
+
+
 def collect_latest_screened_codes() -> List[str]:
     """
     從現有各策略最新選股結果 (`result.csv`) 中收集今日通過的所有精選標的代碼
@@ -284,55 +325,70 @@ def sync_stocks_to_cmoney(
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
-    【高階統一入口】：執行 CMoney 雲端自選股同步 ＋ 本地雙保險匯出
+    【高階統一入口】：執行 CMoney 雲端自選股雙群組分流同步 ＋ 本地雙保險匯出
+    雙群組分流：
+    1. 【量化策略全池】(全量約 15~20 檔標的)
+    2. 【🏆量化明日首選】(僅收錄通過實驗室回測體檢之 3~5 檔 🟢優先買進/🟡拉回低接標的)
     """
-    # 1. 若未指定股票，自動收集今日最新精選標的
+    # 1. 收集全量代碼與明日核心首選代碼
     codes = stock_codes or collect_latest_screened_codes()
-    target_group = group_name or DEFAULT_GROUP_NAME
+    priority_codes = collect_priority_advisor_codes() if stock_codes is None else []
+    target_group_all = group_name or DEFAULT_GROUP_NAME
+    target_group_pri = DEFAULT_PRIORITY_GROUP_NAME
 
     result = {
         "total_codes": len(codes),
         "codes": codes,
-        "group_name": target_group,
+        "priority_codes": priority_codes,
+        "group_name": target_group_all,
         "cloud_sync_success": False,
         "cloud_message": "",
-        "local_file": str(EXPORT_TXT_PATH),
+        "local_file": str(EXPORT_PRIORITY_TXT_PATH),
         "clipboard_copied": False
     }
 
     if verbose:
         print("\n" + "=" * 65)
-        print(f" 📲 籌碼K線 (CMoney) 自選股智慧同步引擎")
-        print(f" 🎯 同步目標群組: 【{target_group}】")
-        print(f" 📊 今日入選標的 ({len(codes)} 檔): {', '.join(codes) if codes else '(無入選標的)'}")
+        print(f" 📲 籌碼K線 (CMoney) 自選股智慧雙軌分流同步引擎")
+        print(f" 🎯 目標群組 1 (全量池): 【{target_group_all}】 ({len(codes)} 檔)")
+        print(f" 🎯 目標群組 2 (明日首選): 【{target_group_pri}】 ({len(priority_codes)} 檔: {', '.join(priority_codes) if priority_codes else '同全量'})")
+        print(f" 📊 全量標的: {', '.join(codes) if codes else '(無入選標的)'}")
         print("=" * 65)
 
     if not codes:
         result["cloud_message"] = "今日無入選標的，跳過同步"
         return result
 
-    # 2. 雙保險：先生成本地匯入檔與寫入 Windows 剪貼簿
-    export_local_cmoney_file(codes, group_name=target_group)
+    # 2. 雙保險：生成本地全量/首選匯入檔，並將【明日首選】注入 Windows 剪貼簿
+    export_local_cmoney_file(codes, priority_codes=priority_codes, group_name=target_group_all)
     result["clipboard_copied"] = True
 
-    # 3. 雲端同步
+    # 3. 雲端同步 (若配置憑證，自動同步雙群組)
     client = CMoneyWatchlistClient()
     if client.is_configured():
-        ok, msg = client.update_watchlist_group(codes, group_name=target_group)
-        result["cloud_sync_success"] = ok
-        result["cloud_message"] = msg
-        if ok:
-            print(f"[✓] 🎉 {msg}")
-            print(f"    👉 您開啟手機【籌碼K線 APP】或電腦版即可直接看見【{target_group}】最新名單！")
+        # 同步全量群組
+        ok1, msg1 = client.update_watchlist_group(codes, group_name=target_group_all)
+        # 同步明日首選群組 (若有首選標的)
+        ok2, msg2 = True, ""
+        if priority_codes:
+            ok2, msg2 = client.update_watchlist_group(priority_codes, group_name=target_group_pri)
+        
+        result["cloud_sync_success"] = ok1 and ok2
+        result["cloud_message"] = f"{msg1} | {msg2}".strip(" |")
+        if ok1:
+            print(f"[✓] 🎉 {msg1}")
+            if priority_codes and ok2:
+                print(f"[✓] 🏆 {msg2}")
+            print(f"    👉 打開手機【籌碼K線 APP】或電腦版即可看見【{target_group_pri}】精華名單！")
         else:
-            print(f"[!] 雲端同步未竟全功: {msg}")
+            print(f"[!] 雲端同步未竟全功: {msg1}")
             print(f"    💡 已啟用【本地剪貼簿與文字檔】雙重防線，電腦版按 Ctrl+V 或匯入即可立即使用。")
     else:
         result["cloud_message"] = "未設定 CMONEY_ACCOUNT 帳密或 Token，已切換至本地匯入與剪貼簿自動注入防線。"
         if verbose:
             print(f"[ℹ️] 尚未於 .env 中設定 CMONEY_ACCOUNT 或 CMONEY_AUTH_TOKEN。")
-            print(f"    👉 已將 {len(codes)} 檔個股複製至 Windows 剪貼簿，並儲存至:")
-            print(f"       {EXPORT_TXT_PATH}")
+            print(f"    👉 已將【明日首選】{len(priority_codes or codes)} 檔個股複製至 Windows 剪貼簿，並儲存至:")
+            print(f"       {EXPORT_PRIORITY_TXT_PATH}")
             print(f"    💡 打開籌碼K線電腦版，按「自選股匯入」或 Ctrl+V 即完成匯入！")
 
     return result

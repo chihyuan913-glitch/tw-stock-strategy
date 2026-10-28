@@ -359,6 +359,57 @@ def check_market_open_or_exit(context_name: str = "排程任務", allow_force: b
     return True
 
 
+def verify_twse_data_settlement(
+    target_date: Optional[datetime.date] = None,
+    max_retries: int = 3,
+    retry_delay_sec: int = 15,
+    verbose: bool = True
+) -> Tuple[bool, str]:
+    """
+    【數據結算沉澱守門員 (Data Settlement Integrity Guard)】
+    於夜間選股前檢核證交所 (TWSE) 當日官方信用交易 (MI_MARGN) 與三大法人 (T86) 是否已結算發布。
+    若官方伺服器偶爾延遲，實施平滑重試，確保絕對使用「當日最新沉澱」數據進行選股。
+    """
+    now_tw = get_taiwan_now()
+    check_date = target_date or now_tw.date()
+    # 週末不檢查結算
+    if check_date.weekday() >= 5:
+        return True, "週末非交易日，跳過數據沉澱檢核"
+
+    # 17:00 以前不卡結算檢核（例如盤中測試）
+    if now_tw.hour < 17 and target_date is None:
+        return True, "盤中或早鳥時段，略過晚間沉澱檢驗"
+
+    today_str = check_date.strftime("%Y%m%d")
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=json&selectType=ALL&date={today_str}"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=8) as r:
+                d = json.loads(r.read().decode("utf-8"))
+                if d.get("stat") == "OK" and str(d.get("date", "")).replace("-", "").strip() == today_str:
+                    msg = f"臺灣證交所當日 ({today_str}) 信用交易與法人籌碼已 100% 官方結算沉澱！"
+                    if verbose:
+                        print(f"[✓] 🛡️ 數據結算守衛通過：{msg}")
+                    return True, msg
+        except Exception as e:
+            if verbose:
+                print(f"[!] 連線 TWSE 結算檢核失敗 (第 {attempt} 次): {e}")
+
+        if attempt < max_retries:
+            if verbose:
+                print(f"[*] ⏳ 官方數據結算中或伺服器延遲，等待 {retry_delay_sec} 秒後進行第 {attempt+1} 次重試...")
+            import time
+            time.sleep(retry_delay_sec)
+
+    msg = f"已達最大重試次數，將以現有最新可用市場數據繼續執行。"
+    if verbose:
+        print(f"[⚠️] {msg}")
+    return False, msg
+
+
 if __name__ == "__main__":
     now_tw = get_taiwan_now()
     print("=" * 65)

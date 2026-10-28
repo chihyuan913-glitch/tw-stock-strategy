@@ -793,6 +793,76 @@ def fetch_twii_market_data(force_refresh: bool = False) -> dict:
     _TWII_CACHE_EXPIRE = now_t + 60.0
     return market_res
 
+@app.get("/api/tomorrow_advisor")
+async def get_tomorrow_advisor():
+    """提供明日 (T+1) 量化買賣建議決策卡與一鍵委託資訊"""
+    import json
+    import pandas as pd
+    advisor_csv = Path(__file__).resolve().parent / "lab" / "data" / "tomorrow_trading_advisor.csv"
+    if not advisor_csv.exists():
+        return {"status": "empty", "items": [], "market_regime": {}}
+    
+    try:
+        df = pd.read_csv(advisor_csv, encoding='utf-8-sig', dtype=str).fillna("")
+        items = []
+        for _, row in df.iterrows():
+            sym = str(row.get("symbol", "")).strip()
+            name = str(row.get("name", "")).strip()
+            act = str(row.get("tomorrow_action", "")).strip()
+            entry_p = str(row.get("entry_price", "")).strip()
+            tp1_p = str(row.get("tp1_price", "")).strip()
+            tp2_p = str(row.get("tp2_price", "")).strip()
+            sl_p = str(row.get("stop_loss_price", "")).strip()
+            addon_p = str(row.get("addon_price", "")).strip()
+            shares = str(row.get("recommended_shares", "1000")).strip()
+            
+            # 格式化一鍵下單委託語句
+            is_buy = "買進" in act or "BUY" in act
+            order_verb = "限價買進" if is_buy else "限價放空/賣出"
+            order_text = f"{name}({sym}) {order_verb} ${entry_p} 建議 {shares}股 (TP1: ${tp1_p} / 停損: ${sl_p})"
+
+            items.append({
+                "symbol": sym,
+                "name": name,
+                "tomorrow_action": act,
+                "source_strategy": str(row.get("source_strategy", "")),
+                "verdict": str(row.get("verdict", "")),
+                "close_price": str(row.get("close_price", "")),
+                "entry_price": entry_p,
+                "addon_price": addon_p,
+                "tp1_price": tp1_p,
+                "tp2_price": tp2_p,
+                "stop_loss_price": sl_p,
+                "rr_ratio": str(row.get("rr_ratio", "")),
+                "expectancy_pct": str(row.get("expectancy_pct", "")),
+                "recommended_shares": shares,
+                "hist_return_pct": str(row.get("hist_return_pct", "")),
+                "hist_win_rate_pct": str(row.get("hist_win_rate_pct", "")),
+                "hist_sharpe": str(row.get("hist_sharpe", "")),
+                "overnight_risk": str(row.get("overnight_risk", "")),
+                "action_plan_zh": str(row.get("action_plan_zh", "")),
+                "order_snippet": order_text,
+            })
+        
+        regime_info = {}
+        regime_file = Path(__file__).resolve().parent / "regime_config.json"
+        if regime_file.exists():
+            try:
+                with open(regime_file, "r", encoding="utf-8") as f:
+                    regime_info = json.load(f)
+            except Exception:
+                pass
+        
+        return {
+            "status": "success",
+            "items": items,
+            "total": len(items),
+            "market_regime": regime_info
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e), "items": []}
+
+
 @app.get("/api/overview")
 async def get_overview():
     """提供大盤現況與全策略入選總數概覽"""

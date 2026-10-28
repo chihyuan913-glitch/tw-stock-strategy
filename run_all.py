@@ -130,9 +130,12 @@ def main():
     print(f" 🕒 啟動時間: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"============================================================")
 
-    from market_schedule import check_market_open_or_exit
+    from market_schedule import check_market_open_or_exit, verify_twse_data_settlement
     if not check_market_open_or_exit(context_name="全策略盤後選股排程", allow_force=True):
         return
+
+    # 夜間官方數據沉澱完整性檢核 (若為 17:00 後執行，確認官方信用交易與法人結算到位)
+    verify_twse_data_settlement(verbose=True)
 
     targets = list(STRATEGIES)
     known_ids = {s["id"] for s in targets}

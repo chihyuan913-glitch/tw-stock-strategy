@@ -177,7 +177,11 @@
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-6">
       <div class="flex space-x-2" id="tabButtons">
         <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
-          📊 八大選股策略戰報
+          📊 十大量化策略選股
+        </button>
+        <button onclick="switchTab('advisor')" id="btn-tab-advisor" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
+          <span>🔮 明日實盤決策</span>
+          <span id="tabAdvisorBadge" class="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[10px] font-mono text-emerald-400 border border-emerald-500/30">首選</span>
         </button>
         <button onclick="switchTab('radar')" id="btn-tab-radar" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
           🎯 個股診斷與盤中雷達
@@ -197,6 +201,74 @@
       <div class="text-xs text-slate-400 flex items-center gap-1.5">
         <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
         <span>四大防線標準：進場 ‧ 加碼 ‧ 停利 ‧ 停損</span>
+      </div>
+    </div>
+
+    <!-- 視圖：🔮 明日 (T+1) 實盤下單指南卡 (Tomorrow Action Deck) -->
+    <div id="view-advisor" class="space-y-6 hidden">
+      <!-- 頂部大盤環境與操盤資金指引 -->
+      <div id="advisorRegimeBanner" class="rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-slate-900/95 to-slate-900 p-5 shadow-2xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-2xl font-black shadow-lg shadow-emerald-500/10">
+            🔮
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-black text-white tracking-wide">明日 (T+1) 實盤下單決策指南卡</h2>
+              <span id="advisorMarketRegimeBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                多頭主升期
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">全台股 10 大策略經 100 天滾動回測體檢，提煉勝率最大化之核心實盤操盤標的與四大防線</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs">
+            <span class="text-slate-400">大盤建議現金水位：</span>
+            <span id="advisorCashTarget" class="font-bold text-amber-400 font-mono text-sm">30%</span>
+          </div>
+          <button onclick="loadTomorrowAdvisorData()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 shadow">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>重新整理</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 統計摘要列 (KPI Cards) -->
+      <div id="advisorSummaryBar" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-center">
+          <div class="text-xs text-slate-400 font-medium">🟢 優先買進 (首選)</div>
+          <div id="advisorStrongBuyCount" class="text-2xl font-black text-emerald-400 font-mono mt-1">--</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-center">
+          <div class="text-xs text-slate-400 font-medium">🟡 拉回低接 (次選)</div>
+          <div id="advisorBuyDipCount" class="text-2xl font-black text-amber-400 font-mono mt-1">--</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-center">
+          <div class="text-xs text-slate-400 font-medium">🛑 建議剔除 (回測淘汰)</div>
+          <div id="advisorFilteredCount" class="text-2xl font-black text-rose-400 font-mono mt-1">--</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-center">
+          <div class="text-xs text-slate-400 font-medium">📊 評估標的總數</div>
+          <div id="advisorTotalCount" class="text-2xl font-black text-cyan-400 font-mono mt-1">--</div>
+        </div>
+      </div>
+
+      <!-- 核心實戰下單卡片清單 (Card Deck) -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+            <span>🎯 明日核心作戰清單 (通過回測體檢標的)</span>
+            <span class="text-xs text-slate-500 font-normal">點擊按鈕即可一鍵複製掛單委託指令</span>
+          </h3>
+          <div class="flex gap-2 text-xs">
+            <button onclick="filterAdvisorCards('all')" id="filter-adv-all" class="px-2.5 py-1 rounded bg-slate-800 text-slate-200 border border-slate-700 font-semibold">全部展示</button>
+            <button onclick="filterAdvisorCards('actionable')" id="filter-adv-actionable" class="px-2.5 py-1 rounded bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-semibold">僅看可操作 (買進/低接)</button>
+          </div>
+        </div>
+        <div id="advisorCardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- 動態載入卡片 -->
+        </div>
       </div>
     </div>
 
@@ -776,7 +848,7 @@
 
     // 標籤切換
     function switchTab(tab) {
-      const tabs = ['strategies', 'radar', 'analyzer', 'weekly', 'hub'];
+      const tabs = ['strategies', 'advisor', 'radar', 'analyzer', 'weekly', 'hub'];
       tabs.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`btn-tab-${t}`);
@@ -791,6 +863,8 @@
       });
       if (tab === 'radar') {
         loadRadarWatchlist();
+      } else if (tab === 'advisor') {
+        loadTomorrowAdvisorData();
       }
       lucide.createIcons();
     }
@@ -2815,8 +2889,9 @@
           if (tabBadge) tabBadge.innerText = d.radar_count;
         }
 
-        // 載入當前策略
+        // 載入當前策略與明日買賣決策卡
         await loadStrategyData(currentStrategy);
+        await loadTomorrowAdvisorData();
 
         // 載入週報
         const rep = await fetch('/api/weekly_report');
@@ -3183,6 +3258,211 @@
 
       }
 
+    }
+
+  
+    // =====================================================================
+    // 🔮 明日 (T+1) 實盤下單決策卡 (Tomorrow Action Deck)
+    // =====================================================================
+    let globalAdvisorItems = [];
+    let currentAdvisorFilter = 'actionable';
+
+    async function loadTomorrowAdvisorData() {
+      const container = document.getElementById('advisorCardGrid');
+      if (!container) return;
+      container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-sm"><i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-400"></i>正在載入明日買賣建議與回測數據...</div>';
+      lucide.createIcons();
+
+      try {
+        const resp = await fetch('/api/tomorrow_advisor');
+        const res = await resp.json();
+        if (res.status !== 'success' || !res.items) {
+          container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-sm">目前尚無明日買賣建議表，請先執行盤後選股 run_all.py。</div>';
+          return;
+        }
+
+        globalAdvisorItems = res.items;
+
+        // 更新 KPI
+        let strongBuy = 0, buyDip = 0, filtered = 0;
+        globalAdvisorItems.forEach(r => {
+          const act = r.tomorrow_action || '';
+          if (act.includes('優先買進') || act.includes('STRONG BUY')) strongBuy++;
+          else if (act.includes('拉回低接') || act.includes('BUY ON DIP')) buyDip++;
+          else filtered++;
+        });
+
+        document.getElementById('advisorStrongBuyCount').innerText = strongBuy;
+        document.getElementById('advisorBuyDipCount').innerText = buyDip;
+        document.getElementById('advisorFilteredCount').innerText = filtered;
+        document.getElementById('advisorTotalCount').innerText = globalAdvisorItems.length;
+        const badge = document.getElementById('tabAdvisorBadge');
+        if (badge) badge.innerText = `${strongBuy + buyDip} 檔`;
+
+        if (res.market_regime && res.market_regime.label) {
+          const mb = document.getElementById('advisorMarketRegimeBadge');
+          if (mb) mb.innerText = res.market_regime.label;
+          const ct = document.getElementById('advisorCashTarget');
+          if (ct) ct.innerText = `${res.market_regime.cash_target_pct || 30}%`;
+        }
+
+        renderAdvisorCards();
+      } catch (e) {
+        console.error('載入明日決策失敗:', e);
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-rose-400 text-sm">載入失敗: ${e.message}</div>`;
+      }
+    }
+
+    function filterAdvisorCards(mode) {
+      currentAdvisorFilter = mode;
+      const btnAll = document.getElementById('filter-adv-all');
+      const btnAct = document.getElementById('filter-adv-actionable');
+      if (mode === 'all') {
+        if (btnAll) btnAll.className = "px-2.5 py-1 rounded bg-emerald-600 text-white font-semibold shadow";
+        if (btnAct) btnAct.className = "px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold";
+      } else {
+        if (btnAct) btnAct.className = "px-2.5 py-1 rounded bg-emerald-600 text-white font-semibold shadow";
+        if (btnAll) btnAll.className = "px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold";
+      }
+      renderAdvisorCards();
+    }
+
+    function renderAdvisorCards() {
+      const container = document.getElementById('advisorCardGrid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      let items = globalAdvisorItems;
+      if (currentAdvisorFilter === 'actionable') {
+        items = items.filter(r => {
+          const act = r.tomorrow_action || '';
+          return act.includes('優先買進') || act.includes('STRONG BUY') || act.includes('拉回低接') || act.includes('BUY ON DIP') || act.includes('建議放空');
+        });
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-sm">目前無符合條件之決策卡片。</div>';
+        return;
+      }
+
+      items.forEach(r => {
+        const act = r.tomorrow_action || '';
+        const isStrongBuy = act.includes('優先買進') || act.includes('STRONG BUY');
+        const isDip = act.includes('拉回低接') || act.includes('BUY ON DIP');
+        const isShort = act.includes('放空');
+
+        let cardBorder = 'border-slate-800 bg-slate-900/80';
+        let actionBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+
+        if (isStrongBuy) {
+          cardBorder = 'border-emerald-500/50 bg-gradient-to-br from-emerald-950/20 via-slate-900 to-slate-900 shadow-emerald-950/20';
+          actionBadgeClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-black';
+        } else if (isDip) {
+          cardBorder = 'border-amber-500/40 bg-gradient-to-br from-amber-950/20 via-slate-900 to-slate-900 shadow-amber-950/20';
+          actionBadgeClass = 'bg-amber-500/20 text-amber-400 border-amber-500/40 font-bold';
+        } else if (isShort) {
+          cardBorder = 'border-rose-500/40 bg-slate-900 to-slate-900';
+          actionBadgeClass = 'bg-rose-500/20 text-rose-400 border-rose-500/40 font-bold';
+        }
+
+        const card = document.createElement('div');
+        card.className = `rounded-2xl border ${cardBorder} p-5 shadow-xl flex flex-col justify-between space-y-4 hover:border-slate-600 transition`;
+
+        card.innerHTML = `
+          <div>
+            <!-- 頭部：動作標籤與個股標題 -->
+            <div class="flex items-start justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-xs border ${actionBadgeClass}">
+                    ${r.tomorrow_action}
+                  </span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                    ${r.verdict || '量化評定'}
+                  </span>
+                </div>
+                <div class="mt-2 flex items-baseline gap-2">
+                  <span class="text-xl font-black text-white font-mono">${r.symbol}</span>
+                  <span class="text-lg font-bold text-slate-100">${r.name}</span>
+                  <span class="text-xs text-slate-500">現價 $${r.close_price}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-[10px] text-slate-500">建議部位</div>
+                <div class="text-xs font-mono font-bold text-amber-400">${r.recommended_shares} 股</div>
+              </div>
+            </div>
+
+            <!-- 實戰四大防線 2x2 網格 -->
+            <div class="grid grid-cols-2 gap-2 mt-3 text-xs font-mono">
+              <div class="p-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex justify-between items-center">
+                <span class="text-emerald-400 font-sans text-[11px]">🟢 進場上限</span>
+                <span class="text-emerald-300 font-bold">$${r.entry_price}</span>
+              </div>
+              <div class="p-2 rounded-lg bg-blue-950/30 border border-blue-800/40 flex justify-between items-center">
+                <span class="text-blue-400 font-sans text-[11px]">🔵 突破加碼</span>
+                <span class="text-blue-300 font-bold">$${r.addon_price}</span>
+              </div>
+              <div class="p-2 rounded-lg bg-amber-950/30 border border-amber-800/40 flex justify-between items-center">
+                <span class="text-amber-400 font-sans text-[11px]">🔴 目標停利</span>
+                <span class="text-amber-300 font-bold">$${r.tp1_price}</span>
+              </div>
+              <div class="p-2 rounded-lg bg-rose-950/30 border border-rose-800/40 flex justify-between items-center">
+                <span class="text-rose-400 font-sans text-[11px]">🛑 嚴格停損</span>
+                <span class="text-rose-300 font-bold">$${r.stop_loss_price}</span>
+              </div>
+            </div>
+
+            <!-- 回測關鍵指標 -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 px-1">
+              <span>勝率 <strong class="text-slate-200 font-mono">${r.hist_win_rate_pct}%</strong></span>
+              <span>盈虧比 <strong class="text-slate-200 font-mono">1:${r.rr_ratio}</strong></span>
+              <span>期望值 <strong class="text-emerald-400 font-mono">${r.expectancy_pct}%</strong></span>
+              <span>夏普 <strong class="text-slate-200 font-mono">${r.hist_sharpe}</strong></span>
+            </div>
+
+            <!-- 操盤錦囊細節 -->
+            <div class="mt-3 p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs text-slate-300 leading-relaxed font-sans">
+              <span class="text-slate-400 text-[10px] block mb-0.5">💡 實盤操盤指引：</span>
+              ${r.action_plan_zh || '於指定進場區間內限價分批建倉，嚴格遵守四大防線風控紀律。'}
+            </div>
+          </div>
+
+          <!-- 底部一鍵複製下單委託語句按鈕 -->
+          <div class="pt-2 border-t border-slate-800/80">
+            <button onclick="copyAdvisorOrderSnippet('${r.order_snippet.replace(/'/g, "\\'")}')" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>一鍵複製掛單委託指令</span>
+            </button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function copyAdvisorOrderSnippet(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(`已複製下單指令：${text}`);
+        }).catch(() => {
+          fallbackCopyText(text);
+        });
+      } else {
+        fallbackCopyText(text);
+      }
+    }
+
+    function fallbackCopyText(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(`已複製下單指令：${text}`);
     }
 
   </script>

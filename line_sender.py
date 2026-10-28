@@ -600,6 +600,33 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "color_theme": "#0F172A"
         }
 
+def is_priority_advisor_target(code: str) -> tuple:
+    """
+    檢驗股票是否為昨日實驗室回測體檢之核心首選 (🟢優先買進 / 🟡拉回低接)
+    回傳 (is_priority: bool, tag: str)
+    """
+    if not code:
+        return False, ""
+    advisor_csv = Path(__file__).resolve().parent / "lab" / "data" / "tomorrow_trading_advisor.csv"
+    if not advisor_csv.exists():
+        return False, ""
+    try:
+        import pandas as pd
+        df = pd.read_csv(advisor_csv, encoding='utf-8-sig', dtype=str)
+        if "symbol" in df.columns and "tomorrow_action" in df.columns:
+            clean_c = str(code).strip()
+            row = df[df["symbol"].str.strip() == clean_c]
+            if not row.empty:
+                act = str(row.iloc[0]["tomorrow_action"]).strip()
+                if "優先買進" in act or "STRONG BUY" in act:
+                    return True, "🔥【今日核心推薦首選】"
+                elif "拉回低接" in act or "BUY ON DIP" in act:
+                    return True, "🟡【拉回低接推薦】"
+    except Exception:
+        pass
+    return False, ""
+
+
 def format_price_val(val) -> str:
     """安全格式化股價數值"""
     if val is None or val == "" or val == "-":
@@ -618,6 +645,10 @@ def build_price_alert_card(
     event_desc: str,
     strategy_id: str = "01"
 ) -> dict:
+    code_check = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
+    is_pri, pri_tag = is_priority_advisor_target(code_check)
+    if is_pri and pri_tag:
+        event_title = f"{pri_tag} {event_title}"
     """建構單檔盤中到價高對比 Flex Message 卡片 (大字體、零引線、四大價位一目了然)"""
     import datetime
     meta = resolve_strategy_meta(strategy_id)
@@ -918,6 +949,10 @@ def format_clean_price_alert_text(
     event_desc: str,
     strategy_id: str = "01"
 ) -> str:
+    code_check = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
+    is_pri, pri_tag = is_priority_advisor_target(code_check)
+    if is_pri and pri_tag:
+        event_title = f"{pri_tag} {event_title}"
     """產出零引線、高對比的純文字版本（用於 Telegram 備援與文字終端）"""
     import datetime
     meta = resolve_strategy_meta(strategy_id)
