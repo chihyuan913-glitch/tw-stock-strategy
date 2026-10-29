@@ -1243,6 +1243,8 @@
       items.forEach(it => {
         const code = it.code || '';
         const name = it.name || code;
+        const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
+        const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
         const bp = Number(it.base_price || 0).toFixed(2);
         const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
         const ad = Number(it.addon_price || 0).toFixed(2);
@@ -1281,16 +1283,20 @@
         const isEntryTriggered = events.includes('ENTRY');
 
         if (isSlTriggered) {
-          eventBadgesHtml += '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 text-[11px] animate-pulse">🛑 破線停損</span> ';
+          const slBadgeText = isShort ? '🛑 停損回補' : '🛑 破線停損';
+          eventBadgesHtml += `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 text-[11px] animate-pulse">${slBadgeText}</span> `;
         }
         if (isTpTriggered) {
-          eventBadgesHtml += '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 text-[11px]">🔴 攻抵停利</span> ';
+          const tpBadgeText = isShort ? '🔴 攻抵回補' : '🔴 攻抵停利';
+          eventBadgesHtml += `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 text-[11px]">${tpBadgeText}</span> `;
         }
         if (isAdTriggered) {
-          eventBadgesHtml += '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 text-[11px]">🔵 突破加碼</span> ';
+          const adBadgeText = isShort ? '🔵 摜破加空' : '🔵 突破加碼';
+          eventBadgesHtml += `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 text-[11px]">${adBadgeText}</span> `;
         }
         if (isEntryTriggered) {
-          eventBadgesHtml += '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 text-[11px]">🟢 甜蜜進場</span> ';
+          const entryBadgeText = isShort ? '🟢 甜蜜空點' : '🟢 甜蜜進場';
+          eventBadgesHtml += `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 text-[11px]">${entryBadgeText}</span> `;
         }
         if (!eventBadgesHtml) {
           eventBadgesHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 text-[11px]">⚡ 今日到價</span> ';
@@ -1315,20 +1321,40 @@
 
         if (isSlTriggered) {
           alertBarClass = "bg-rose-950/50 border-rose-500/50 text-rose-300";
-          alertBarDesc = `🛑 警告：現價已摜破嚴格停損價 ${sl} 元，觸發防線停損！`;
-          playbookAdvice = "【持股者】請嚴格遵守紀律執行停損出場，杜絕僥倖；【空手者】觀望嚴禁接刀。";
+          if (isShort) {
+            alertBarDesc = `🛑 警告：現價已突破嚴格停損價 ${sl} 元，觸發空單停損回補！`;
+            playbookAdvice = "【持空者】請嚴格遵守紀律執行空單停損回補退場，防短線軋空；【空手者】觀望嚴禁放空。";
+          } else {
+            alertBarDesc = `🛑 警告：現價已摜破嚴格停損價 ${sl} 元，觸發防線停損！`;
+            playbookAdvice = "【持股者】請嚴格遵守紀律執行停損出場，杜絕僥倖；【空手者】觀望嚴禁接刀。";
+          }
         } else if (isTpTriggered) {
           alertBarClass = "bg-rose-950/40 border-rose-400/50 text-rose-300";
-          alertBarDesc = `🔴 恭喜：現價已攻抵反壓目標區 TP1 ${tp1} 元，獲利達標！`;
-          playbookAdvice = "【持股者】建議在此反壓區分批拔檔獲利 1/3 ~ 1/2，餘股續抱移動停利；【空手者】切勿追高。";
+          if (isShort) {
+            alertBarDesc = `🔴 恭喜：現價已跌抵目標回補區 TP1 ${tp1} 元，放空獲利達標！`;
+            playbookAdvice = "【持空者】建議在此目標區分批回補獲利 1/3 ~ 1/2，餘單續抱移動停利；【空手者】切勿追空。";
+          } else {
+            alertBarDesc = `🔴 恭喜：現價已攻抵反壓目標區 TP1 ${tp1} 元，獲利達標！`;
+            playbookAdvice = "【持股者】建議在此反壓區分批拔檔獲利 1/3 ~ 1/2，餘股續抱移動停利；【空手者】切勿追高。";
+          }
         } else if (isAdTriggered) {
           alertBarClass = "bg-blue-950/50 border-blue-500/50 text-blue-300";
-          alertBarDesc = `🔵 強勢：突破關鍵加碼價 ${ad} 元，右側多方動能續強！`;
-          playbookAdvice = "【持股者】帶量續強可於回測時逢低加碼；【空手者】留意假突破，沿短期防線佈局。";
+          if (isShort) {
+            alertBarDesc = `🔵 強勢殺多：摜破關鍵加空價 ${ad} 元，右側空方動能續強！`;
+            playbookAdvice = "【持空者】帶量摜破可逢反彈加碼放空；【空手者】留意假跌破，沿短期防線佈局。";
+          } else {
+            alertBarDesc = `🔵 強勢：突破關鍵加碼價 ${ad} 元，右側多方動能續強！`;
+            playbookAdvice = "【持股者】帶量續強可於回測時逢低加碼；【空手者】留意假突破，沿短期防線佈局。";
+          }
         } else if (isEntryTriggered || diffFromEntry <= 0) {
           alertBarClass = "bg-emerald-950/40 border-emerald-500/40 text-emerald-300";
-          alertBarDesc = `🟢 黃金買點：現價折價在建議進場上限 (${ep}) 之內，盈虧比極佳！`;
-          playbookAdvice = "【空手者】可於進場上限以內分批掛單建倉，防追高；【持股者】以進場價或低點作為防守點。";
+          if (isShort) {
+            alertBarDesc = `🟢 黃金空點：現價在建議放空上限 (${ep}) 之內，做空盈虧比極佳！`;
+            playbookAdvice = "【空手者】可於放空上限附近掛單放空，防低檔追殺；【持空者】以停損價作為防守點。";
+          } else {
+            alertBarDesc = `🟢 黃金買點：現價折價在建議進場上限 (${ep}) 之內，盈虧比極佳！`;
+            playbookAdvice = "【空手者】可於進場上限以內分批掛單建倉，防追高；【持股者】以進場價或低點作為防守點。";
+          }
         }
 
         const card = document.createElement('div');
@@ -1381,29 +1407,29 @@
           <div class="grid grid-cols-2 gap-2 text-xs">
             <div class="p-2.5 rounded-xl bg-emerald-950/30 border ${isEntryTriggered ? 'border-emerald-400 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-950/60' : 'border-emerald-500/30'}">
               <div class="text-[10px] font-bold text-emerald-400 flex items-center justify-between">
-                <span>🟢 進場上限</span>
+                <span>🟢 ${isShort ? '建議放空' : '進場上限'}</span>
                 ${isEntryTriggered ? '<span class="text-[9px] px-1 rounded bg-emerald-500/30 text-emerald-200 font-bold animate-pulse">今日觸發</span>' : ''}
               </div>
               <div class="text-base font-black font-mono text-emerald-400 mt-0.5">${ep}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-blue-950/30 border ${isAdTriggered ? 'border-blue-400 ring-2 ring-blue-500/50 shadow-lg shadow-blue-950/60' : 'border-blue-500/30'}">
               <div class="text-[10px] font-bold text-blue-400 flex items-center justify-between">
-                <span>🔵 動能加碼</span>
+                <span>🔵 ${isShort ? '摜破加空' : '動能加碼'}</span>
                 ${isAdTriggered ? '<span class="text-[9px] px-1 rounded bg-blue-500/30 text-blue-200 font-bold animate-pulse">今日突破</span>' : ''}
               </div>
               <div class="text-base font-black font-mono text-blue-400 mt-0.5">${ad}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-rose-950/30 border ${isTpTriggered ? 'border-rose-400 ring-2 ring-rose-500/50 shadow-lg shadow-rose-950/60' : 'border-rose-500/30'}">
               <div class="text-[10px] font-bold text-rose-400 flex items-center justify-between">
-                <span>🔴 目標停利</span>
+                <span>🔴 ${isShort ? '目標回補' : '目標停利'}</span>
                 ${isTpTriggered ? '<span class="text-[9px] px-1 rounded bg-rose-500/30 text-rose-200 font-bold animate-pulse">今日達標</span>' : ''}
               </div>
               <div class="text-xs font-black font-mono text-rose-400 mt-1 truncate">TP1 ${tp1} / ${tp2}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-amber-950/30 border ${isSlTriggered ? 'border-rose-500 ring-2 ring-rose-500 shadow-xl shadow-rose-950/80 animate-pulse' : 'border-amber-500/30'}">
               <div class="text-[10px] font-bold ${isSlTriggered ? 'text-rose-400' : 'text-amber-400'} flex items-center justify-between">
-                <span>🛑 嚴格停損</span>
-                ${isSlTriggered ? '<span class="text-[9px] px-1 rounded bg-rose-600 text-white font-black animate-ping">破線已警示</span>' : ''}
+                <span>🛑 ${isShort ? '停損回補' : '嚴格停損'}</span>
+                ${isSlTriggered ? '<span class="text-[9px] px-1 rounded bg-rose-600 text-white font-black animate-ping">觸發已警示</span>' : ''}
               </div>
               <div class="text-base font-black font-mono ${isSlTriggered ? 'text-rose-400' : 'text-amber-400'} mt-0.5">${sl}</div>
             </div>
@@ -1528,6 +1554,7 @@
       items.forEach(it => {
         const code = it.code || '';
         const name = it.name || code;
+        const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
         const bp = Number(it.base_price || 0).toFixed(2);
         const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
         const ad = Number(it.addon_price || 0).toFixed(2);
@@ -1578,41 +1605,80 @@
         const tp1Num = Number(tp1);
         const adNum = Number(ad);
 
-        if (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum)) {
-          gapBgClass = "bg-rose-950/40 border-rose-500/40";
-          gapBadge = "🛑【跌破停損線】觸發風控";
-          gapBadgeTable = "🛑 破線停損";
-          gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
-          gapDesc = `現價已摜破嚴格停損防線 ${sl} 元，請嚴守紀律停損！`;
-          gapDiffColor = "text-rose-400";
-        } else if (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num)) {
-          gapBgClass = "bg-rose-950/30 border-rose-500/30";
-          gapBadge = "🔴【攻抵停利區】TP1 目標達標";
-          gapBadgeTable = "🔴 攻抵停利";
-          gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
-          gapDesc = `現價已達反壓目標區 ${tp1} 元，建議分批獲利入袋！`;
-          gapDiffColor = "text-rose-400";
-        } else if (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum)) {
-          gapBgClass = "bg-blue-950/40 border-blue-500/40";
-          gapBadge = "🔵【突破加碼區】右側動能確認";
-          gapBadgeTable = "🔵 突破加碼";
-          gapBadgeTableClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
-          gapDesc = `突破加碼價位 ${ad} 元，多方續強可逢回加碼！`;
-          gapDiffColor = "text-blue-400";
-        } else if (diffFromEntry <= 0) {
-          gapBgClass = "bg-emerald-950/30 border-emerald-500/30";
-          gapBadge = "🟢【進場甜蜜區】低於買進上限";
-          gapBadgeTable = "🟢 甜蜜進場";
-          gapBadgeTableClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-          gapDesc = `現價折價 ${Math.abs(diffFromEntry).toFixed(2)} 元，在建議進場上限 (${ep}) 之內，盈虧比極佳！`;
-          gapDiffColor = "text-emerald-400";
+        if (isShort) {
+          if (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice >= slNum)) {
+            gapBgClass = "bg-rose-950/40 border-rose-500/40";
+            gapBadge = "🛑【突破停損線】觸發風控";
+            gapBadgeTable = "🛑 停損回補";
+            gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+            gapDesc = `現價已突破嚴格停損防線 ${sl} 元，請嚴守紀律空單停損！`;
+            gapDiffColor = "text-rose-400";
+          } else if (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice <= tp1Num)) {
+            gapBgClass = "bg-rose-950/30 border-rose-500/30";
+            gapBadge = "🔴【跌達回補區】TP1 目標達標";
+            gapBadgeTable = "🔴 攻抵回補";
+            gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+            gapDesc = `現價已跌達反壓目標區 ${tp1} 元，建議分批獲利回補！`;
+            gapDiffColor = "text-rose-400";
+          } else if (positionStatus === 'addon' || (adNum > 0 && rtPrice <= adNum)) {
+            gapBgClass = "bg-blue-950/40 border-blue-500/40";
+            gapBadge = "🔵【摜破加空區】右側動能確認";
+            gapBadgeTable = "🔵 摜破加空";
+            gapBadgeTableClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
+            gapDesc = `摜破加空價位 ${ad} 元，空方續強可順勢加空！`;
+            gapDiffColor = "text-blue-400";
+          } else if (diffFromEntry <= 0) {
+            gapBgClass = "bg-emerald-950/30 border-emerald-500/30";
+            gapBadge = "🟢【放空甜蜜區】反彈不過可空";
+            gapBadgeTable = "🟢 甜蜜空點";
+            gapBadgeTableClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+            gapDesc = `現價在建議放空上限 (${ep}) 附近，做空盈虧比極佳！`;
+            gapDiffColor = "text-emerald-400";
+          } else {
+            gapBgClass = "bg-amber-950/30 border-amber-500/30";
+            gapBadge = "⚠️【高於放空價】逼近停損防線";
+            gapBadgeTable = "⚠️ 高於放空";
+            gapBadgeTableClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+            gapDesc = `現價已高於建議放空價，請密切注意停損防守線！`;
+            gapDiffColor = "text-amber-400";
+          }
         } else {
-          gapBgClass = "bg-amber-950/30 border-amber-500/30";
-          gapBadge = "⚠️【高於進場價】留意追高風險";
-          gapBadgeTable = "⚠️ 高於進場";
-          gapBadgeTableClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
-          gapDesc = `現價溢價 +${diffFromEntry.toFixed(2)} 元，已高於買進上限 (${ep})，建議等待回測！`;
-          gapDiffColor = "text-amber-400";
+          if (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum)) {
+            gapBgClass = "bg-rose-950/40 border-rose-500/40";
+            gapBadge = "🛑【跌破停損線】觸發風控";
+            gapBadgeTable = "🛑 破線停損";
+            gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+            gapDesc = `現價已摜破嚴格停損防線 ${sl} 元，請嚴守紀律停損！`;
+            gapDiffColor = "text-rose-400";
+          } else if (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num)) {
+            gapBgClass = "bg-rose-950/30 border-rose-500/30";
+            gapBadge = "🔴【攻抵停利區】TP1 目標達標";
+            gapBadgeTable = "🔴 攻抵停利";
+            gapBadgeTableClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+            gapDesc = `現價已達反壓目標區 ${tp1} 元，建議分批獲利入袋！`;
+            gapDiffColor = "text-rose-400";
+          } else if (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum)) {
+            gapBgClass = "bg-blue-950/40 border-blue-500/40";
+            gapBadge = "🔵【突破加碼區】右側動能確認";
+            gapBadgeTable = "🔵 突破加碼";
+            gapBadgeTableClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
+            gapDesc = `突破加碼價位 ${ad} 元，多方續強可逢回加碼！`;
+            gapDiffColor = "text-blue-400";
+          } else if (diffFromEntry <= 0) {
+            gapBgClass = "bg-emerald-950/30 border-emerald-500/30";
+            gapBadge = "🟢【進場甜蜜區】低於買進上限";
+            gapBadgeTable = "🟢 甜蜜進場";
+            gapBadgeTableClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+            gapDesc = `現價折價 ${Math.abs(diffFromEntry).toFixed(2)} 元，在建議進場上限 (${ep}) 之內，盈虧比極佳！`;
+            gapDiffColor = "text-emerald-400";
+          } else {
+            gapBgClass = "bg-amber-950/30 border-amber-500/30";
+            gapBadge = "⚠️【高於進場價】留意追高風險";
+            gapBadgeTable = "⚠️ 高於進場";
+            gapBadgeTableClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+            gapDesc = `現價溢價 +${diffFromEntry.toFixed(2)} 元，已高於買進上限 (${ep})，建議等待回測！`;
+            gapDiffColor = "text-amber-400";
+          }
         }
 
         const diffDisplay = diffFromEntry <= 0
@@ -1621,10 +1687,18 @@
         const diffPctDisplay = `${diffPctFromEntry >= 0 ? '+' : ''}${diffPctFromEntry.toFixed(2)}%`;
 
         // 判斷哪個四價方塊需要強調高亮
-        const isEntryBoxActive = (diffFromEntry <= 0 && positionStatus !== 'stop_loss');
-        const isAddonBoxActive = (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum));
-        const isTpBoxActive = (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num));
-        const isSlBoxActive = (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum));
+        const isEntryBoxActive = isShort
+          ? (rtPrice <= epNum && rtPrice < slNum && positionStatus !== 'stop_loss')
+          : (diffFromEntry <= 0 && positionStatus !== 'stop_loss');
+        const isAddonBoxActive = isShort
+          ? (positionStatus === 'addon' || (adNum > 0 && rtPrice <= adNum))
+          : (positionStatus === 'addon' || (adNum > 0 && rtPrice >= adNum));
+        const isTpBoxActive = isShort
+          ? (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice <= tp1Num))
+          : (positionStatus === 'take_profit' || (tp1Num > 0 && rtPrice >= tp1Num));
+        const isSlBoxActive = isShort
+          ? (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice >= slNum))
+          : (positionStatus === 'stop_loss' || (slNum > 0 && rtPrice <= slNum));
 
         // 5 個交易日進場監控計時徽章
         const waitingDays = Number(it.trading_days_waiting || 0);
@@ -1680,29 +1754,29 @@
           <div class="grid grid-cols-2 gap-2 text-xs">
             <div class="p-2.5 rounded-xl bg-emerald-950/20 border ${isEntryBoxActive ? 'border-emerald-400/80 shadow-md shadow-emerald-950/50 ring-1 ring-emerald-500/30' : 'border-emerald-500/20'}">
               <div class="text-[10px] font-bold text-emerald-400 flex items-center justify-between">
-                <span>🟢 進場上限</span>
+                <span>🟢 ${isShort ? '建議放空' : '進場上限'}</span>
                 ${isEntryBoxActive ? '<span class="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-normal">甜蜜中</span>' : ''}
               </div>
               <div class="text-base font-black font-mono text-emerald-400 mt-0.5">${ep}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-blue-950/20 border ${isAddonBoxActive ? 'border-blue-400/80 shadow-md shadow-blue-950/50 ring-1 ring-blue-500/30' : 'border-blue-500/20'}">
               <div class="text-[10px] font-bold text-blue-400 flex items-center justify-between">
-                <span>🔵 動能加碼</span>
-                ${isAddonBoxActive ? '<span class="text-[9px] px-1 rounded bg-blue-500/20 text-blue-300 font-normal">已突破</span>' : ''}
+                <span>🔵 ${isShort ? '摜破加空' : '動能加碼'}</span>
+                ${isAddonBoxActive ? `<span class="text-[9px] px-1 rounded bg-blue-500/20 text-blue-300 font-normal">${isShort ? '已摜破' : '已突破'}</span>` : ''}
               </div>
               <div class="text-base font-black font-mono text-blue-400 mt-0.5">${ad}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-rose-950/20 border ${isTpBoxActive ? 'border-rose-400/80 shadow-md shadow-rose-950/50 ring-1 ring-rose-500/30' : 'border-rose-500/20'}">
               <div class="text-[10px] font-bold text-rose-400 flex items-center justify-between">
-                <span>🔴 目標停利</span>
+                <span>🔴 ${isShort ? '目標回補' : '目標停利'}</span>
                 ${isTpBoxActive ? '<span class="text-[9px] px-1 rounded bg-rose-500/20 text-rose-300 font-normal">達標</span>' : ''}
               </div>
               <div class="text-xs font-black font-mono text-rose-400 mt-1 truncate">TP1 ${tp1} / ${tp2}</div>
             </div>
             <div class="p-2.5 rounded-xl bg-amber-950/20 border ${isSlBoxActive ? 'border-rose-500 shadow-md shadow-rose-950/60 ring-1 ring-rose-500 animate-pulse' : 'border-amber-500/20'}">
               <div class="text-[10px] font-bold ${isSlBoxActive ? 'text-rose-400' : 'text-amber-400'} flex items-center justify-between">
-                <span>🛑 嚴格停損</span>
-                ${isSlBoxActive ? '<span class="text-[9px] px-1 rounded bg-rose-500/30 text-rose-300 font-bold">已跌破</span>' : ''}
+                <span>🛑 ${isShort ? '停損回補' : '嚴格停損'}</span>
+                ${isSlBoxActive ? `<span class="text-[9px] px-1 rounded bg-rose-500/30 text-rose-300 font-bold">${isShort ? '已突破' : '已跌破'}</span>` : ''}
               </div>
               <div class="text-base font-black font-mono ${isSlBoxActive ? 'text-rose-400' : 'text-amber-400'} mt-0.5">${sl}</div>
             </div>
@@ -1752,6 +1826,7 @@
 
         const code = it.code || '';
         const name = it.name || code;
+        const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
         const bp = Number(it.base_price || 0).toFixed(2);
         const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
         const ad = Number(it.addon_price || 0).toFixed(2);
@@ -1789,16 +1864,30 @@
 
         const positionStatus = it.position_status || (diffFromEntry <= 0 ? 'discount' : 'premium');
         let badgeHtml = '';
-        if (positionStatus === 'stop_loss') {
-          badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🛑 破線停損</span>';
-        } else if (positionStatus === 'take_profit') {
-          badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🔴 攻抵停利</span>';
-        } else if (positionStatus === 'addon') {
-          badgeHtml = '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 text-[10px]">🔵 突破加碼</span>';
-        } else if (isDiscount) {
-          badgeHtml = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">🟢 甜蜜進場</span>';
+        if (isShort) {
+          if (positionStatus === 'stop_loss') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🛑 停損回補</span>';
+          } else if (positionStatus === 'take_profit') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🔴 攻抵回補</span>';
+          } else if (positionStatus === 'addon') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 text-[10px]">🔵 摜破加空</span>';
+          } else if (isDiscount) {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">🟢 甜蜜空點</span>';
+          } else {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">⚠️ 高於放空</span>';
+          }
         } else {
-          badgeHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">⚠️ 高於進場</span>';
+          if (positionStatus === 'stop_loss') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🛑 破線停損</span>';
+          } else if (positionStatus === 'take_profit') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30 text-[10px]">🔴 攻抵停利</span>';
+          } else if (positionStatus === 'addon') {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 text-[10px]">🔵 突破加碼</span>';
+          } else if (isDiscount) {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">🟢 甜蜜進場</span>';
+          } else {
+            badgeHtml = '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">⚠️ 高於進場</span>';
+          }
         }
 
         const waitingDays = Number(it.trading_days_waiting || 0);

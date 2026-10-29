@@ -1266,31 +1266,64 @@ async def get_radar_watchlist_endpoint():
             diff_pct = round((diff / ep) * 100, 2)
             it['diff_from_entry'] = diff
             it['diff_pct_from_entry'] = diff_pct
-
             sl_p = float(it.get('sl_price') or 0)
             ad_p = float(it.get('addon_price') or 0)
             tp1_p = float(it.get('tp1_price') or 0)
 
-            if sl_p > 0 and eval_p <= sl_p:
-                it['position_status'] = 'stop_loss'
-                it['position_badge'] = '🛑 觸及停損防線'
-                it['position_desc'] = f'現價已跌破停損線 {sl_p:.2f} 元'
-            elif tp1_p > 0 and eval_p >= tp1_p:
-                it['position_status'] = 'take_profit'
-                it['position_badge'] = '🔴 攻抵目標停利'
-                it['position_desc'] = f'現價已達 TP1 目標 {tp1_p:.2f} 元'
-            elif ad_p > 0 and eval_p >= ad_p:
-                it['position_status'] = 'addon'
-                it['position_badge'] = '🔵 突破動能加碼'
-                it['position_desc'] = f'現價高於進場 +{diff:.2f} 元 (+{diff_pct:.2f}%)，突破加碼'
-            elif diff <= 0:
-                it['position_status'] = 'discount'
-                it['position_badge'] = '🟢 甜蜜進場區'
-                it['position_desc'] = f'現價折價 {abs(diff):.2f} 元 ({diff_pct:.2f}%)，低於買進上限'
+            # 判斷多空方向
+            is_short = (
+                it.get('direction') == 'SHORT' or
+                '[弱勢破線]' in it.get('name', '') or
+                '[做空]' in it.get('name', '') or
+                '放空' in it.get('name', '')
+            )
+            it['is_short'] = is_short
+            it['direction'] = 'SHORT' if is_short else 'LONG'
+
+            if is_short:
+                # 空方狀態機
+                if sl_p > 0 and eval_p >= sl_p:
+                    it['position_status'] = 'stop_loss'
+                    it['position_badge'] = '🛑 觸及停損回補'
+                    it['position_desc'] = f'現價已突破停損回補線 {sl_p:.2f} 元'
+                elif tp1_p > 0 and eval_p <= tp1_p:
+                    it['position_status'] = 'take_profit'
+                    it['position_badge'] = '🔴 攻抵回補目標'
+                    it['position_desc'] = f'現價已跌達 TP1 回補點 {tp1_p:.2f} 元'
+                elif ad_p > 0 and eval_p <= ad_p:
+                    it['position_status'] = 'addon'
+                    it['position_badge'] = '🔵 摜破動能加空'
+                    it['position_desc'] = f'現價摜破加空點 {ad_p:.2f} 元，空方續強'
+                elif eval_p <= ep:
+                    it['position_status'] = 'discount'
+                    it['position_badge'] = '🟢 反彈放空區'
+                    it['position_desc'] = f'現價在放空上限 ({ep:.2f}) 附近，反彈不過可空'
+                else:
+                    it['position_status'] = 'premium'
+                    it['position_badge'] = '⚠️ 高於放空上限'
+                    it['position_desc'] = f'現價高於放空上限 +{diff:.2f} 元，逼近停損防線'
             else:
-                it['position_status'] = 'premium'
-                it['position_badge'] = '⚠️ 高於進場上限'
-                it['position_desc'] = f'現價溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)，高於建議進場'
+                # 多方狀態機
+                if sl_p > 0 and eval_p <= sl_p:
+                    it['position_status'] = 'stop_loss'
+                    it['position_badge'] = '🛑 觸及停損防線'
+                    it['position_desc'] = f'現價已跌破停損線 {sl_p:.2f} 元'
+                elif tp1_p > 0 and eval_p >= tp1_p:
+                    it['position_status'] = 'take_profit'
+                    it['position_badge'] = '🔴 攻抵目標停利'
+                    it['position_desc'] = f'現價已達 TP1 目標 {tp1_p:.2f} 元'
+                elif ad_p > 0 and eval_p >= ad_p:
+                    it['position_status'] = 'addon'
+                    it['position_badge'] = '🔵 突破動能加碼'
+                    it['position_desc'] = f'現價高於進場 +{diff:.2f} 元 (+{diff_pct:.2f}%)，突破加碼'
+                elif diff <= 0:
+                    it['position_status'] = 'discount'
+                    it['position_badge'] = '🟢 甜蜜進場區'
+                    it['position_desc'] = f'現價折價 {abs(diff):.2f} 元 ({diff_pct:.2f}%)，低於買進上限'
+                else:
+                    it['position_status'] = 'premium'
+                    it['position_badge'] = '⚠️ 高於進場上限'
+                    it['position_desc'] = f'現價溢價 +{diff:.2f} 元 (+{diff_pct:.2f}%)，高於建議進場'
         else:
             it['diff_from_entry'] = 0.0
             it['diff_pct_from_entry'] = 0.0

@@ -220,9 +220,10 @@ def save_watchlist(data: dict):
     with open(WATCHLIST_FILE, "w", encoding="utf-8") as f:
         json.dump(clean_data, f, ensure_ascii=False, indent=2)
 
-def calculate_stock_defense(code: str) -> dict:
-    """為單一股票計算四大操盤防線"""
+def calculate_stock_defense(code: str, direction: str = 'LONG') -> dict:
+    """為單一股票計算四大操盤防線 (全面支援 LONG 多方與 SHORT 空方四大防線標準定價)"""
     from stock_analyzer import fetch_realtime_mis, fetch_history_and_technicals, load_stock_dict
+    import four_price_engine
     
     stock_dict = load_stock_dict()
     realtime = fetch_realtime_mis(code)
@@ -237,53 +238,48 @@ def calculate_stock_defense(code: str) -> dict:
     else:
         current_price = tech['last_close']
 
-    ma5 = tech['ma5']
-    ma10 = tech['ma10']
-    ma20 = tech['ma20']
-    bb_dn = tech['bb_dn']
-    bias20 = ((current_price - ma20) / ma20 * 100) if ma20 else 0.0
-    is_above_ma20 = (current_price >= ma20)
+    prev_close = tech.get('last_close', current_price)
+    high_ref = max(tech.get('last_high', current_price), current_price)
+    low_ref = min(tech.get('last_low', current_price), current_price)
+    ma20 = tech.get('ma20')
+    bb_dn = tech.get('bb_dn')
+    bb_up = tech.get('bb_up')
+    atr = tech.get('atr') or (high_ref - low_ref)
 
-    # 停損
-    if is_above_ma20 and tech['low_5d'] >= ma20:
-        sl_base = min(tech['low_5d'] * 0.995, current_price * 0.955)
-    elif is_above_ma20:
-        sl_base = min(ma20 * 0.985, current_price * 0.955)
+    if direction == 'SHORT':
+        fp = four_price_engine.calculate_four_prices_short(
+            curr_price=current_price,
+            prev_close=prev_close,
+            high=high_ref,
+            low=low_ref,
+            ma20=ma20,
+            upper_band=bb_up,
+            atr=atr
+        )
     else:
-        sl_base = min(tech['low_5d'] * 0.985, current_price * 0.95)
-    stop_loss = round(sl_base, 2)
-
-    # 進場基準上限價 (Entry Price: 單一確定買進上限價)
-    if bias20 > 8.0:
-        entry_price = round(current_price * 0.985, 2)
-        entry_floor = round(min(ma10, current_price * 0.965), 2)
-    elif bias20 < -8.0:
-        entry_price = round(current_price, 2)
-        entry_floor = round(max(bb_dn, current_price * 0.98), 2)
-    else:
-        entry_price = round(current_price, 2)
-        entry_cand1 = min(ma10, current_price * 0.975) if current_price < ma10 else max(ma10, current_price * 0.975)
-        entry_floor = round(min(entry_cand1, current_price * 0.985), 2)
-
-    # 加碼
-    high_ref = max(tech['last_high'], current_price)
-    addon_price = round(max(high_ref * 1.01, current_price * 1.025), 2)
-
-    # 停利
-    tp1_price = round(max(tech['high_5d'], current_price * 1.07), 2)
-    tp2_price = round(max(tech['high_20d'] * 1.05, current_price * 1.15), 2)
+        fp = four_price_engine.calculate_four_prices_long(
+            curr_price=current_price,
+            prev_close=prev_close,
+            high=high_ref,
+            low=low_ref,
+            ma20=ma20,
+            lower_band=bb_dn,
+            atr=atr
+        )
 
     return {
         'code': code,
         'name': stock_name,
+        'direction': direction,
         'base_price': current_price,
-        'entry_price': entry_price,
-        'entry_low': entry_floor,
-        'entry_high': entry_price,
-        'addon_price': addon_price,
-        'tp1_price': tp1_price,
-        'tp2_price': tp2_price,
-        'sl_price': stop_loss
+        'entry_price': fp['entry_price'],
+        'entry_low': fp['entry_price'],
+        'entry_high': fp['entry_price'],
+        'addon_price': fp['addon_price'],
+        'tp1_price': fp['tp1_price'],
+        'tp2_price': fp['tp2_price'],
+        'sl_price': fp['sl_price'],
+        'guidance': fp.get('guidance', {})
     }
 
 def batch_add_to_radar(user_text: str, target_id: str = "") -> str:
@@ -431,14 +427,55 @@ def sync_screener_to_radar(target_id: str = "") -> str:
                 if not code or not code.isdigit() or len(code) != 4:
                     continue
                 name = str(row.get('證券名稱', row.get('名稱', code))).strip()
-                close_p = float(row.get('收盤價', row.get('現價', 0)))
+                close_p = float(row.get('收盤價', row.get('現價', 0)))                # 判定多空方向 (策略03、融資斷頭放空、集團結帳順勢空)
+                is_strat_short = (folder_name == "03_short_momentum")
+                row_status = str(row.get('狀態代碼', ''))
+                row_dir_text = str(row.get('多空狀態', ''))
+                is_row_short = is_strat_short or (row_status in ['SHORT_BREAKDOWN', 'GROUP_UNWIND']) or ('放空' in row_dir_text or '做空' in row_dir_text)
+                direction = 'SHORT' if is_row_short else 'LONG'
+
+                # 優先直接提取 result.csv 中已由 four_price_engine 計算合規之四大防線！
+                def _get_f(col_names):
+                    for cn in col_names:
+                        if cn in row and pd.notna(row[cn]):
+                            try:
+                                v = float(str(row[cn]).replace(',', '').strip())
+                                if v > 0:
+                                    return v
+                            except Exception:
+                                pass
+                    return None
+
+                entry_p = _get_f(['建議進場價', '空單進場', '進場價位', '第一次進場價位'])
+                addon_p = _get_f(['動能加碼價', '加空價位', '加碼價位', '第二次進場價位'])
+                tp1_p = _get_f(['停利TP1', '目標停利TP1', '第一次停利價位'])
+                tp2_p = _get_f(['停利TP2', '目標停利TP2', '第二次停利價位'])
+                sl_p = _get_f(['嚴格停損價', '停損回補', '停損價位', '停損防守'])
+
+                if entry_p and addon_p and tp1_p and sl_p:
+                    res = {
+                        'code': code,
+                        'name': name,
+                        'direction': direction,
+                        'base_price': close_p if close_p > 0 else float(entry_p),
+                        'entry_price': float(entry_p),
+                        'entry_low': float(entry_p),
+                        'entry_high': float(entry_p),
+                        'addon_price': float(addon_p),
+                        'tp1_price': float(tp1_p),
+                        'tp2_price': float(tp2_p) if tp2_p else float(tp1_p),
+                        'sl_price': float(sl_p)
+                    }
+                else:
+                    res = calculate_stock_defense(code, direction=direction)
                 
-                # 計算或提取價位
-                res = calculate_stock_defense(code)
                 if not res:
                     continue
 
-                res['name'] = f"{res['name']}[{tag}]"
+                res['direction'] = direction
+                tag_str = f"[{tag}]"
+                if tag_str not in res['name']:
+                    res['name'] = f"{res['name']}{tag_str}"
                 res['target_id'] = target_id or watchlist.get(code, {}).get('target_id', '')
                 res['added_at'] = now_str
                 res['alerted_today'] = {}
@@ -680,72 +717,136 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
 
         alerted = item.setdefault('alerted_today', {}).setdefault(today_str, [])
         radar_channel_id = get_radar_channel()
-        target_dest = radar_channel_id or item.get('target_id') or default_user_id
-
-        # 事件判定 (優先級：停損 > 停利TP2 > 停利TP1 > 加碼 > 進場)
+        target_dest = radar_channel_id or item.get('target_id') or default_user_id        # 事件判定 (支援多方與空方獨立事件狀態機)
+        is_short = (
+            item.get('direction') == 'SHORT' or
+            '[弱勢破線]' in name or
+            '[做空]' in name or
+            '放空' in name
+        )
         event_info = None
 
-        # 1. 停損警戒 (現價 <= 停損線) - 優先級第一！
-        if sl_p > 0 and curr_p <= sl_p and 'STOP_LOSS' not in alerted:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', curr_p, sl_p)
-            if not confirmed:
-                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
-            else:
-                sl_drop = ((curr_p - sl_p) / sl_p * 100)
-                event_info = {
-                    'type': 'STOP_LOSS',
-                    'badge': '🛑【最高風控警報・破線停損警戒觸發】',
-                    'guide': f'現價已跌破嚴格防守停損線 {sl_p:.2f} 元 (破線幅度 {sl_drop:.1f}%)！\n多頭結構已遭破壞，請無條件依紀律嚴格執行停損退場，保留實力鎖定最大風險！'
-                }
-        # 2. 波段滿足 (現價 >= TP2)
-        elif tp2_p > 0 and curr_p >= tp2_p and 'TP2' not in alerted:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', curr_p, tp2_p)
-            if not confirmed:
-                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
-            else:
-                gain_pct = ((curr_p - entry_price) / entry_price * 100) if entry_price else 0.0
-                event_info = {
-                    'type': 'TP2',
-                    'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
-                    'guide': f'現價強勢衝抵第二波段等幅滿足點 {tp2_p:.2f} 元 (累積獲利估 +{gain_pct:.1f}%)！\n主升段利潤豐碩，建議獲利全數落袋為安，或緊縮移動停利線至今日低點保本！'
-                }
-        # 3. 前高停利 (現價 >= TP1)
-        elif tp1_p > 0 and curr_p >= tp1_p and 'TP1' not in alerted:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', curr_p, tp1_p)
-            if not confirmed:
-                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
-            else:
-                event_info = {
-                    'type': 'TP1',
-                    'badge': '🔴【獲利了結通知・TP1 第一目標觸發】',
-                    'guide': f'現價已攻抵第一反壓目標區 {tp1_p:.2f} 元！前方逢前波密集解套區，建議先獲利了結 1/2 倉位落袋，其餘半數拉高成本線續抱讓利潤奔馳！'
-                }
-        # 4. 突破加碼 (現價 >= 加碼價)
-        elif addon_p > 0 and curr_p >= addon_p and 'ADDON' not in alerted:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ADDON', curr_p, addon_p)
-            if not confirmed:
-                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
-            else:
-                event_info = {
-                    'type': 'ADDON',
-                    'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
-                    'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
-                }
-        # 5. 建倉進場 (現價處於建議進場上限以下且未跌破停損線)
-        elif sl_p < curr_p <= entry_price and 'ENTRY' not in alerted:
-            confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', curr_p, entry_price)
-            if not confirmed:
-                print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
-            else:
-                risk = max(curr_p - sl_p, 0.1)
-                reward = max(tp1_p - curr_p, 0.1)
-                rr_ratio = reward / risk if risk > 0 else 1.0
-                event_info = {
-                    'type': 'ENTRY',
-                    'badge': '🟢【黃金買點通知・現價處於建議進場價以下】',
-                    'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
-                }
-
+        if is_short:
+            # 空方四大防線事件判定 (優先級：停損回補 > 停利TP2 > 停利TP1 > 摜破加空 > 反彈放空)
+            # 1. 停損回補警戒 (現價 >= 停損線) - 優先級第一！
+            if sl_p > 0 and curr_p >= sl_p and 'STOP_LOSS' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', curr_p, sl_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    sl_rise = ((curr_p - sl_p) / sl_p * 100)
+                    event_info = {
+                        'type': 'STOP_LOSS',
+                        'badge': '🛑【最高風控警報・空單停損警戒觸發】',
+                        'guide': f'現價已突破空單嚴格防守停損線 {sl_p:.2f} 元 (漲破幅度 +{sl_rise:.1f}%)！\n空方結構遭到破壞或面臨軋空風險，請無條件依紀律嚴格執行【空單停損回補退場】，保全戰力！'
+                    }
+            # 2. 波段滿足回補 (現價 <= TP2)
+            elif tp2_p > 0 and curr_p <= tp2_p and 'TP2' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', curr_p, tp2_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    gain_pct = ((entry_price - curr_p) / entry_price * 100) if entry_price else 0.0
+                    event_info = {
+                        'type': 'TP2',
+                        'badge': '🔴【波段滿足通知・TP2 目標強勢達標回補】',
+                        'guide': f'現價強勢摜跌至第二波段等幅滿足點 {tp2_p:.2f} 元 (做空獲利估 +{gain_pct:.1f}%)！\n主跌段利潤豐碩，建議【空單全數獲利回補】落袋為安，或緊縮移動停利線至今日高點保本！'
+                    }
+            # 3. 前低停利回補 (現價 <= TP1)
+            elif tp1_p > 0 and curr_p <= tp1_p and 'TP1' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', curr_p, tp1_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    event_info = {
+                        'type': 'TP1',
+                        'badge': '🔴【獲利回補通知・TP1 第一目標觸發】',
+                        'guide': f'現價已跌抵第一目標回補區 {tp1_p:.2f} 元！前方逢前波密集支撐區，建議先【獲利回補 1/2 空單】落袋為安，其餘半數壓低防守線續抱讓利潤奔馳！'
+                    }
+            # 4. 摜破加空 (現價 <= 加碼價)
+            elif addon_p > 0 and curr_p <= addon_p and 'ADDON' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ADDON', curr_p, addon_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    event_info = {
+                        'type': 'ADDON',
+                        'badge': '🔵【空方追擊通知・摜破關鍵加空防線】',
+                        'guide': f'現價實體放量摜破關鍵續跌點 {addon_p:.2f} 元！空頭下殺動能確認，右側交易者可【順勢加空 1/3 倉位】，並同步將停損線下移至破線K棒高點！'
+                    }
+            # 5. 反彈放空 (現價在放空上限之內且未突破停損)
+            elif sl_p > curr_p >= entry_price and 'ENTRY' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', curr_p, entry_price)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    event_info = {
+                        'type': 'ENTRY',
+                        'badge': '🟢【黃金空點通知・反彈在放空上限之內】',
+                        'guide': f'現價 {curr_p:.2f} 元 處於建議放空區間，且未向上突破停損防線！\n當前做空盈虧比優良，未在低檔過度追殺，可於反彈不過時掛單建立空頭倉位！'
+                    }
+        else:
+            # 多方四大防線事件判定 (停損 > TP2 > TP1 > 加碼 > 進場)
+            # 1. 停損警戒 (現價 <= 停損線) - 優先級第一！
+            if sl_p > 0 and curr_p <= sl_p and 'STOP_LOSS' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', curr_p, sl_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    sl_drop = ((curr_p - sl_p) / sl_p * 100)
+                    event_info = {
+                        'type': 'STOP_LOSS',
+                        'badge': '🛑【最高風控警報・破線停損警戒觸發】',
+                        'guide': f'現價已跌破嚴格防守停損線 {sl_p:.2f} 元 (破線幅度 {sl_drop:.1f}%)！\n多頭結構已遭破壞，請無條件依紀律嚴格執行停損退場，保留實力鎖定最大風險！'
+                    }
+            # 2. 波段滿足 (現價 >= TP2)
+            elif tp2_p > 0 and curr_p >= tp2_p and 'TP2' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', curr_p, tp2_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    gain_pct = ((curr_p - entry_price) / entry_price * 100) if entry_price else 0.0
+                    event_info = {
+                        'type': 'TP2',
+                        'badge': '🔴【波段滿足通知・TP2 目標強勢攻抵】',
+                        'guide': f'現價強勢衝抵第二波段等幅滿足點 {tp2_p:.2f} 元 (累積獲利估 +{gain_pct:.1f}%)！\n主升段利潤豐碩，建議獲利全數落袋為安，或緊縮移動停利線至今日低點保本！'
+                    }
+            # 3. 前高停利 (現價 >= TP1)
+            elif tp1_p > 0 and curr_p >= tp1_p and 'TP1' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', curr_p, tp1_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    event_info = {
+                        'type': 'TP1',
+                        'badge': '🔴【獲利了結通知・TP1 第一目標觸發】',
+                        'guide': f'現價已攻抵第一反壓目標區 {tp1_p:.2f} 元！前方逢前波密集解套區，建議先獲利了結 1/2 倉位落袋，其餘半數拉高成本線續抱讓利潤奔馳！'
+                    }
+            # 4. 突破加碼 (現價 >= 加碼價)
+            elif addon_p > 0 and curr_p >= addon_p and 'ADDON' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ADDON', curr_p, addon_p)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    event_info = {
+                        'type': 'ADDON',
+                        'badge': '🔵【動能追擊通知・突破關鍵加碼防線】',
+                        'guide': f'現價實體放量突破關鍵續強點 {addon_p:.2f} 元！多頭攻擊動能確認，右側交易者可順勢加碼 1/3 倉位，並同步將停損線拉高至突破K棒低點！'
+                    }
+            # 5. 建倉進場 (現價處於建議進場上限以下且未跌破停損線)
+            elif sl_p < curr_p <= entry_price and 'ENTRY' not in alerted:
+                confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'ENTRY', curr_p, entry_price)
+                if not confirmed:
+                    print(f"  [🛡️ 防毛刺攔截] {code} {name}: {cmsg}")
+                else:
+                    risk = max(curr_p - sl_p, 0.1)
+                    reward = max(tp1_p - curr_p, 0.1)
+                    rr_ratio = reward / risk if risk > 0 else 1.0
+                    event_info = {
+                        'type': 'ENTRY',
+                        'badge': '🟢【黃金買點通知・現價處於建議進場價以下】',
+                        'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
+                    }
         if event_info and target_dest:
             rt_dict = {
                 'price': curr_p,

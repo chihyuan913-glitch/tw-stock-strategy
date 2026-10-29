@@ -679,9 +679,28 @@ def build_price_alert_card(
         event_title = f"{pri_tag} {event_title}"
     """建構單檔盤中到價高對比 Flex Message 卡片 (大字體、零引線、四大價位一目了然)"""
     import datetime
-    meta = resolve_strategy_meta(strategy_id)
     code = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
     name = str(target.get('name') or target.get('證券名稱') or target.get('名稱') or '')
+    is_short = (
+        target.get('direction') == 'SHORT' or
+        '[弱勢破線]' in name or
+        '[做空]' in name or
+        '放空' in name or
+        strategy_id in ('03', '03_short_momentum')
+    )
+    if is_short:
+        meta = dict(resolve_strategy_meta("03"))
+        meta['name'] = "弱勢破線做空" if strategy_id == "RADAR" else meta['name']
+        meta['entry_label'] = "🟢 建議放空"
+        meta['addon_label'] = "🔵 摜破加空"
+        meta['tp_label'] = "🔴 回補停利"
+        meta['sl_label'] = "🛑 停損回補"
+        meta['entry_desc'] = "反彈放空區"
+        meta['addon_desc'] = "摜破續跌加空"
+        meta['tp_desc'] = "TP1目標 / TP2滿足"
+        meta['sl_desc'] = "向上突破停損回補"
+    else:
+        meta = resolve_strategy_meta(strategy_id)
     stars = str(target.get('stars') or target.get('星級推薦') or target.get('星級') or '★★★★☆')
     price = rt.get('price') or target.get('收盤價') or 0.0
     high_p = rt.get('high') or price
@@ -983,9 +1002,28 @@ def format_clean_price_alert_text(
         event_title = f"{pri_tag} {event_title}"
     """產出零引線、高對比的純文字版本（用於 Telegram 備援與文字終端）"""
     import datetime
-    meta = resolve_strategy_meta(strategy_id)
     code = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
     name = str(target.get('name') or target.get('證券名稱') or target.get('名稱') or '')
+    is_short = (
+        target.get('direction') == 'SHORT' or
+        '[弱勢破線]' in name or
+        '[做空]' in name or
+        '放空' in name or
+        strategy_id in ('03', '03_short_momentum')
+    )
+    if is_short:
+        meta = dict(resolve_strategy_meta("03"))
+        meta['name'] = "弱勢破線做空" if strategy_id == "RADAR" else meta['name']
+        meta['entry_label'] = "🟢 建議放空"
+        meta['addon_label'] = "🔵 摜破加空"
+        meta['tp_label'] = "🔴 回補停利"
+        meta['sl_label'] = "🛑 停損回補"
+        meta['entry_desc'] = "反彈放空區"
+        meta['addon_desc'] = "摜破續跌加空"
+        meta['tp_desc'] = "TP1目標 / TP2滿足"
+        meta['sl_desc'] = "向上突破停損回補"
+    else:
+        meta = resolve_strategy_meta(strategy_id)
     stars = str(target.get('stars') or target.get('星級推薦') or target.get('星級') or '★★★★☆')
     price = rt.get('price') or target.get('收盤價') or 0.0
     high_p = rt.get('high') or price
