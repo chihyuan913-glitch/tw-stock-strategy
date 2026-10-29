@@ -82,6 +82,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "10_investment_trust_sprint" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "11_revenue_volume_breakout",
+        "name": "營收創高與量價突破成長動能策略",
+        "script": ROOT_DIR / "strategies" / "11_revenue_volume_breakout" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False, force=False):

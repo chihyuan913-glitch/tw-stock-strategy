@@ -91,6 +91,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "10_investment_trust_sprint" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "10_investment_trust_sprint"
     },
+    {
+        "id": "11_revenue_volume_breakout",
+        "name": "策略 11：營收創高與量價突破到價雷達",
+        "script": ROOT_DIR / "strategies" / "11_revenue_volume_breakout" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "11_revenue_volume_breakout"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):

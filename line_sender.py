@@ -571,6 +571,34 @@ def resolve_strategy_meta(strategy_id: str) -> dict:
             "sl_desc": "跌破宣告低點或區間下限",
             "color_theme": "#D97706"
         }
+    elif sid in ("10", "10_investment_trust_sprint"):
+        return {
+            "id": "10",
+            "name": "投信認養集中度爆發飆股",
+            "entry_label": "🟢 認養進場",
+            "addon_label": "🔵 動能加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 破線停損",
+            "entry_desc": "起跑甜蜜買進區",
+            "addon_desc": "突破日高續強",
+            "tp_desc": "TP1波段 / TP2滿足",
+            "sl_desc": "跌破月線或起漲紅K低點",
+            "color_theme": "#2563EB"
+        }
+    elif sid in ("11", "11_revenue_volume_breakout"):
+        return {
+            "id": "11",
+            "name": "營收創高與量價突破成長動能",
+            "entry_label": "🟢 突破進場",
+            "addon_label": "🔵 動能加碼",
+            "tp_label": "🔴 停利目標",
+            "sl_label": "🛑 嚴格停損",
+            "entry_desc": "A軌突破/買進上限",
+            "addon_desc": "突破日高順勢加碼",
+            "tp_desc": "TP1 +10% / TP2 +20%",
+            "sl_desc": "跌破突破低點或-5.5%",
+            "color_theme": "#059669"
+        }
     elif sid == "RADAR":
         return {
             "id": "RADAR",
@@ -1809,7 +1837,7 @@ def format_screener_markdown_cards(
         tp_str = f"TP1 `{format_price_val(tp1_val)}` 元 ｜ TP2 `{format_price_val(tp2_val)}` 元" if tp2_val else f"`{format_price_val(tp1_val)}` 元"
         sl_str = format_price_val(sl_val)
 
-        status_tag = r.get('多空狀態') or r.get('多空位階') or ("🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05", "08", "09") else "🔴【弱勢破線・避險放空】")
+        status_tag = r.get('多空狀態') or r.get('多空位階') or ("🟢【偏多起漲・高勝率】" if meta['id'] in ("01", "02", "04", "05", "06", "08", "09", "10", "11") else "🔴【弱勢破線・避險放空】")
 
         md_lines.extend([
             f"### 🏷️ 【{i:02d}】{title_badge} {stars} ({score}分) {status_tag}",
