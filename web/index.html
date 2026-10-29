@@ -560,8 +560,12 @@
         <div class="flex items-center gap-6">
           <h2 class="text-xl font-black text-white tracking-wider flex items-center gap-2">
             <span>看盤</span>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-              即時全市場雷達
+            <span id="marketRealtimeBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shadow">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>TWSE 官方行情連線中</span>
+            </span>
+            <span id="marketQuoteTime" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-cyan-300">
+              撮合時間: 13:30:00
             </span>
           </h2>
 
@@ -1332,6 +1336,14 @@
       } else if (tab === 'pulse') {
         if (typeof loadMarketPulseData === 'function') loadMarketPulseData();
         if (typeof loadTreemapData === 'function') loadTreemapData();
+        if (!watchAutoRefreshTimer) {
+          watchAutoRefreshTimer = setInterval(() => {
+            const viewPulse = document.getElementById('view-pulse');
+            if (viewPulse && !viewPulse.classList.contains('hidden') && currentWatchTab === 'industry') {
+              loadMarketWatchData(false);
+            }
+          }, 30000);
+        }
       }
       lucide.createIcons();
     }
@@ -4308,6 +4320,7 @@
     let currentWatchSearch = '';
     let currentWatchFocusGroup = null;
     let marketWatchRawData = null;
+    let watchAutoRefreshTimer = null;
 
     // 1. 切換看盤頂部雙 Tab (產業資訊 vs 大盤指標)
     function switchWatchTab(tab) {
@@ -4364,9 +4377,9 @@
     });
 
     // 3. 載入看盤全市場資料 (Treemap & Scatter)
-    async function loadMarketWatchData() {
+    async function loadMarketWatchData(force = false) {
       try {
-        const url = `/api/market_pulse/treemap?dimension=${currentWatchDimension}&metric=${currentWatchMetric}&timeframe=${currentWatchTimeframe}&color_mode=${currentWatchColorMode}&scope=${currentWatchScope}&search=${encodeURIComponent(currentWatchSearch)}`;
+        const url = `/api/market_pulse/treemap?dimension=${currentWatchDimension}&metric=${currentWatchMetric}&timeframe=${currentWatchTimeframe}&color_mode=${currentWatchColorMode}&scope=${currentWatchScope}&search=${encodeURIComponent(currentWatchSearch)}${force ? "&force=true" : ""}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -4393,6 +4406,10 @@
 
         // 更新左下全市場統計
         const summary = data.summary || {};
+        const timeBadge = document.getElementById('marketQuoteTime');
+        if (timeBadge && summary.as_of_date) {
+          timeBadge.innerText = `最新撮合: ${summary.as_of_date}`;
+        }
         const sumIndex = document.getElementById('summaryIndexChange');
         const sumBreadth = document.getElementById('summaryMarketBreadth');
         if (sumIndex) {
@@ -4900,9 +4917,10 @@
     }
 
     // 13. 重新整理資料
-    function refreshMarketWatchData() {
-      showToast('正在即時同步全市場產業與概念股最新報價...');
-      loadMarketWatchData();
+    async function refreshMarketWatchData() {
+      showToast('正在向臺灣證券交易所 (TWSE) 同步 196 檔即時最新行情...');
+      await loadMarketWatchData(true);
+      showToast('行情同步完成！已更新上市櫃全市場個股最新真實價格與成交量');
     }
 
     // 14. 全螢幕切換

@@ -880,7 +880,8 @@ async def get_market_pulse_treemap(
     dimension: str = "industry",
     timeframe: str = "1d",
     scope: str = "all",
-    search: str = ""
+    search: str = "",
+    force: bool = False
 ):
     """全市場產業/產業鏈/概念股看盤雷達 (Treemap and Scatter)"""
     try:
@@ -891,7 +892,8 @@ async def get_market_pulse_treemap(
             dimension=dimension,
             timeframe=timeframe,
             scope=scope,
-            search=search
+            search=search,
+            force=force
         )
     except Exception as e:
         return {"status": "error", "message": str(e)}
