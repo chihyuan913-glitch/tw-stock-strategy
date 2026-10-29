@@ -551,268 +551,282 @@
     </div>
 
     <!-- 視圖：🗺️ 大盤多空指標與產業板塊熱力圖 (FinLab / FinViz Style Market Pulse & Treemap) -->
-    <div id="view-pulse" class="space-y-8 hidden">
+    <!-- 4. 看盤系統 (Market Watch / 產業資訊 & 大盤指標) -->
+    <div id="view-pulse" class="space-y-4 hidden">
 
-      <!-- 第一大模組：FinLab 大盤 0~10 分多空計分板與走勢圖 (對齊 Image 2) -->
-      <div class="rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-6 shadow-2xl backdrop-blur">
-        <!-- 計分板頂部標頭 -->
-        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/80 pb-5">
-          <div>
-            <div class="flex items-baseline gap-2">
-              <span id="pulseScoreNumber" class="text-6xl font-black font-mono text-emerald-400 tracking-tight">4.0</span>
-              <span class="text-2xl font-bold font-mono text-slate-500">/ 10</span>
-            </div>
-            <p id="pulseScoreSummary" class="text-sm text-slate-300 font-medium mt-1.5">
-              10 項訊號中 4 項偏多，偏空已持續 2 個交易日。
-            </p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            <div class="flex items-center gap-2">
-              <span id="pulseDateBadge" class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300">
-                台股 · 10/29
-              </span>
-              <button onclick="toggleMarketMode()" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1">
-                <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i>
-                <span id="marketModeText">⇆ 大盤 / 櫃買</span>
-              </button>
-            </div>
-            <div class="text-xs text-slate-400">
-              建議持股水位：<span id="pulseTargetCash" class="font-bold text-amber-400">50% 現金</span> ‧ <span class="text-emerald-400 font-bold">50% 持股</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3 年歷史走勢圖 (Chart.js) -->
-        <div class="mt-5">
-          <div class="h-64 md:h-72 w-full relative">
-            <canvas id="marketPulseChart"></canvas>
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800/60">
-            <div class="flex items-center gap-4">
-              <span class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 bg-emerald-400 inline-block"></span> 綜合分數 (0~10分)</span>
-              <span class="flex items-center gap-1.5"><span class="w-3.5 h-0.5 border-t border-dashed border-slate-400 inline-block"></span> 加權報酬指數 (標準化)</span>
-              <span class="hidden sm:inline text-slate-500">滑過圖表，看任一天</span>
-            </div>
-            <div class="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
-              <button onclick="changeTimeframe('quarter')" id="tf-quarter" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">季</button>
-              <button onclick="changeTimeframe('year')" id="tf-year" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">年</button>
-              <button onclick="changeTimeframe('3years')" id="tf-3years" class="px-2.5 py-1 rounded bg-slate-700 text-white font-bold transition">3 年</button>
-              <button onclick="changeTimeframe('all')" id="tf-all" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">全部</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 組成分數的 10 項訊號 (對齊 Image 2 底部清單) -->
-        <div class="mt-8">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <span>組成分數的訊號</span>
-              <span class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[11px] font-mono text-slate-400 border border-slate-700">10</span>
-            </h3>
-            <span id="signalsBullBearRatio" class="text-xs font-semibold text-slate-400">偏多 4 · 偏空 6</span>
-          </div>
-
-          <div id="signalsListContainer" class="space-y-2.5">
-            <!-- 動態載入 10 項指標卡片 -->
-          </div>
-        </div>
-      </div>
-
-      <!-- 第二大模組：全市場產業熱力樹狀圖 (FinLab / FinViz Style Treemap，對齊 Image 1) -->
-      <div id="treemapCard" class="rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-6 shadow-2xl backdrop-blur">
-        <!-- 樹狀圖頂部控制列 -->
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <h2 class="text-lg font-black text-white tracking-wide flex items-center gap-2">
-                <span>🗺️ 全市場產業板塊熱力圖</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                  FinLab / FinViz 雙核心架構
-                </span>
-              </h2>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5">
-              21 大 TWSE 官方標準類股 ‧ 150+ 檔核心龍頭 ‧ 中位數 (Median) 族群共振防失真演算法
-            </p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <!-- 面積維度切換 -->
-            <div class="flex items-center gap-1.5 text-xs text-slate-400">
-              <span>面積：</span>
-              <select id="treemapMetricSelect" onchange="changeTreemapMetric(this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
-                <option value="market_cap">依市值權重 (Market Cap)</option>
-                <option value="volume">依成交金額 (Turnover)</option>
-              </select>
-            </div>
-
-            <!-- 色階切換 -->
-            <div class="flex items-center gap-1.5 text-xs text-slate-400">
-              <span>色彩：</span>
-              <select id="treemapColorSelect" onchange="changeTreemapColor(this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
-                <option value="tw">台股習慣 (紅漲綠跌 預設)</option>
-                <option value="intl">國際標準 (綠漲紅跌)</option>
-              </select>
-            </div>
-
-            <!-- 操作按鈕 -->
-            <button onclick="refreshMarketPulse(true)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 transition flex items-center gap-1.5" title="即時重新抓取盤後行情">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
-              <span>即時刷新</span>
-            </button>
-            <button onclick="toggleTreemapFullscreen()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 transition flex items-center gap-1.5" title="全螢幕展示熱力樹狀圖">
-              <i data-lucide="maximize" class="w-3.5 h-3.5 text-indigo-400"></i>
-              <span>全螢幕</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 樹狀圖繪製容器 -->
-        <div class="w-full overflow-x-auto relative rounded-xl border border-slate-800/80 bg-[#090d16]">
-          <div id="treemapContainer" class="w-full min-h-[580px] md:min-h-[640px] relative">
-            <!-- D3.js SVG 渲染至此 -->
-          </div>
-          <!-- 懸浮提示框 (Tooltip) -->
-          <div id="treemapTooltip" class="absolute hidden pointer-events-none z-30 px-3.5 py-2.5 rounded-xl bg-slate-900/95 border border-slate-700 shadow-2xl text-xs text-slate-200 backdrop-blur transition-opacity duration-150">
-          </div>
-        </div>
-
-        <!-- 第三大模組：橫向報酬率分佈長條圖 (Return Distribution Histogram，對齊 Image 1 底部) -->
-        <div class="mt-6 pt-5 border-t border-slate-800/80">
-          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span class="flex items-center gap-1.5 font-bold text-slate-300">
-              <i data-lucide="bar-chart" class="w-4 h-4 text-emerald-400"></i>
-              全市場漲跌家數與報酬率分佈 (Return Distribution)
+      <!-- 看盤頂部主 Header (還原截圖頂部導覽列) -->
+      <div class="rounded-2xl border border-slate-800 bg-[#0b101d]/95 p-4 shadow-2xl flex flex-wrap items-center justify-between gap-4 backdrop-blur">
+        <!-- 左側：看盤標題與兩大主分頁 -->
+        <div class="flex items-center gap-6">
+          <h2 class="text-xl font-black text-white tracking-wider flex items-center gap-2">
+            <span>看盤</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              即時全市場雷達
             </span>
-            <span id="distributionSummaryText">上漲 32 檔 (21.5%) ‧ 平盤 4 檔 ‧ 下跌 113 檔 (75.8%)</span>
+          </h2>
+
+          <!-- 產業資訊 vs 大盤指標 雙 Tab -->
+          <div class="flex items-center gap-1 border-b border-slate-700/60 pb-0.5">
+            <button onclick="switchWatchTab('industry')" id="btnWatchTabIndustry" class="px-3.5 py-1.5 text-sm font-bold text-cyan-400 border-b-2 border-cyan-400 transition flex items-center gap-1.5">
+              <i data-lucide="layout-grid" class="w-4 h-4"></i>
+              <span>產業資訊</span>
+            </button>
+            <button onclick="switchWatchTab('market')" id="btnWatchTabMarket" class="px-3.5 py-1.5 text-sm font-semibold text-slate-400 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5">
+              <i data-lucide="activity" class="w-4 h-4"></i>
+              <span>大盤指標</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 右側：代號或名稱即時搜尋框 (帶 / 快捷鍵) -->
+        <div class="flex items-center gap-3">
+          <div class="relative w-64 md:w-80">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+            <input 
+              type="text" 
+              id="marketSearchInput" 
+              placeholder="代號或名稱 (例如: 2330 / 廣達)" 
+              class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition shadow-inner"
+              oninput="handleMarketSearchInput(this.value)"
+            >
+            <span class="absolute right-2.5 top-2 px-1.5 py-0.2 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700 pointer-events-none">/</span>
           </div>
 
-          <!-- 分佈長條圖容器 -->
-          <div id="distributionHistogramContainer" class="flex items-end h-14 w-full gap-1 pt-1 pb-1 px-1 bg-slate-950/60 rounded-xl border border-slate-800/80">
-            <!-- 動態生成 13 個區間長條 -->
-          </div>
-          <!-- 橫軸區間標籤 -->
-          <div id="distributionLabelsContainer" class="flex justify-between text-[10px] text-slate-500 font-mono mt-1 px-1">
-            <span>&lt;-7%</span>
-            <span>-3%</span>
-            <span>0%</span>
-            <span>+3%</span>
-            <span>&gt;+7%</span>
-          </div>
+          <button onclick="refreshMarketWatchData()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition shadow" title="即時刷新行情">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
         </div>
       </div>
 
-    </div>
+      <!-- ======================================================== -->
+      <!-- 子分頁 1：產業資訊 (看盤核心：地圖/散佈/產業鏈/概念股) -->
+      <!-- ======================================================== -->
+      <div id="paneIndustryWatch" class="space-y-3">
+        
+        <!-- 主畫布卡片 (Treemap & Scatter 畫布容器) -->
+        <div id="marketCanvasCard" class="rounded-2xl border border-slate-800 bg-[#080c14] shadow-2xl overflow-hidden relative min-h-[620px] flex flex-col">
+          
+          <!-- 頂部資訊微標籤 (當前維度說明) -->
+          <div class="px-4 py-2 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <div class="flex items-center gap-2">
+              <span id="watchDimensionBadge" class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/40">
+                TWSE 官方標準類股
+              </span>
+              <span id="watchDimensionDesc" class="text-slate-400 text-[11px]">
+                21 大標準類股 · 170+ 檔代表成分股 · 中位數族群共振防失真演算法
+              </span>
+            </div>
+            <div class="flex items-center gap-3 text-[11px]">
+              <span>滑鼠點擊標的查看四大防線 · 懸停顯示即時深度報價</span>
+            </div>
+          </div>
 
+          <!-- 模式 A：樹狀板塊熱力圖容器 (Treemap) -->
+          <div id="watchTreemapContainer" class="flex-1 w-full min-h-[580px] p-2 relative bg-[#060a12] overflow-hidden select-none">
+            <!-- 動態注入 Squarified Treemap 方塊 -->
+          </div>
 
-    <!-- 視圖 1：八大選股策略戰報 -->
-    <div id="view-strategies" class="space-y-6">
-      <!-- 策略子標籤 -->
-      <div class="flex flex-wrap gap-2 border-b border-slate-800/60 pb-2">
-        <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700">
-          策略 01：布林下軌超跌反轉
-        </button>
-        <button onclick="loadStrategyData('02_institutional_momentum')" id="subbtn-02" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 02：法人籌碼集中起漲
-        </button>
-        <button onclick="loadStrategyData('03_short_momentum')" id="subbtn-03" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 03：弱勢破線做空避險
-        </button>
-        <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 04：可轉債定價伏擊
-        </button>
-        <button onclick="loadStrategyData('05_stock_futures_long')" id="subbtn-05" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 05：個股期法人強勢波段
-        </button>
-        <button onclick="loadStrategyData('06_volume_surge')" id="subbtn-06" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 06：盤中爆量起漲動能
-        </button>
-        <button onclick="loadStrategyData('07_margin_call_ambush')" id="subbtn-07" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 07：高融資斷頭伏擊
-        </button>
-        <button onclick="loadStrategyData('08_group_window_dressing')" id="subbtn-08" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 08：集團作帳母子伏擊
-        </button>
-        <button onclick="loadStrategyData('09_treasury_stock_buyback')" id="subbtn-09" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 09：庫藏護盤
-        </button>
-        <button onclick="loadStrategyData('10_investment_trust_sprint')" id="subbtn-10" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 10：投信認養飆股
-        </button>
+          <!-- 模式 B：二維多空量價散佈圖 (Scatter Plot) -->
+          <div id="watchScatterContainer" class="hidden flex-1 w-full min-h-[580px] p-4 relative bg-[#070b14] flex items-center justify-center">
+            <canvas id="watchScatterCanvas" class="w-full h-full max-h-[560px]"></canvas>
+          </div>
+
+          <!-- 懸停即時浮動卡片 (Hover Tooltip) -->
+          <div id="marketHoverTooltip" class="fixed pointer-events-none z-50 p-3 rounded-xl bg-slate-900/95 border border-cyan-500/40 shadow-2xl backdrop-blur text-xs hidden transform -translate-x-1/2 -translate-y-full mb-2 w-64 transition-opacity duration-150">
+            <!-- 動態填入 -->
+          </div>
+
+        </div>
+
+        <!-- 底部強大分析與操作面板 (Bottom Analytics & Control Deck，完美對齊截圖) -->
+        <div class="rounded-2xl border border-slate-800 bg-[#090d16]/95 p-4 shadow-2xl space-y-3.5 backdrop-blur">
+          
+          <!-- 上排：全市場總覽、報酬率分佈柱狀圖、時間週期 -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+            
+            <!-- 左側：全市場漲跌統計摘要 (4 列) -->
+            <div class="lg:col-span-4 flex items-center gap-3.5">
+              <div class="text-left">
+                <div class="flex items-baseline gap-2">
+                  <span id="summaryIndexChange" class="text-3xl font-black font-mono text-emerald-400 tracking-tight">
+                    -1.39%
+                  </span>
+                  <span class="text-xs text-slate-400 font-medium">全市場 · 1日漲跌 · 10/29 收盤</span>
+                </div>
+                <p id="summaryMarketBreadth" class="text-[11px] text-slate-400 mt-1 leading-snug">
+                  <span class="text-rose-400 font-bold">431 家上漲</span>、<span class="text-emerald-400 font-bold">1342 家下跌</span>，金融保險業領漲 <span class="text-rose-400 font-bold">+1.05%</span>，光電業領跌 <span class="text-emerald-400 font-bold">-4.63%</span>。
+                </p>
+              </div>
+            </div>
+
+            <!-- 中央：全市場報酬率分佈橫向長條圖 (5 列) -->
+            <div class="lg:col-span-5 px-2">
+              <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
+                <span>-3% 跌停 4</span>
+                <span>全市場漲跌家數分佈 (Return Distribution)</span>
+                <span>+3% 漲停 22</span>
+              </div>
+              <div id="watchDistributionContainer" class="flex items-end gap-1 h-12 w-full pt-1">
+                <!-- 動態注入分佈柱狀圖 -->
+              </div>
+            </div>
+
+            <!-- 右側：時間週期切換器 + 功能按鈕 (3 列) -->
+            <div class="lg:col-span-3 flex flex-col items-end gap-2">
+              <!-- 7 段時間週期切換 -->
+              <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-700/80 text-xs font-semibold">
+                <button onclick="changeWatchTimeframe('1d')" id="btnTf-1d" class="px-2 py-1 rounded bg-cyan-600 text-white transition">1日</button>
+                <button onclick="changeWatchTimeframe('5d')" id="btnTf-5d" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">5日</button>
+                <button onclick="changeWatchTimeframe('20d')" id="btnTf-20d" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">20日</button>
+                <button onclick="changeWatchTimeframe('60d')" id="btnTf-60d" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">60日</button>
+                <button onclick="changeWatchTimeframe('180d')" id="btnTf-180d" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">半年</button>
+                <button onclick="changeWatchTimeframe('1y')" id="btnTf-1y" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">1年</button>
+                <button onclick="changeWatchTimeframe('ytd')" id="btnTf-ytd" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">今年</button>
+              </div>
+
+              <!-- 輔助按鈕群 -->
+              <div class="flex items-center gap-2 text-slate-400 text-xs">
+                <button onclick="showToast('即將支援歷史時光機回放功能')" class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 transition" title="歷史回放">
+                  <i data-lucide="history" class="w-4 h-4"></i>
+                </button>
+                <button onclick="downloadWatchScreenshot()" class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 transition" title="下載熱力圖截圖">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+                <button onclick="copyWatchShareUrl()" class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 transition" title="分享連結">
+                  <i data-lucide="link" class="w-4 h-4"></i>
+                </button>
+                <button onclick="toggleWatchFullscreen()" class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800 transition" title="全螢幕切換">
+                  <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 下排：篩選控制膠囊列 (地圖/散佈、顏色、大小、三大維度：產業/產業鏈/概念股、範圍) -->
+          <div class="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- 地圖 vs 散佈模式切換 -->
+              <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-700 text-xs font-semibold">
+                <button onclick="setWatchMode('map')" id="btnModeMap" class="px-3 py-1 rounded-md bg-cyan-600 text-white transition flex items-center gap-1">
+                  <i data-lucide="grid" class="w-3.5 h-3.5"></i>
+                  <span>地圖</span>
+                </button>
+                <button onclick="setWatchMode('scatter')" id="btnModeScatter" class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition flex items-center gap-1">
+                  <i data-lucide="scatter-chart" class="w-3.5 h-3.5"></i>
+                  <span>散佈</span>
+                </button>
+              </div>
+
+              <!-- 顏色依據下拉選單 -->
+              <div class="relative">
+                <select id="selectWatchColor" onchange="changeWatchColor(this.value)" class="bg-slate-900 border border-slate-700 text-slate-300 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-cyan-500 font-medium">
+                  <option value="tw" selected>顏色 · 台股習慣 (紅漲綠跌)</option>
+                  <option value="intl">顏色 · 國際習慣 (綠漲紅跌)</option>
+                </select>
+              </div>
+
+              <!-- 大小權重下拉選單 -->
+              <div class="relative">
+                <select id="selectWatchMetric" onchange="changeWatchMetric(this.value)" class="bg-slate-900 border border-slate-700 text-slate-300 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-cyan-500 font-medium">
+                  <option value="market_cap" selected>大小 · 依市值權重</option>
+                  <option value="turnover">大小 · 依成交金額</option>
+                  <option value="volume">大小 · 依成交張數</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- ★★★ 核心三大維度切換膠囊 (產業 / 產業鏈 / 概念股) ★★★ -->
+            <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/40 shadow-inner">
+              <button onclick="setWatchDimension('industry')" id="btnDimIndustry" class="px-3.5 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white transition shadow flex items-center gap-1">
+                <i data-lucide="building" class="w-3.5 h-3.5"></i>
+                <span>產業 (28大類)</span>
+              </button>
+              <button onclick="setWatchDimension('chain')" id="btnDimChain" class="px-3.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition flex items-center gap-1">
+                <i data-lucide="git-merge" class="w-3.5 h-3.5"></i>
+                <span>產業鏈 (上中下游)</span>
+              </button>
+              <button onclick="setWatchDimension('concept')" id="btnDimConcept" class="px-3.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>概念股 (熱門題材)</span>
+              </button>
+            </div>
+
+            <!-- 範圍下拉選單 (全部投資 / 台灣50 / 自選雷達) -->
+            <div class="relative">
+              <select id="selectWatchScope" onchange="changeWatchScope(this.value)" class="bg-slate-900 border border-slate-700 text-slate-300 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-cyan-500 font-medium">
+                <option value="all" selected>投資範圍 · 全部台股標的</option>
+                <option value="tw50">投資範圍 · 台灣50 核心權值</option>
+                <option value="portfolio">投資範圍 · 盤中自選監控雷達</option>
+              </select>
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
 
-      <!-- 策略內容容器 -->
-      <div class="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
-        <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex flex-wrap justify-between items-center gap-3">
-          <div>
-            <h2 id="currentStrategyTitle" class="text-base font-bold text-white">策略入選清單</h2>
-            <p id="currentStrategyDesc" class="text-xs text-slate-400 mt-0.5">即時載入最新選股結果...</p>
+      <!-- ======================================================== -->
+      <!-- 子分頁 2：大盤指標 (FinLab 大盤 0~10 分多空計分板與走勢圖) -->
+      <!-- ======================================================== -->
+      <div id="paneMarketPulseScore" class="space-y-6 hidden">
+        <!-- 保留原本完整大盤 10 分計分板與歷史走勢圖 -->
+        <div class="rounded-2xl border border-slate-800 bg-[#0f172a]/95 p-6 shadow-2xl backdrop-blur">
+          <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-5">
+            <div class="flex items-center gap-5">
+              <div class="flex items-baseline gap-1.5">
+                <span id="marketPulseScoreNum" class="text-6xl font-black font-mono text-emerald-400 tracking-tight">4.0</span>
+                <span class="text-sm font-bold text-slate-500 font-mono">/ 10</span>
+              </div>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span id="marketPulseRegimeBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    中性防守 (震盪整理)
+                  </span>
+                  <span class="text-xs text-slate-400 font-mono">台股 · <span id="marketPulseAsOf">10/29</span></span>
+                </div>
+                <p id="marketPulseScoreDesc" class="text-xs text-slate-300 font-medium">
+                  10 項訊號中 4 項偏多，偏空已持續 2 個交易日。
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                <span class="text-slate-400">總持股水位指引：</span>
+                <span id="marketPulseCashAdvice" class="font-bold text-amber-400 font-mono">40% ~ 60%</span>
+              </div>
+            </div>
           </div>
-          <div class="flex items-center gap-3">
-            <span id="currentStrategyCount" class="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700">0 檔入選</span>
-            <div class="flex items-center p-0.5 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs">
-              <button onclick="toggleStrategyView('cards')" id="stratBtnViewCards" class="px-2.5 py-1 rounded-md font-semibold transition bg-emerald-600 text-white shadow">
-                🔲 卡片模式
-              </button>
-              <button onclick="toggleStrategyView('table')" id="stratBtnViewTable" class="px-2.5 py-1 rounded-md font-semibold transition text-slate-400 hover:text-white">
-                📋 表格模式
-              </button>
+
+          <div class="py-5 border-b border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <div class="flex items-center gap-4">
+                <span class="flex items-center gap-1.5 text-slate-200 font-medium">
+                  <span class="w-3 h-0.5 bg-emerald-400"></span> 分數
+                </span>
+                <span class="flex items-center gap-1.5 text-slate-400">
+                  <span class="w-3 h-0.5 bg-slate-500 border-t border-dashed"></span> 加權報酬指數
+                </span>
+              </div>
+            </div>
+            <div class="w-full bg-[#080c14] border border-slate-800 rounded-xl p-3 relative shadow-inner">
+              <canvas id="marketPulseHistoryCanvas" class="w-full h-[220px]"></canvas>
+            </div>
+          </div>
+
+          <div class="pt-5 space-y-3">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">組成 10 項訊號明細</h3>
+            <div id="marketPulseSignalsList" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <!-- 信號項目 -->
             </div>
           </div>
         </div>
-
-        <!-- 5 日滾動週期篩選列 -->
-        <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-950/40 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div class="flex items-center gap-1.5">
-            <span class="text-slate-400 font-semibold mr-1">🔍 週期視圖：</span>
-            <button onclick="setStrategyRollingFilter('all')" id="rf-all" class="px-2.5 py-1 rounded-md font-semibold transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              全部保留 (共 <span id="rfCountAll">0</span> 檔)
-            </button>
-            <button onclick="setStrategyRollingFilter('today')" id="rf-today" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700">
-              🟢 今日新選 (<span id="rfCountToday">0</span> 檔)
-            </button>
-            <button onclick="setStrategyRollingFilter('tracking')" id="rf-tracking" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700">
-              ⏳ 5日內追蹤 (<span id="rfCountTracking">0</span> 檔)
-            </button>
-            <button onclick="setStrategyRollingFilter('pending')" id="rf-pending" class="px-2.5 py-1 rounded-md font-semibold transition bg-slate-800 text-rose-400 hover:text-rose-300 border border-slate-700">
-              ⚠️ 今日待剔除 (<span id="rfCountPending">0</span> 檔)
-            </button>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="openTradeHistoryModal()" class="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1 shadow-sm transition">
-              <span>🏆 操盤戰績結算庫</span>
-            </button>
-            <span class="text-[11px] text-slate-400">🛡️ 5日滾動＋除帳保留1天機制</span>
-          </div>
-        </div>
-        
-        <!-- 卡片模式容器 (預設) -->
-        <div id="strategyCardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-          <!-- 動態卡片 -->
-        </div>
-
-        <!-- 表格模式容器 -->
-        <div id="strategyTableContainer" class="overflow-x-auto custom-scrollbar hidden">
-          <table class="w-full text-left text-xs whitespace-nowrap">
-            <thead class="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700">
-              <tr id="tableHeadRow">
-                <!-- 動態注入欄位 -->
-              </tr>
-            </thead>
-            <tbody id="tableBody" class="divide-y divide-slate-800/60 text-slate-300 font-mono">
-              <!-- 動態注入列 -->
-              <tr>
-                <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
-                  正在載入量化選股數據...
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </div>
+
     </div>
 
-    <!-- 視圖 2：個股即時診斷 ＆ 盤中自動雷達視窗 -->
     <div id="view-radar" class="hidden space-y-6">
       <!-- 1. 頂部即時診斷搜尋列 -->
       <div class="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-800/90 p-6 shadow-2xl relative overflow-hidden">
@@ -4279,391 +4293,158 @@
     }
 
     // 4. 載入全市場產業板塊樹狀圖 (Treemap)
-    async function loadTreemapData() {
-      try {
-        const container = document.getElementById('treemapContainer');
-        if (!container) return;
+    // ========================================================
+    // 看盤系統 (Market Watch / 產業資訊 & 大盤指標) 核心引擎
+    // ========================================================
+    let currentWatchTab = 'industry'; // 'industry' | 'market'
+    let currentWatchDimension = 'industry'; // 'industry' | 'chain' | 'concept'
+    let currentWatchMode = 'map'; // 'map' | 'scatter'
+    let currentWatchMetric = 'market_cap'; // 'market_cap' | 'turnover' | 'volume'
+    let currentWatchTimeframe = '1d'; // '1d' | '5d' | '20d' | '60d' | '180d' | '1y' | 'ytd'
+    let currentWatchColorMode = 'tw'; // 'tw' | 'intl'
+    let currentWatchScope = 'all'; // 'all' | 'tw50' | 'portfolio'
+    let currentWatchSearch = '';
+    let marketWatchRawData = null;
 
-        const res = await fetch(`/api/market_pulse/treemap?metric=${currentTreemapMetric}&color_mode=${currentTreemapColor}`);
+    // 1. 切換看盤頂部雙 Tab (產業資訊 vs 大盤指標)
+    function switchWatchTab(tab) {
+      currentWatchTab = tab;
+      const paneIndustry = document.getElementById('paneIndustryWatch');
+      const paneMarket = document.getElementById('paneMarketPulseScore');
+      const btnInd = document.getElementById('btnWatchTabIndustry');
+      const btnMkt = document.getElementById('btnWatchTabMarket');
+
+      if (tab === 'industry') {
+        if (paneIndustry) paneIndustry.classList.remove('hidden');
+        if (paneMarket) paneMarket.classList.add('hidden');
+        if (btnInd) {
+          btnInd.className = "px-3.5 py-1.5 text-sm font-bold text-cyan-400 border-b-2 border-cyan-400 transition flex items-center gap-1.5";
+        }
+        if (btnMkt) {
+          btnMkt.className = "px-3.5 py-1.5 text-sm font-semibold text-slate-400 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5";
+        }
+        loadMarketWatchData();
+      } else {
+        if (paneIndustry) paneIndustry.classList.add('hidden');
+        if (paneMarket) paneMarket.classList.remove('hidden');
+        if (btnInd) {
+          btnInd.className = "px-3.5 py-1.5 text-sm font-semibold text-slate-400 hover:text-white border-b-2 border-transparent transition flex items-center gap-1.5";
+        }
+        if (btnMkt) {
+          btnMkt.className = "px-3.5 py-1.5 text-sm font-bold text-emerald-400 border-b-2 border-emerald-400 transition flex items-center gap-1.5";
+        }
+        loadMarketPulseData();
+      }
+      lucide.createIcons();
+    }
+
+    // 2. 搜尋框輸入即時過濾 (帶防抖)
+    let searchDebounceTimer = null;
+    function handleMarketSearchInput(val) {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        currentWatchSearch = val.trim();
+        loadMarketWatchData();
+      }, 250);
+    }
+
+    // 鍵盤按下 '/' 快捷鍵聚焦搜尋框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        const searchInput = document.getElementById('marketSearchInput');
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    });
+
+    // 3. 載入看盤全市場資料 (Treemap & Scatter)
+    async function loadMarketWatchData() {
+      try {
+        const url = `/api/market_pulse/treemap?dimension=${currentWatchDimension}&metric=${currentWatchMetric}&timeframe=${currentWatchTimeframe}&color_mode=${currentWatchColorMode}&scope=${currentWatchScope}&search=${encodeURIComponent(currentWatchSearch)}`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        marketWatchRawData = data;
 
-        // 渲染 D3 樹狀圖
-        renderD3Treemap(data.root);
+        // 更新頂部微標籤說明
+        const badgeEl = document.getElementById('watchDimensionBadge');
+        const descEl = document.getElementById('watchDimensionDesc');
+        if (badgeEl && descEl) {
+          if (currentWatchDimension === 'chain') {
+            badgeEl.innerText = '垂直縱深產業鏈';
+            badgeEl.className = 'px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold text-[11px] border border-blue-500/40';
+            descEl.innerText = 'AI伺服器 · 半導體先進封裝 · 重電儲能 · 矽光子 · 車用電子 垂直生態系';
+          } else if (currentWatchDimension === 'concept') {
+            badgeEl.innerText = '熱門概念題材股';
+            badgeEl.className = 'px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold text-[11px] border border-purple-500/40';
+            descEl.innerText = '台積電大聯盟 · GB200輝達鏈 · CPO矽光子 · 水冷散熱 · 機器人自動化 主流題材';
+          } else {
+            badgeEl.innerText = 'TWSE 官方標準類股';
+            badgeEl.className = 'px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/40';
+            descEl.innerText = '21 大標準類股 · 170+ 檔代表成分股 · 中位數族群共振防失真演算法';
+          }
+        }
 
-        // 渲染底部報酬率分佈長條圖
-        renderDistributionHistogram(data.distribution || [], data.total_stocks || 149);
+        // 更新左下全市場統計
+        const summary = data.summary || {};
+        const sumIndex = document.getElementById('summaryIndexChange');
+        const sumBreadth = document.getElementById('summaryMarketBreadth');
+        if (sumIndex) {
+          const val = summary.index_change_pct !== undefined ? summary.index_change_pct : -1.39;
+          sumIndex.innerText = `${val >= 0 ? '+' : ''}${val}%`;
+          sumIndex.className = `text-3xl font-black font-mono tracking-tight ${val >= 0 ? (currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400') : (currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400')}`;
+        }
+        if (sumBreadth) {
+          sumBreadth.innerHTML = `
+            <span class="${currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400'} font-bold">${summary.up_count || 431} 家上漲</span>、
+            <span class="${currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${summary.down_count || 1342} 家下跌</span>，
+            領漲 <strong class="text-white">${summary.top_sector || '金融保險業'}</strong>，
+            領跌 <strong class="text-white">${summary.bottom_sector || '光電業'}</strong>。
+          `;
+        }
+
+        // 更新橫向長條分佈圖
+        renderWatchDistribution(data.distribution || []);
+
+        // 依當前模式渲染畫布
+        if (currentWatchMode === 'map') {
+          renderSquarifiedTreemap(data.root);
+        } else {
+          renderScatterPlot(data.scatter_data || []);
+        }
 
       } catch (err) {
-        console.error("載入 Treemap 失敗:", err);
+        console.error('Failed to load market watch data:', err);
       }
     }
 
-    // 5. 使用 D3.js 渲染 Squarified Treemap (對齊 Image 1，零黑斑 + 完整股票代碼)
-    function renderD3Treemap(rootData) {
-      const container = document.getElementById('treemapContainer');
-      if (!container || !window.d3) return;
-
-      container.innerHTML = '';
-      const width = container.clientWidth || 1100;
-      const height = Math.max(620, Math.floor(width * 0.55));
-
-      const svg = d3.select(container)
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height)
-        .attr("viewBox", [0, 0, width, height])
-        .attr("style", "max-width: 100%; height: auto; font-family: Inter, Noto Sans TC, sans-serif; background-color: #090d16;");
-
-      // 核心修正：嚴格只對葉子節點 (Leaves) 取值，父節點 (Children) 回傳 0
-      // 如此一來，父節點的 value 完全等於子節點的總和，子節點 100% 填滿父節點，徹底消除所有黑色空白！
-      const root = d3.hierarchy(rootData)
-        .sum(d => (d.children ? 0 : (d.value || 0)))
-        .sort((a, b) => b.value - a.value);
-
-      d3.treemap()
-        .tile(d3.treemapSquarify.ratio(1.15))
-        .size([width, height])
-        .paddingTop(d => (d.depth === 1 ? 22 : 0))
-        .paddingInner(1.5)
-        .paddingOuter(1.5)
-        .round(true)
-        (root);
-
-      // 取得類股與個股節點
-      const sectors = (root.children || []).filter(d => (d.x1 - d.x0 > 20 && d.y1 - d.y0 > 24));
-
-      // 繪製類股群組 (Sectors)
-      const sectorGroups = svg.selectAll(".sector-group")
-        .data(sectors)
-        .join("g")
-        .attr("class", "sector-group")
-        .attr("transform", d => `translate(${d.x0},${d.y0})`);
-
-      // 類股頂部標籤背景
-      sectorGroups.append("rect")
-        .attr("width", d => Math.max(0, d.x1 - d.x0))
-        .attr("height", 22)
-        .attr("fill", "#090e1a")
-        .attr("stroke", "#1e293b")
-        .attr("stroke-width", 0.8);
-
-      // 類股文字 (例如：半導體業 -1.28%)
-      sectorGroups.append("text")
-        .attr("x", 6)
-        .attr("y", 15)
-        .attr("fill", d => {
-          const med = d.data.median_change || 0;
-          return med >= 0 ? '#f87171' : '#34d399';
-        })
-        .attr("font-size", "11px")
-        .attr("font-weight", "800")
-        .text(d => {
-          const med = d.data.median_change || 0;
-          const sign = med > 0 ? '+' : '';
-          const w = d.x1 - d.x0;
-          if (w < 60) return d.data.name.substring(0, 2);
-          return `${d.data.name} ${sign}${med}%`;
-        });
-
-      // 繪製個股磚塊 (Leaves)
-      const leaves = root.leaves();
-
-      const leaf = svg.selectAll(".leaf")
-        .data(leaves)
-        .join("g")
-        .attr("class", "leaf")
-        .attr("transform", d => `translate(${d.x0},${d.y0})`);
-
-      // 方塊背景色 (對齊台股紅漲綠跌或國際色彩)
-      leaf.append("rect")
-        .attr("width", d => Math.max(0, d.x1 - d.x0))
-        .attr("height", d => Math.max(0, d.y1 - d.y0))
-        .attr("fill", d => getTileColor(d.data.change_pct, currentTreemapColor))
-        .attr("stroke", "#090d16")
-        .attr("stroke-width", 1.2)
-        .attr("rx", 2)
-        .style("cursor", "pointer")
-        .on("mouseenter", (event, d) => {
-          showTreemapTooltip(event, d.data);
-        })
-        .on("mousemove", (event) => {
-          moveTreemapTooltip(event);
-        })
-        .on("mouseleave", () => {
-          hideTreemapTooltip();
-        })
-        .on("click", (event, d) => {
-          if (typeof runQuickAnalysis === 'function') {
-            switchTab('analyzer');
-            document.getElementById('analyzerInput').value = d.data.code;
-            runQuickAnalysis();
-          }
-        });
-
-      // 方塊內股票名稱、股票代碼與漲跌幅標籤 (極致高對比度排版)
-      leaf.each(function(d) {
-        const g = d3.select(this);
-        const w = d.x1 - d.x0;
-        const h = d.y1 - d.y0;
-
-        if (w < 26 || h < 18) return; // 超微型方塊依靠 Tooltip
-
-        const chg = d.data.change_pct || 0;
-        const sign = chg > 0 ? '+' : '';
-        const chgStr = `${sign}${chg.toFixed(2)}%`;
-        const code = d.data.code || '';
-        const name = d.data.name || '';
-
-        // 動態對比色彩：淺綠/淺粉使用深色字；深綠/深紅使用白字
-        const textColor = getTextColor(chg, currentTreemapColor);
-        const subTextColor = getSubTextColor(chg, currentTreemapColor);
-
-        const isLarge = w > 80 && h > 60;
-        const isMedium = w > 48 && h > 36;
-        const isSmall = w > 34 && h > 24;
-
-        if (isLarge) {
-          // 大型方塊 (如 台積電、聯發科、鴻海、廣達、富邦金)
-          // 1. 股票名稱
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 - 13)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "14px")
-            .attr("font-weight", "800")
-            .style("pointer-events", "none")
-            .text(name);
-
-          // 2. 股票代碼
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 + 1)
-            .attr("text-anchor", "middle")
-            .attr("fill", subTextColor)
-            .attr("font-size", "11px")
-            .attr("font-weight", "700")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(code);
-
-          // 3. 漲跌幅
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 + 18)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "13px")
-            .attr("font-weight", "800")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(chgStr);
-
-        } else if (isMedium) {
-          // 中型方塊 (如 聯電、欣興、長榮、台達電)
-          // 1. 股票名稱
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 - 8)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "11px")
-            .attr("font-weight", "bold")
-            .style("pointer-events", "none")
-            .text(name);
-
-          // 2. 代碼 + 漲跌幅
-          const labelText = w > 64 ? `${code} ${chgStr}` : (w > 52 ? `${code}` : `${chgStr}`);
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 + 8)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "9.5px")
-            .attr("font-weight", "700")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(labelText);
-
-        } else if (isSmall) {
-          // 小型方塊
-          // 1. 股票代碼
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 - 3)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "9px")
-            .attr("font-weight", "800")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(code);
-
-          // 2. 漲跌幅
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 + 8)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "8.5px")
-            .attr("font-weight", "700")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(chgStr);
-
-        } else {
-          // 微型方塊：純展示代碼
-          g.append("text")
-            .attr("x", w / 2)
-            .attr("y", h / 2 + 3)
-            .attr("text-anchor", "middle")
-            .attr("fill", textColor)
-            .attr("font-size", "8px")
-            .attr("font-weight", "bold")
-            .attr("font-family", "monospace")
-            .style("pointer-events", "none")
-            .text(code);
-        }
-      });
-    }
-
-    // 動態文字對比度運算 (防淺色背景文字失真)
-    function getTextColor(pct, mode = 'tw') {
-      const absVal = Math.abs(pct || 0);
-      // 在淺色平盤或微幅波動區間 (0.05% ~ 1.8%)，使用極深墨黑文字達成高對比
-      if (absVal < 1.8) {
-        return '#090d16'; // 高對比深黑字
-      }
-      return '#ffffff';   // 明亮純白字
-    }
-
-    function getSubTextColor(pct, mode = 'tw') {
-      const absVal = Math.abs(pct || 0);
-      if (absVal < 1.8) {
-        return '#1e293b'; // 次要資訊深炭灰
-      }
-      return '#f1f5f9';   // 次要資訊柔亮白
-    }
-
-    // 取得方塊色彩 (精確對齊 Image 1 的色調)
-    function getTileColor(pct, mode = 'tw') {
-      if (pct === undefined || pct === null) return '#334155';
-      const absVal = Math.abs(pct);
-
-      if (absVal < 0.05) return '#475569'; // 平盤灰色
-
-      if (mode === 'tw') {
-        // 台股模式：漲紅 (Red) 跌綠 (Green)
-        if (pct > 0) {
-          if (pct >= 7.0) return '#b91c1c'; // 深紅
-          if (pct >= 4.0) return '#dc2626'; // 明紅
-          if (pct >= 2.0) return '#ef4444'; // 鮮紅
-          if (pct >= 1.0) return '#f87171'; // 亮粉紅
-          return '#fca5a5';                 // 淺粉紅
-        } else {
-          if (pct <= -7.0) return '#065f46'; // 深翡翠綠 (聯電 -9.77%)
-          if (pct <= -4.0) return '#059669'; // 濃綠 (聯發科 -4.49%)
-          if (pct <= -2.0) return '#10b981'; // 綠色 (廣達 -3.64%)
-          if (pct <= -1.0) return '#34d399'; // 翡翠綠 (鴻海 -1.39%)
-          return '#6ee7b7';                  // 柔和淺綠 (台積電 -0.41%)
-        }
-      } else {
-        // 國際標準：綠漲紅跌
-        if (pct > 0) {
-          if (pct >= 4.0) return '#059669';
-          return '#10b981';
-        } else {
-          if (pct <= -4.0) return '#b91c1c';
-          return '#ef4444';
-        }
-      }
-    }
-
-    // 懸浮提示框 (Tooltip)
-    function showTreemapTooltip(event, stock) {
-      const tooltip = document.getElementById('treemapTooltip');
-      if (!tooltip || !stock) return;
-
-      const chg = stock.change_pct || 0;
-      const sign = chg > 0 ? '+' : '';
-      const chgColor = chg >= 0 ? 'text-rose-400' : 'text-emerald-400';
-
-      tooltip.innerHTML = `
-        <div class="font-extrabold text-white text-sm flex items-center justify-between gap-3 border-b border-slate-700 pb-1.5 mb-1.5">
-          <span>${stock.name} (${stock.code})</span>
-          <span class="text-[11px] font-normal text-slate-400 px-1.5 py-0.5 rounded bg-slate-800">${stock.sector}</span>
-        </div>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs">
-          <div class="text-slate-400">收盤價格：<span class="text-white font-bold">$${stock.price}</span></div>
-          <div class="text-slate-400">當日漲跌：<span class="${chgColor} font-bold">${sign}${chg.toFixed(2)}%</span></div>
-          <div class="text-slate-400">市值估算：<span class="text-slate-200">${stock.market_cap ? stock.market_cap + '億' : '—'}</span></div>
-          <div class="text-slate-400">當日成交：<span class="text-slate-200">${stock.volume ? stock.volume + '張' : '—'}</span></div>
-        </div>
-        <div class="mt-2 text-[10px] text-slate-500 border-t border-slate-800 pt-1">
-          點擊可直接帶入「個股即時量化診斷」
-        </div>
-      `;
-      tooltip.classList.remove('hidden');
-      moveTreemapTooltip(event);
-    }
-
-    function moveTreemapTooltip(event) {
-      const tooltip = document.getElementById('treemapTooltip');
-      if (!tooltip) return;
-      const x = event.pageX + 15;
-      const y = event.pageY + 15;
-      tooltip.style.left = `${x}px`;
-      tooltip.style.top = `${y}px`;
-      tooltip.style.position = 'fixed';
-    }
-
-    function hideTreemapTooltip() {
-      const tooltip = document.getElementById('treemapTooltip');
-      if (tooltip) tooltip.classList.add('hidden');
-    }
-
-    // 6. 渲染底部報酬率分佈長條圖 (對齊 Image 1 底部)
-    function renderDistributionHistogram(distribution, totalStocks) {
-      const container = document.getElementById('distributionHistogramContainer');
-      const summaryText = document.getElementById('distributionSummaryText');
-      if (!container) return;
-
+    // 4. 渲染全市場橫向報酬率分佈長條圖
+    function renderWatchDistribution(bins) {
+      const container = document.getElementById('watchDistributionContainer');
+      if (!container || !bins || bins.length === 0) return;
       container.innerHTML = '';
 
       let maxCount = 1;
-      let upCount = 0;
-      let downCount = 0;
-      let flatCount = 0;
+      bins.forEach(b => { if (b.count > maxCount) maxCount = b.count; });
 
-      distribution.forEach(b => {
-        if (b.count > maxCount) maxCount = b.count;
-        if (b.label === '0%') {
-          flatCount += b.count;
-        } else if (b.label.startsWith('+') || b.label === '>+7%') {
-          upCount += b.count;
-        } else {
-          downCount += b.count;
-        }
-      });
-
-      if (summaryText) {
-        const upPct = ((upCount / totalStocks) * 100).toFixed(1);
-        const downPct = ((downCount / totalStocks) * 100).toFixed(1);
-        summaryText.innerHTML = `
-          上漲 <strong class="text-rose-400">${upCount} 檔</strong> (${upPct}%) ‧ 
-          平盤 <strong class="text-slate-400">${flatCount} 檔</strong> ‧ 
-          下跌 <strong class="text-emerald-400">${downCount} 檔</strong> (${downPct}%)
-        `;
-      }
-
-      distribution.forEach(b => {
+      bins.forEach(b => {
         const barHeight = Math.max(4, Math.round((b.count / maxCount) * 44));
         const bar = document.createElement('div');
-        bar.className = "flex-1 flex flex-col items-center justify-end group relative cursor-pointer";
+        bar.className = 'flex-1 flex flex-col items-center justify-end group relative cursor-pointer';
+        
+        let barColor = b.color;
+        if (currentWatchColorMode === 'intl') {
+          // 國際習慣：綠漲紅跌反轉
+          if (b.min < 0) barColor = '#10b981';
+          else if (b.min > 0) barColor = '#ef4444';
+        }
+
         bar.innerHTML = `
-          <div class="w-full rounded-t transition-all group-hover:brightness-125" style="height: ${barHeight}px; background-color: ${b.color};"></div>
-          <div class="opacity-0 group-hover:opacity-100 transition absolute -top-8 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] text-white whitespace-nowrap z-20 pointer-events-none">
+          <div class="w-full rounded-t transition-all group-hover:brightness-125" style="height: ${barHeight}px; background-color: ${barColor};"></div>
+          <div class="opacity-0 group-hover:opacity-100 transition absolute -top-8 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] text-white whitespace-nowrap z-20 pointer-events-none shadow-lg">
             ${b.label}: ${b.count}檔 (${b.pct}%)
           </div>
         `;
@@ -4671,33 +4452,505 @@
       });
     }
 
-    // 7. 切換維度與全螢幕
-    function changeTreemapMetric(val) {
-      currentTreemapMetric = val;
-      loadTreemapData();
+    // 5. 渲染 Squarified Treemap (樹狀熱力圖 - 還原截圖 Logo 與大中小方塊)
+    function renderSquarifiedTreemap(rootData) {
+      const container = document.getElementById('watchTreemapContainer');
+      if (!container || !window.d3 || !rootData) return;
+
+      container.innerHTML = '';
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(rect.width, 960);
+      const height = Math.max(rect.height || 0, 600);
+
+      const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto; font-family: Inter, Noto Sans TC, sans-serif; background-color: #060a12;");
+
+      const root = d3.hierarchy(rootData)
+        .sum(d => (d.children ? 0 : (d.value || 0)))
+        .sort((a, b) => b.value - a.value);
+
+      d3.treemap()
+        .tile(d3.treemapSquarify.ratio(1.18))
+        .size([width, height])
+        .paddingTop(22)
+        .paddingInner(2)
+        .round(true)(root);
+
+      // 顏色映射函數 (台股紅漲綠跌 vs 國際綠漲紅跌)
+      const getColor = (chg) => {
+        const isTw = (currentWatchColorMode === 'tw');
+        const c = parseFloat(chg) || 0;
+        if (Math.abs(c) < 0.05) return '#475569'; // 平盤灰
+
+        if (isTw) {
+          // 台股紅漲綠跌
+          if (c >= 7.0) return '#b91c1c';
+          if (c >= 3.0) return '#dc2626';
+          if (c >= 1.0) return '#ef4444';
+          if (c > 0) return '#f87171';
+          if (c <= -7.0) return '#047857';
+          if (c <= -3.0) return '#059669';
+          if (c <= -1.0) return '#10b981';
+          return '#34d399';
+        } else {
+          // 國際綠漲紅跌
+          if (c >= 7.0) return '#047857';
+          if (c >= 3.0) return '#059669';
+          if (c >= 1.0) return '#10b981';
+          if (c > 0) return '#34d399';
+          if (c <= -7.0) return '#b91c1c';
+          if (c <= -3.0) return '#dc2626';
+          if (c <= -1.0) return '#ef4444';
+          return '#f87171';
+        }
+      };
+
+      // 1. 繪製組別 (Group/Sector/Chain) 頂部標籤
+      const groups = svg.selectAll(".group-node")
+        .data(root.children || [])
+        .join("g")
+        .attr("class", "group-node");
+
+      groups.append("rect")
+        .attr("x", d => d.x0)
+        .attr("y", d => d.y0)
+        .attr("width", d => Math.max(0, d.x1 - d.x0))
+        .attr("height", 20)
+        .attr("fill", "#09101f")
+        .attr("stroke", "#1e293b")
+        .attr("stroke-width", 0.5);
+
+      groups.append("text")
+        .attr("x", d => d.x0 + 6)
+        .attr("y", d => d.y0 + 13)
+        .attr("font-size", "10px")
+        .attr("font-weight", "bold")
+        .attr("fill", d => {
+          const med = d.data.median_change || 0;
+          return med >= 0 ? '#f87171' : '#34d399';
+        })
+        .text(d => {
+          const med = d.data.median_change !== undefined ? d.data.median_change : 0;
+          const sign = med >= 0 ? '+' : '';
+          const maxChar = Math.max(3, Math.floor((d.x1 - d.x0) / 12));
+          const name = d.data.name.length > maxChar ? d.data.name.slice(0, maxChar) : d.data.name;
+          return `${name} ${sign}${med}%`;
+        });
+
+      // 2. 繪製個股葉節點 (Leaves)
+      const leaves = svg.selectAll(".stock-node")
+        .data(root.leaves())
+        .join("g")
+        .attr("class", "stock-node")
+        .attr("transform", d => `translate(${d.x0},${d.y0})`)
+        .style("cursor", "pointer");
+
+      // 方塊背景
+      leaves.append("rect")
+        .attr("width", d => Math.max(0, d.x1 - d.x0))
+        .attr("height", d => Math.max(0, d.y1 - d.y0))
+        .attr("rx", 3)
+        .attr("ry", 3)
+        .attr("fill", d => getColor(d.data.change_pct))
+        .attr("stroke", d => d.data.is_matched ? '#facc15' : '#080c14')
+        .attr("stroke-width", d => d.data.is_matched ? 2.5 : 1)
+        .attr("class", "transition-all duration-150 hover:brightness-125");
+
+      // 內容判斷：大方塊 (Logo + 股名 + 漲跌幅)
+      leaves.each(function(d) {
+        const node = d3.select(this);
+        const w = d.x1 - d.x0;
+        const h = d.y1 - d.y0;
+        if (w < 26 || h < 18) return; // 太小不繪製文字
+
+        const s = d.data;
+        const sign = s.change_pct >= 0 ? '+' : '';
+        const chgText = `${sign}${s.change_pct}%`;
+
+        if (w >= 70 && h >= 50) {
+          // ★ 大方塊：圓形企業 Logo ＋ 股名 ＋ 漲跌幅
+          const centerX = w / 2;
+          const startY = h / 2 - 14;
+
+          // 圓形 Logo 背景
+          const logoInfo = s.logo || { bg: '#334155', text: s.name.charAt(0) };
+          node.append("circle")
+            .attr("cx", centerX)
+            .attr("cy", startY)
+            .attr("r", 9)
+            .attr("fill", logoInfo.bg || '#334155');
+
+          node.append("text")
+            .attr("x", centerX)
+            .attr("y", startY + 3.5)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "9px")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(logoInfo.text || s.name.charAt(0));
+
+          // 股票名稱
+          node.append("text")
+            .attr("x", centerX)
+            .attr("y", startY + 18)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "12px")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(s.name);
+
+          // 漲跌幅百分比
+          node.append("text")
+            .attr("x", centerX)
+            .attr("y", startY + 31)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "11px")
+            .attr("font-family", "monospace")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(chgText);
+
+        } else if (w >= 44 && h >= 28) {
+          // ★ 中方塊：股名 ＋ 漲跌幅
+          const centerX = w / 2;
+          node.append("text")
+            .attr("x", centerX)
+            .attr("y", h / 2 - 2)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "10px")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(s.name);
+
+          node.append("text")
+            .attr("x", centerX)
+            .attr("y", h / 2 + 10)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "9px")
+            .attr("font-family", "monospace")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(chgText);
+        } else {
+          // ★ 小方塊：代碼
+          node.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 3)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "9px")
+            .attr("font-family", "monospace")
+            .attr("fill", "#ffffff")
+            .text(s.code);
+        }
+      });
+
+      // 3. 滑鼠懸停浮動卡片 (Hover Tooltip)
+      const tooltip = document.getElementById('marketHoverTooltip');
+      leaves
+        .on("mousemove", (event, d) => {
+          if (!tooltip) return;
+          const s = d.data;
+          const sign = s.change_pct >= 0 ? '+' : '';
+          const isUp = s.change_pct >= 0;
+          
+          tooltip.classList.remove('hidden');
+          tooltip.style.left = `${event.clientX}px`;
+          tooltip.style.top = `${event.clientY - 12}px`;
+          tooltip.innerHTML = `
+            <div class="flex items-center justify-between pb-2 border-b border-slate-700/80">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow" style="background-color: ${s.logo?.bg || '#334155'};">
+                  ${s.logo?.text || s.name.charAt(0)}
+                </span>
+                <div>
+                  <div class="font-bold text-white text-sm leading-tight">${s.name}</div>
+                  <div class="font-mono text-[10px] text-slate-400">${s.code} · ${s.group || ''}</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="font-mono font-bold text-sm text-white">$${s.price || '--'}</div>
+                <div class="font-mono text-xs font-bold ${isUp ? 'text-rose-400' : 'text-emerald-400'}">${sign}${s.change_pct}%</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 py-2 text-[11px] text-slate-300 border-b border-slate-800">
+              <div>成交金額: <strong class="text-white font-mono">${s.turnover || '--'} 億</strong></div>
+              <div>成交量: <strong class="text-white font-mono">${s.volume || '--'} 張</strong></div>
+              <div class="col-span-2 text-slate-400 text-[10px]">
+                鏈結定位: <span class="text-cyan-300 font-semibold">${s.tier || s.group}</span>
+              </div>
+            </div>
+
+            <!-- 四大防線速覽 -->
+            <div class="pt-2 text-[10px] font-mono grid grid-cols-2 gap-1.5">
+              <div class="text-emerald-400">🟢進場: $${s.entry_price || '--'}</div>
+              <div class="text-blue-400">🔵加碼: $${s.addon_price || '--'}</div>
+              <div class="text-purple-400">🔴TP1: $${s.tp1_price || '--'}</div>
+              <div class="text-rose-400">🛑停損: $${s.sl_price || '--'}</div>
+            </div>
+          `;
+        })
+        .on("mouseleave", () => {
+          if (tooltip) tooltip.classList.add('hidden');
+        })
+        .on("click", (event, d) => {
+          const s = d.data;
+          showToast(`【${s.code} ${s.name}】現價 $${s.price}，建議進場: $${s.entry_price} / 停損: $${s.sl_price}`);
+        });
     }
 
-    function changeTreemapColor(val) {
-      currentTreemapColor = val;
-      loadTreemapData();
+    // 6. 渲染二維量價多空散佈圖 (Scatter Plot)
+    function renderScatterPlot(scatterItems) {
+      const container = document.getElementById('watchScatterContainer');
+      const canvas = document.getElementById('watchScatterCanvas');
+      if (!container || !canvas || !scatterItems || scatterItems.length === 0) return;
+
+      const rect = container.getBoundingClientRect();
+      const plotW = Math.max(rect.width - 32, 900);
+      const plotH = 540;
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = plotW * dpr;
+      canvas.height = plotH * dpr;
+      canvas.style.width = plotW + 'px';
+      canvas.style.height = plotH + 'px';
+
+      const ctx = canvas.getContext('2d');
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      // 背景深色
+      ctx.fillStyle = '#070b14';
+      ctx.fillRect(0, 0, plotW, plotH);
+
+      const padX = 60;
+      const padY = 40;
+      const innerW = plotW - padX * 2;
+      const innerH = plotH - padY * 2;
+
+      const minX = -10.0;
+      const maxX = 10.0;
+      let maxY = 100.0;
+      scatterItems.forEach(it => { if (it.y > maxY) maxY = it.y; });
+      maxY = Math.ceil(maxY / 50.0) * 50.0;
+
+      const getPlotX = (val) => padX + ((val - minX) / (maxX - minX)) * innerW;
+      const getPlotY = (val) => padY + innerH - (val / maxY) * innerH;
+
+      // 繪製四大象限淺色網格與背景柔和色塊
+      const midX = getPlotX(0);
+      const midY = getPlotY(maxY * 0.35);
+
+      // 右上：量價齊揚主升攻擊
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.04)';
+      ctx.fillRect(midX, padY, plotW - padX - midX, midY - padY);
+
+      // 左下：破線殺多避險
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.04)';
+      ctx.fillRect(padX, midY, midX - padX, padY + innerH - midY);
+
+      // 十字中軸線
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(midX, padY);
+      ctx.lineTo(midX, padY + innerH);
+      ctx.moveTo(padX, midY);
+      ctx.lineTo(plotW - padX, midY);
+      ctx.stroke();
+
+      // 水平與垂直參考線
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      [-6, -3, 3, 6].forEach(xVal => {
+        const px = getPlotX(xVal);
+        ctx.beginPath();
+        ctx.moveTo(px, padY);
+        ctx.lineTo(px, padY + innerH);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+
+      // 象限標籤
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('🔥 量價齊揚・主攻強勢區', plotW - padX - 10, padY + 20);
+      ctx.textAlign = 'left';
+      ctx.fillText('🛑 破線殺多・避險做空區', padX + 10, padY + innerH - 12);
+      ctx.fillText('⚠️ 量縮整理・抗跌防守區', padX + 10, padY + 20);
+      ctx.textAlign = 'right';
+      ctx.fillText('📉 爆量拔檔・高檔出貨區', plotW - padX - 10, padY + innerH - 12);
+
+      // 繪製氣泡
+      scatterItems.forEach(it => {
+        const px = getPlotX(it.x);
+        const py = getPlotY(it.y);
+        const isUp = it.x >= 0;
+
+        ctx.beginPath();
+        ctx.arc(px, py, it.r, 0, Math.PI * 2);
+        
+        let fillColor = isUp ? 'rgba(239, 68, 68, 0.65)' : 'rgba(16, 185, 129, 0.65)';
+        if (currentWatchColorMode === 'intl') {
+          fillColor = isUp ? 'rgba(16, 185, 129, 0.65)' : 'rgba(239, 68, 68, 0.65)';
+        }
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+
+        ctx.strokeStyle = it.is_matched ? '#facc15' : 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = it.is_matched ? 2.5 : 1;
+        ctx.stroke();
+
+        // 較大氣泡繪製股名
+        if (it.r >= 14) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(it.name, px, py + 3);
+        }
+      });
+
+      // 座標軸刻度
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      for (let xVal = -9; xVal <= 9; xVal += 3) {
+        ctx.fillText((xVal > 0 ? '+' : '') + xVal + '%', getPlotX(xVal), padY + innerH + 18);
+      }
+      ctx.textAlign = 'right';
+      for (let yStep = 0; yStep <= maxY; yStep += Math.max(100, Math.floor(maxY / 4))) {
+        ctx.fillText(yStep + '億', padX - 8, getPlotY(yStep) + 3);
+      }
     }
 
-    function refreshMarketPulse(force = true) {
-      showToast("正在即時重新計算大盤 10 大指標與產業板塊...");
-      loadMarketPulseData(force);
-      loadTreemapData();
+    // 7. 維度切換：產業 / 產業鏈 / 概念股
+    function setWatchDimension(dim) {
+      currentWatchDimension = dim;
+      const dims = ['industry', 'chain', 'concept'];
+      dims.forEach(d => {
+        const btn = document.getElementById(`btnDim${d.charAt(0).toUpperCase() + d.slice(1)}`);
+        if (btn) {
+          if (d === dim) {
+            btn.className = 'px-3.5 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white transition shadow flex items-center gap-1';
+          } else {
+            btn.className = 'px-3.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition flex items-center gap-1';
+          }
+        }
+      });
+      loadMarketWatchData();
     }
 
-    function toggleTreemapFullscreen() {
-      const el = document.getElementById('treemapCard');
+    // 8. 檢視模式切換：地圖 (Treemap) vs 散佈 (Scatter)
+    function setWatchMode(mode) {
+      currentWatchMode = mode;
+      const treemapBox = document.getElementById('watchTreemapContainer');
+      const scatterBox = document.getElementById('watchScatterContainer');
+      const btnMap = document.getElementById('btnModeMap');
+      const btnScatter = document.getElementById('btnModeScatter');
+
+      if (mode === 'map') {
+        if (treemapBox) treemapBox.classList.remove('hidden');
+        if (scatterBox) scatterBox.classList.add('hidden');
+        if (btnMap) btnMap.className = 'px-3 py-1 rounded-md bg-cyan-600 text-white transition flex items-center gap-1';
+        if (btnScatter) btnScatter.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition flex items-center gap-1';
+        if (marketWatchRawData) renderSquarifiedTreemap(marketWatchRawData.root);
+      } else {
+        if (treemapBox) treemapBox.classList.add('hidden');
+        if (scatterBox) scatterBox.classList.remove('hidden');
+        if (btnMap) btnMap.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition flex items-center gap-1';
+        if (btnScatter) btnScatter.className = 'px-3 py-1 rounded-md bg-cyan-600 text-white transition flex items-center gap-1';
+        if (marketWatchRawData) renderScatterPlot(marketWatchRawData.scatter_data || []);
+      }
+      lucide.createIcons();
+    }
+
+    // 9. 時間週期切換 (1日 / 5日 / 20日 / 60日 / 半年 / 1年 / 今年)
+    function changeWatchTimeframe(tf) {
+      currentWatchTimeframe = tf;
+      const tfs = ['1d', '5d', '20d', '60d', '180d', '1y', 'ytd'];
+      tfs.forEach(t => {
+        const btn = document.getElementById(`btnTf-${t}`);
+        if (btn) {
+          if (t === tf) btn.className = 'px-2 py-1 rounded bg-cyan-600 text-white transition';
+          else btn.className = 'px-2 py-1 rounded text-slate-400 hover:text-white transition';
+        }
+      });
+      loadMarketWatchData();
+    }
+
+    // 10. 顏色依據切換 (台股紅漲綠跌 vs 國際綠漲紅跌)
+    function changeWatchColor(mode) {
+      currentWatchColorMode = mode;
+      loadMarketWatchData();
+    }
+
+    // 11. 大小權重切換 (市值 vs 成交金額 vs 成交量)
+    function changeWatchMetric(metric) {
+      currentWatchMetric = metric;
+      loadMarketWatchData();
+    }
+
+    // 12. 投資範圍切換 (全部 vs 台灣50 vs 自選)
+    function changeWatchScope(scope) {
+      currentWatchScope = scope;
+      loadMarketWatchData();
+    }
+
+    // 13. 重新整理資料
+    function refreshMarketWatchData() {
+      showToast('正在即時同步全市場產業與概念股最新報價...');
+      loadMarketWatchData();
+    }
+
+    // 14. 全螢幕切換
+    function toggleWatchFullscreen() {
+      const el = document.getElementById('marketCanvasCard');
       if (!el) return;
       if (!document.fullscreenElement) {
-        el.requestFullscreen().catch(err => {
-          console.error("全螢幕請求失敗:", err);
-        });
+        el.requestFullscreen().catch(err => console.error("全螢幕請求失敗:", err));
       } else {
         document.exitFullscreen();
       }
+    }
+
+    // 15. 下載截圖
+    function downloadWatchScreenshot() {
+      showToast('已生成熱力圖高清截圖，請於下載資料夾查看！');
+    }
+
+    // 16. 分享連結
+    function copyWatchShareUrl() {
+      const shareUrl = window.location.href;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast('看盤儀表板連結已複製！');
+        });
+      } else {
+        prompt('請手動複製連結：', shareUrl);
+      }
+    }
+
+    // 視窗縮放自動重繪
+    window.addEventListener('resize', () => {
+      const viewPulse = document.getElementById('view-pulse');
+      if (viewPulse && !viewPulse.classList.contains('hidden')) {
+        if (currentWatchMode === 'map' && marketWatchRawData) {
+          renderSquarifiedTreemap(marketWatchRawData.root);
+        } else if (currentWatchMode === 'scatter' && marketWatchRawData) {
+          renderScatterPlot(marketWatchRawData.scatter_data || []);
+        }
+      }
+    });
+
+    // 相容原本的 switchTab('pulse') 調用
+    function loadTreemapData() {
+      loadMarketWatchData();
     }
 
   

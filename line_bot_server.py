@@ -874,11 +874,25 @@ async def get_market_pulse_score(refresh: bool = False):
 
 
 @app.get("/api/market_pulse/treemap")
-async def get_market_pulse_treemap(metric: str = "market_cap", color_mode: str = "tw"):
-    """提供全市場產業板塊熱力樹狀圖 (Treemap) 與報酬率分佈長條圖資料"""
+async def get_market_pulse_treemap(
+    metric: str = "market_cap",
+    color_mode: str = "tw",
+    dimension: str = "industry",
+    timeframe: str = "1d",
+    scope: str = "all",
+    search: str = ""
+):
+    """全市場產業/產業鏈/概念股看盤雷達 (Treemap and Scatter)"""
     try:
         from market_pulse import GLOBAL_MARKET_PULSE
-        return GLOBAL_MARKET_PULSE.get_treemap_data(metric=metric, color_mode=color_mode)
+        return GLOBAL_MARKET_PULSE.get_treemap_data(
+            metric=metric,
+            color_mode=color_mode,
+            dimension=dimension,
+            timeframe=timeframe,
+            scope=scope,
+            search=search
+        )
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
