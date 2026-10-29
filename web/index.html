@@ -1288,21 +1288,34 @@
         if (!view || !btn) return;
         if (t === tab) {
           view.classList.remove('hidden');
-          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow";
+          // 針對 Studio 與一般按鈕區分選中高亮風格
+          if (t === 'studio') {
+            btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-cyan-900/30 flex items-center gap-1.5 border border-cyan-500/40";
+          } else {
+            btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow flex items-center gap-1.5";
+          }
         } else {
           view.classList.add('hidden');
-          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800";
+          btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5";
         }
       });
+      
+      // 觸發對應分頁的即時資料載入
       if (tab === 'studio') {
         initStudio();
+      } else if (tab === 'strategies') {
+        if (typeof currentStrategy !== 'undefined' && currentStrategy) {
+          loadStrategyData(currentStrategy);
+        } else if (typeof loadStrategyData === 'function') {
+          loadStrategyData('01_bollinger_reversal');
+        }
       } else if (tab === 'radar') {
-        loadRadarWatchlist();
+        if (typeof loadRadarWatchlist === 'function') loadRadarWatchlist();
       } else if (tab === 'advisor') {
-        loadTomorrowAdvisorData();
+        if (typeof loadTomorrowAdvisorData === 'function') loadTomorrowAdvisorData();
       } else if (tab === 'pulse') {
-        loadMarketPulseData();
-        loadTreemapData();
+        if (typeof loadMarketPulseData === 'function') loadMarketPulseData();
+        if (typeof loadTreemapData === 'function') loadTreemapData();
       }
       lucide.createIcons();
     }
@@ -1516,7 +1529,6 @@
       items.forEach(it => {
         const code = it.code || '';
         const name = it.name || code;
-        const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
         const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
         const bp = Number(it.base_price || 0).toFixed(2);
         const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
