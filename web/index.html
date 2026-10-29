@@ -3925,7 +3925,7 @@
       }
     }
 
-    // 5. 使用 D3.js 渲染 Squarified Treemap (對齊 Image 1)
+    // 5. 使用 D3.js 渲染 Squarified Treemap (對齊 Image 1，零黑斑 + 完整股票代碼)
     function renderD3Treemap(rootData) {
       const container = document.getElementById('treemapContainer');
       if (!container || !window.d3) return;
@@ -3939,25 +3939,25 @@
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
-        .attr("style", "max-width: 100%; height: auto; font-family: Inter, Noto Sans TC, sans-serif;");
+        .attr("style", "max-width: 100%; height: auto; font-family: Inter, Noto Sans TC, sans-serif; background-color: #090d16;");
 
+      // 核心修正：嚴格只對葉子節點 (Leaves) 取值，父節點 (Children) 回傳 0
+      // 如此一來，父節點的 value 完全等於子節點的總和，子節點 100% 填滿父節點，徹底消除所有黑色空白！
       const root = d3.hierarchy(rootData)
-        .sum(d => d.value || 0)
+        .sum(d => (d.children ? 0 : (d.value || 0)))
         .sort((a, b) => b.value - a.value);
 
       d3.treemap()
-        .tile(d3.treemapSquarify.ratio(1.3))
+        .tile(d3.treemapSquarify.ratio(1.15))
         .size([width, height])
-        .paddingTop(22)
+        .paddingTop(d => (d.depth === 1 ? 22 : 0))
         .paddingInner(1.5)
         .paddingOuter(1.5)
         .round(true)
         (root);
 
-      const tooltip = document.getElementById('treemapTooltip');
-
       // 取得類股與個股節點
-      const sectors = root.children || [];
+      const sectors = (root.children || []).filter(d => (d.x1 - d.x0 > 20 && d.y1 - d.y0 > 24));
 
       // 繪製類股群組 (Sectors)
       const sectorGroups = svg.selectAll(".sector-group")
@@ -3970,9 +3970,9 @@
       sectorGroups.append("rect")
         .attr("width", d => Math.max(0, d.x1 - d.x0))
         .attr("height", 22)
-        .attr("fill", "#0b1120")
+        .attr("fill", "#090e1a")
         .attr("stroke", "#1e293b")
-        .attr("stroke-width", 0.5);
+        .attr("stroke-width", 0.8);
 
       // 類股文字 (例如：半導體業 -1.28%)
       sectorGroups.append("text")
@@ -3983,10 +3983,12 @@
           return med >= 0 ? '#f87171' : '#34d399';
         })
         .attr("font-size", "11px")
-        .attr("font-weight", "bold")
+        .attr("font-weight", "800")
         .text(d => {
           const med = d.data.median_change || 0;
           const sign = med > 0 ? '+' : '';
+          const w = d.x1 - d.x0;
+          if (w < 60) return d.data.name.substring(0, 2);
           return `${d.data.name} ${sign}${med}%`;
         });
 
@@ -4006,7 +4008,7 @@
         .attr("fill", d => getTileColor(d.data.change_pct, currentTreemapColor))
         .attr("stroke", "#090d16")
         .attr("stroke-width", 1.2)
-        .attr("rx", 3)
+        .attr("rx", 2)
         .style("cursor", "pointer")
         .on("mouseenter", (event, d) => {
           showTreemapTooltip(event, d.data);
@@ -4018,7 +4020,6 @@
           hideTreemapTooltip();
         })
         .on("click", (event, d) => {
-          // 點擊複製或帶入診斷
           if (typeof runQuickAnalysis === 'function') {
             switchTab('analyzer');
             document.getElementById('analyzerInput').value = d.data.code;
@@ -4026,45 +4027,149 @@
           }
         });
 
-      // 方塊內股票名稱與漲跌幅標籤
+      // 方塊內股票名稱、股票代碼與漲跌幅標籤 (極致高對比度排版)
       leaf.each(function(d) {
         const g = d3.select(this);
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;
 
-        if (w < 34 || h < 24) return; // 太小不繪製文字，依靠 tooltip
+        if (w < 26 || h < 18) return; // 超微型方塊依靠 Tooltip
 
-        const isLarge = w > 80 && h > 60;
-        const isMedium = w > 50 && h > 40;
-
-        const nameSize = isLarge ? "14px" : (isMedium ? "11px" : "9px");
-        const changeSize = isLarge ? "12px" : (isMedium ? "10px" : "8px");
-
-        // 股票名稱
-        g.append("text")
-          .attr("x", w / 2)
-          .attr("y", h / 2 - (isMedium ? 4 : 1))
-          .attr("text-anchor", "middle")
-          .attr("fill", "#ffffff")
-          .attr("font-size", nameSize)
-          .attr("font-weight", "bold")
-          .style("pointer-events", "none")
-          .text(d.data.name);
-
-        // 漲跌幅百分比
         const chg = d.data.change_pct || 0;
         const sign = chg > 0 ? '+' : '';
-        g.append("text")
-          .attr("x", w / 2)
-          .attr("y", h / 2 + (isMedium ? 14 : 9))
-          .attr("text-anchor", "middle")
-          .attr("fill", "#f8fafc")
-          .attr("font-size", changeSize)
-          .attr("font-weight", "600")
-          .attr("font-family", "monospace")
-          .style("pointer-events", "none")
-          .text(`${sign}${chg.toFixed(2)}%`);
+        const chgStr = `${sign}${chg.toFixed(2)}%`;
+        const code = d.data.code || '';
+        const name = d.data.name || '';
+
+        // 動態對比色彩：淺綠/淺粉使用深色字；深綠/深紅使用白字
+        const textColor = getTextColor(chg, currentTreemapColor);
+        const subTextColor = getSubTextColor(chg, currentTreemapColor);
+
+        const isLarge = w > 80 && h > 60;
+        const isMedium = w > 48 && h > 36;
+        const isSmall = w > 34 && h > 24;
+
+        if (isLarge) {
+          // 大型方塊 (如 台積電、聯發科、鴻海、廣達、富邦金)
+          // 1. 股票名稱
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 - 13)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "14px")
+            .attr("font-weight", "800")
+            .style("pointer-events", "none")
+            .text(name);
+
+          // 2. 股票代碼
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 1)
+            .attr("text-anchor", "middle")
+            .attr("fill", subTextColor)
+            .attr("font-size", "11px")
+            .attr("font-weight", "700")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(code);
+
+          // 3. 漲跌幅
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 18)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "13px")
+            .attr("font-weight", "800")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(chgStr);
+
+        } else if (isMedium) {
+          // 中型方塊 (如 聯電、欣興、長榮、台達電)
+          // 1. 股票名稱
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 - 8)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "11px")
+            .attr("font-weight", "bold")
+            .style("pointer-events", "none")
+            .text(name);
+
+          // 2. 代碼 + 漲跌幅
+          const labelText = w > 64 ? `${code} ${chgStr}` : (w > 52 ? `${code}` : `${chgStr}`);
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 8)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "9.5px")
+            .attr("font-weight", "700")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(labelText);
+
+        } else if (isSmall) {
+          // 小型方塊
+          // 1. 股票代碼
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 - 3)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "9px")
+            .attr("font-weight", "800")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(code);
+
+          // 2. 漲跌幅
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 8)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "8.5px")
+            .attr("font-weight", "700")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(chgStr);
+
+        } else {
+          // 微型方塊：純展示代碼
+          g.append("text")
+            .attr("x", w / 2)
+            .attr("y", h / 2 + 3)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "8px")
+            .attr("font-weight", "bold")
+            .attr("font-family", "monospace")
+            .style("pointer-events", "none")
+            .text(code);
+        }
       });
+    }
+
+    // 動態文字對比度運算 (防淺色背景文字失真)
+    function getTextColor(pct, mode = 'tw') {
+      const absVal = Math.abs(pct || 0);
+      // 在淺色平盤或微幅波動區間 (0.05% ~ 1.8%)，使用極深墨黑文字達成高對比
+      if (absVal < 1.8) {
+        return '#090d16'; // 高對比深黑字
+      }
+      return '#ffffff';   // 明亮純白字
+    }
+
+    function getSubTextColor(pct, mode = 'tw') {
+      const absVal = Math.abs(pct || 0);
+      if (absVal < 1.8) {
+        return '#1e293b'; // 次要資訊深炭灰
+      }
+      return '#f1f5f9';   // 次要資訊柔亮白
     }
 
     // 取得方塊色彩 (精確對齊 Image 1 的色調)

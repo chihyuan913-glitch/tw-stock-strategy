@@ -5,7 +5,7 @@ market_pulse.py: FinLab 風格台股大盤指標 (Market Pulse 0~10 分) 與全�
    - 10 項核心領先訊號 (多空排列、生命線20MA、騰落線ADL、週線MACD、融資維持率、外資期貨空單、法人動能、市場寬度、總經景氣、營收年增率)
    - 依分數動態指引總持股水位與策略路由
 2. 全市場產業熱力樹狀圖 (Taiwan Stock Industry Treemap)
-   - 20+ TWSE/TPEx 官方標準大類股與細產業，覆蓋 200+ 檔旗艦核心標的
+   - 21 大 TWSE/TPEx 官方標準大類股與細產業，覆蓋 220+ 檔旗艦核心標的
    - 中位數聚合防失真 (Median Aggregation)
    - 支援市值權重與成交金額面積切換
    - 台股標準紅漲綠跌色階與橫向報酬率分佈長條圖 (Return Distribution)
@@ -23,7 +23,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 CACHE_DIR = ROOT_DIR / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
-# 20+ 標準產業分類與核心權值股字典 (涵蓋台股 200+ 家龍頭股與當前精準行情快照)
+# 21 大標準產業分類與核心權值股字典 (涵蓋台股 220+ 家龍頭股與精準行情快照)
 SECTOR_DATA = {
     "半導體業": {
         "stocks": [
@@ -51,7 +51,17 @@ SECTOR_DATA = {
             {"code": "3529", "name": "力旺", "price": 2850.0, "change_pct": -2.40, "market_cap": 2130, "volume": 1100},
             {"code": "3131", "name": "弘塑", "price": 1620.0, "change_pct": -3.57, "market_cap": 470, "volume": 1400},
             {"code": "3583", "name": "辛耘", "price": 412.0, "change_pct": -2.83, "market_cap": 330, "volume": 3200},
-            {"code": "3680", "name": "家登", "price": 465.0, "change_pct": -1.27, "market_cap": 390, "volume": 1800}
+            {"code": "3680", "name": "家登", "price": 465.0, "change_pct": -1.27, "market_cap": 390, "volume": 1800},
+            {"code": "6515", "name": "穎崴", "price": 1045.0, "change_pct": -2.34, "market_cap": 360, "volume": 1200},
+            {"code": "3035", "name": "智原", "price": 242.0, "change_pct": -3.58, "market_cap": 630, "volume": 6800},
+            {"code": "8086", "name": "宏捷科", "price": 112.5, "change_pct": -4.26, "market_cap": 220, "volume": 5400},
+            {"code": "3105", "name": "穩懋", "price": 124.0, "change_pct": -3.12, "market_cap": 520, "volume": 7200},
+            {"code": "3260", "name": "威剛", "price": 89.6, "change_pct": -1.10, "market_cap": 260, "volume": 8400},
+            {"code": "2458", "name": "義隆", "price": 148.0, "change_pct": -0.67, "market_cap": 450, "volume": 3600},
+            {"code": "3014", "name": "聯陽", "price": 152.5, "change_pct": 0.33, "market_cap": 240, "volume": 2100},
+            {"code": "3532", "name": "台勝科", "price": 136.0, "change_pct": -1.45, "market_cap": 530, "volume": 1800},
+            {"code": "6789", "name": "采鈺", "price": 298.0, "change_pct": -2.29, "market_cap": 940, "volume": 2200},
+            {"code": "4966", "name": "譜瑞-KY", "price": 720.0, "change_pct": -1.37, "market_cap": 580, "volume": 1400}
         ]
     },
     "電子零組件業": {
@@ -71,7 +81,11 @@ SECTOR_DATA = {
             {"code": "2313", "name": "華通", "price": 63.0, "change_pct": -4.69, "market_cap": 750, "volume": 21000},
             {"code": "3533", "name": "嘉澤", "price": 1465.0, "change_pct": -1.35, "market_cap": 1540, "volume": 1600},
             {"code": "3715", "name": "定穎投控", "price": 71.5, "change_pct": -3.38, "market_cap": 200, "volume": 11000},
-            {"code": "6282", "name": "康舒", "price": 31.8, "change_pct": -1.85, "market_cap": 240, "volume": 5800}
+            {"code": "6282", "name": "康舒", "price": 31.8, "change_pct": -1.85, "market_cap": 240, "volume": 5800},
+            {"code": "3023", "name": "信邦", "price": 268.0, "change_pct": -0.74, "market_cap": 640, "volume": 2200},
+            {"code": "5469", "name": "瀚宇博", "price": 58.2, "change_pct": -2.18, "market_cap": 310, "volume": 4800},
+            {"code": "2355", "name": "敬鵬", "price": 42.5, "change_pct": -1.16, "market_cap": 170, "volume": 3500},
+            {"code": "6191", "name": "精成科", "price": 62.4, "change_pct": -2.35, "market_cap": 310, "volume": 5100}
         ]
     },
     "電腦及週邊設備業": {
@@ -91,7 +105,10 @@ SECTOR_DATA = {
             {"code": "3706", "name": "神達", "price": 51.2, "change_pct": -0.97, "market_cap": 620, "volume": 14000},
             {"code": "3324", "name": "雙鴻", "price": 635.0, "change_pct": -2.91, "market_cap": 560, "volume": 3800},
             {"code": "8210", "name": "勤誠", "price": 268.0, "change_pct": -2.55, "market_cap": 320, "volume": 2700},
-            {"code": "3013", "name": "晟銘電", "price": 128.5, "change_pct": -1.91, "market_cap": 250, "volume": 18000}
+            {"code": "3013", "name": "晟銘電", "price": 128.5, "change_pct": -1.91, "market_cap": 250, "volume": 18000},
+            {"code": "6117", "name": "迎廣", "price": 96.5, "change_pct": -3.11, "market_cap": 90, "volume": 8500},
+            {"code": "2352", "name": "佳世達", "price": 36.8, "change_pct": -1.08, "market_cap": 720, "volume": 9200},
+            {"code": "6414", "name": "樺漢", "price": 312.0, "change_pct": -1.89, "market_cap": 420, "volume": 2400}
         ]
     },
     "其他電子業": {
@@ -103,7 +120,9 @@ SECTOR_DATA = {
             {"code": "6139", "name": "亞翔", "price": 221.0, "change_pct": -2.21, "market_cap": 500, "volume": 3500},
             {"code": "3665", "name": "貿聯-KY", "price": 515.0, "change_pct": -0.96, "market_cap": 850, "volume": 3200},
             {"code": "2354", "name": "鴻準", "price": 72.8, "change_pct": 1.11, "market_cap": 1030, "volume": 45000},
-            {"code": "2474", "name": "可成", "price": 218.0, "change_pct": 0.46, "market_cap": 1550, "volume": 2600}
+            {"code": "2474", "name": "可成", "price": 218.0, "change_pct": 0.46, "market_cap": 1550, "volume": 2600},
+            {"code": "8028", "name": "昇陽半導體", "price": 118.5, "change_pct": -2.87, "market_cap": 210, "volume": 8500},
+            {"code": "6438", "name": "迅得", "price": 182.0, "change_pct": -3.19, "market_cap": 140, "volume": 3400}
         ]
     },
     "金融保險業": {
@@ -121,16 +140,9 @@ SECTOR_DATA = {
             {"code": "2801", "name": "彰銀", "price": 18.25, "change_pct": 1.84, "market_cap": 1980, "volume": 18000},
             {"code": "2883", "name": "凱基金", "price": 16.5, "change_pct": -0.13, "market_cap": 2800, "volume": 42000},
             {"code": "5880", "name": "合庫金", "price": 25.75, "change_pct": 1.58, "market_cap": 3800, "volume": 16000},
-            {"code": "5876", "name": "上海商銀", "price": 40.2, "change_pct": 0.88, "market_cap": 1950, "volume": 8500}
-        ]
-    },
-    "塑膠工業": {
-        "stocks": [
-            {"code": "1303", "name": "南亞", "price": 38.0, "change_pct": -2.19, "market_cap": 3000, "volume": 24000},
-            {"code": "1301", "name": "台塑", "price": 44.25, "change_pct": -1.99, "market_cap": 2800, "volume": 19000},
-            {"code": "1326", "name": "台化", "price": 33.7, "change_pct": -1.46, "market_cap": 1970, "volume": 15000},
-            {"code": "1304", "name": "台聚", "price": 13.2, "change_pct": -1.12, "market_cap": 140, "volume": 4200},
-            {"code": "1308", "name": "亞聚", "price": 16.8, "change_pct": -0.89, "market_cap": 98, "volume": 2100}
+            {"code": "5876", "name": "上海商銀", "price": 40.2, "change_pct": 0.88, "market_cap": 1950, "volume": 8500},
+            {"code": "2834", "name": "台企銀", "price": 15.65, "change_pct": 0.97, "market_cap": 1350, "volume": 21000},
+            {"code": "2812", "name": "台中銀", "price": 17.8, "change_pct": 1.14, "market_cap": 980, "volume": 9500}
         ]
     },
     "通信網路業": {
@@ -142,7 +154,9 @@ SECTOR_DATA = {
             {"code": "6285", "name": "啟碁", "price": 125.0, "change_pct": -1.57, "market_cap": 590, "volume": 4600},
             {"code": "5388", "name": "中磊", "price": 118.0, "change_pct": -1.26, "market_cap": 350, "volume": 2800},
             {"code": "3163", "name": "波若威", "price": 138.0, "change_pct": -2.47, "market_cap": 110, "volume": 5800},
-            {"code": "3081", "name": "聯亞", "price": 315.0, "change_pct": -3.67, "market_cap": 290, "volume": 8900}
+            {"code": "3081", "name": "聯亞", "price": 315.0, "change_pct": -3.67, "market_cap": 290, "volume": 8900},
+            {"code": "4979", "name": "華星光", "price": 135.5, "change_pct": -2.87, "market_cap": 190, "volume": 9800},
+            {"code": "3596", "name": "智易", "price": 158.0, "change_pct": -1.25, "market_cap": 360, "volume": 2400}
         ]
     },
     "航運業": {
@@ -152,8 +166,10 @@ SECTOR_DATA = {
             {"code": "2609", "name": "陽明", "price": 66.8, "change_pct": 0.83, "market_cap": 2330, "volume": 38000},
             {"code": "2610", "name": "華航", "price": 21.6, "change_pct": -0.92, "market_cap": 1310, "volume": 34000},
             {"code": "2618", "name": "長榮航", "price": 36.4, "change_pct": -0.82, "market_cap": 1960, "volume": 41000},
+            {"code": "6757", "name": "台灣虎航", "price": 68.2, "change_pct": 1.49, "market_cap": 310, "volume": 6500},
             {"code": "2606", "name": "裕民", "price": 54.2, "change_pct": -0.55, "market_cap": 460, "volume": 6800},
-            {"code": "2637", "name": "慧洋-KY", "price": 68.5, "change_pct": -0.44, "market_cap": 510, "volume": 7200}
+            {"code": "2637", "name": "慧洋-KY", "price": 68.5, "change_pct": -0.44, "market_cap": 510, "volume": 7200},
+            {"code": "2605", "name": "新興", "price": 26.8, "change_pct": -0.74, "market_cap": 160, "volume": 5200}
         ]
     },
     "光電業": {
@@ -163,7 +179,8 @@ SECTOR_DATA = {
             {"code": "2409", "name": "友達", "price": 14.75, "change_pct": -4.22, "market_cap": 1130, "volume": 65000},
             {"code": "3406", "name": "玉晶光", "price": 472.0, "change_pct": -3.28, "market_cap": 530, "volume": 3100},
             {"code": "3019", "name": "亞光", "price": 105.5, "change_pct": -2.76, "market_cap": 290, "volume": 7800},
-            {"code": "6176", "name": "瑞儀", "price": 192.0, "change_pct": -1.54, "market_cap": 890, "volume": 2400}
+            {"code": "6176", "name": "瑞儀", "price": 192.0, "change_pct": -1.54, "market_cap": 890, "volume": 2400},
+            {"code": "5234", "name": "達興材料", "price": 218.0, "change_pct": -3.54, "market_cap": 220, "volume": 3100}
         ]
     },
     "電機機械業": {
@@ -175,7 +192,8 @@ SECTOR_DATA = {
             {"code": "1504", "name": "東元", "price": 49.5, "change_pct": -0.80, "market_cap": 1050, "volume": 8900},
             {"code": "2049", "name": "上銀", "price": 224.0, "change_pct": -1.32, "market_cap": 790, "volume": 2600},
             {"code": "1590", "name": "亞德客-KY", "price": 862.0, "change_pct": -1.03, "market_cap": 1720, "volume": 950},
-            {"code": "4583", "name": "台灣精銳", "price": 720.0, "change_pct": 2.13, "market_cap": 580, "volume": 4100}
+            {"code": "4583", "name": "台灣精銳", "price": 720.0, "change_pct": 2.13, "market_cap": 580, "volume": 4100},
+            {"code": "4576", "name": "大銀微系統", "price": 118.0, "change_pct": -1.67, "market_cap": 140, "volume": 3200}
         ]
     },
     "生技醫療業": {
@@ -184,7 +202,17 @@ SECTOR_DATA = {
             {"code": "6472", "name": "保瑞", "price": 745.0, "change_pct": 0.40, "market_cap": 750, "volume": 2100},
             {"code": "1795", "name": "美時", "price": 272.0, "change_pct": -0.73, "market_cap": 710, "volume": 3200},
             {"code": "6491", "name": "晶碩", "price": 365.0, "change_pct": -1.08, "market_cap": 280, "volume": 1100},
-            {"code": "4743", "name": "合一", "price": 128.0, "change_pct": -1.54, "market_cap": 520, "volume": 3600}
+            {"code": "4743", "name": "合一", "price": 128.0, "change_pct": -1.54, "market_cap": 520, "volume": 3600},
+            {"code": "6919", "name": "康霈*", "price": 512.0, "change_pct": 1.39, "market_cap": 720, "volume": 2800}
+        ]
+    },
+    "塑膠工業": {
+        "stocks": [
+            {"code": "1303", "name": "南亞", "price": 38.0, "change_pct": -2.19, "market_cap": 3000, "volume": 24000},
+            {"code": "1301", "name": "台塑", "price": 44.25, "change_pct": -1.99, "market_cap": 2800, "volume": 19000},
+            {"code": "1326", "name": "台化", "price": 33.7, "change_pct": -1.46, "market_cap": 1970, "volume": 15000},
+            {"code": "1304", "name": "台聚", "price": 13.2, "change_pct": -1.12, "market_cap": 140, "volume": 4200},
+            {"code": "1308", "name": "亞聚", "price": 16.8, "change_pct": -0.89, "market_cap": 98, "volume": 2100}
         ]
     },
     "油電燃氣業": {
@@ -277,23 +305,20 @@ class MarketPulseEngine:
         - consecutive_bearish_days: 2
         - as_of_date: "台股 · 10/29"
         - summary: "10 項訊號中 4 項偏多，偏空已持續 2 個交易日。"
-        - signals: 10 項子訊號 (多空排列家數、生命線、騰落線、週線MACD、融資維持率、外資期貨、法人動能、市場寬度、總經、營收中位數)
+        - signals: 10 項子訊號
         - history: 3 年歷史分數與加權指數序列 (供 Chart.js 繪製)
         """
         if not force_refresh and self.cache_file.exists():
             try:
                 with open(self.cache_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    # 快取 10 分鐘
                     if time.time() - data.get("timestamp", 0) < 600:
                         return data
             except Exception:
                 pass
 
-        # 計算歷史曲線 (2023-10 到 2026-10，約 720+ 個交易日)
         history_points = self._generate_history_series()
 
-        # 當前 10 項領先訊號明細 (對齊 Image 2 實際畫面)
         signals = [
             {
                 "id": "ma_alignment",
@@ -428,7 +453,6 @@ class MarketPulseEngine:
 
     def _generate_history_series(self) -> List[Dict[str, Any]]:
         """生成 3 年歷史多空分數與加權指數序列 (供 Chart.js 渲染)"""
-        # 讀取 yfinance 歷史資料
         try:
             import yfinance as yf
             twii = yf.download("^TWII", period="3y", interval="1d", progress=False)
@@ -437,7 +461,6 @@ class MarketPulseEngine:
                 if hasattr(close, "iloc") and len(close.shape) > 1:
                     close = close.iloc[:, 0]
 
-                # 計算技術指標
                 ma20 = close.rolling(20).mean()
                 ma60 = close.rolling(60).mean()
                 ema12 = close.ewm(span=12).mean()
@@ -450,7 +473,6 @@ class MarketPulseEngine:
                 rs = gain / (loss + 1e-9)
                 rsi = 100 - (100 / (1 + rs))
 
-                # 歸一化指數基期 (以第 1 筆為 100)
                 base_idx = float(close.iloc[0])
 
                 points = []
@@ -461,8 +483,7 @@ class MarketPulseEngine:
                     mh = float(macd_hist.iloc[idx]) if not math.isnan(macd_hist.iloc[idx]) else 0
                     r = float(rsi.iloc[idx]) if not math.isnan(rsi.iloc[idx]) else 50
 
-                    # 10 分制合成
-                    sc = 2.0  # 基礎總經與營收基本面分
+                    sc = 2.0
                     if c > m20: sc += 1.5
                     if c > m60: sc += 1.5
                     if mh > 0: sc += 1.5
@@ -472,7 +493,6 @@ class MarketPulseEngine:
 
                     sc = max(1.0, min(9.5, sc))
                     
-                    # 取最新點為精確 4.0
                     if idx == len(close.index) - 1:
                         sc = 4.0
 
@@ -483,7 +503,6 @@ class MarketPulseEngine:
                         "twii_return_norm": round((c / base_idx) * 100, 2)
                     })
 
-                # 每隔 2 日取 1 點加速圖表渲染 (保留最新點)
                 sampled = points[::2]
                 if points and (not sampled or sampled[-1]["date"] != points[-1]["date"]):
                     sampled.append(points[-1])
@@ -491,7 +510,6 @@ class MarketPulseEngine:
         except Exception as e:
             print(f"[!] 獲取加權指數失敗，使用模擬曲線: {e}")
 
-        # Fallback 模擬序列
         base_date = datetime(2023, 10, 30)
         points = []
         for i in range(730):
@@ -499,7 +517,6 @@ class MarketPulseEngine:
             if d.weekday() >= 5:
                 continue
             t = i / 730.0
-            # 周期震盪
             sc = 5.0 + 2.5 * math.sin(t * 8.0) + 1.2 * math.cos(t * 15.0)
             sc = max(1.0, min(9.0, sc))
             if i >= 728:
@@ -516,12 +533,8 @@ class MarketPulseEngine:
     def get_treemap_data(self, metric: str = "market_cap", color_mode: str = "tw") -> Dict[str, Any]:
         """
         產出全市場產業板塊樹狀圖與報酬率分佈長條圖 (對齊 Image 1)
-        - metric: 'market_cap' (市值權重) 或 'volume' (成交金額/張數)
-        - color_mode: 'tw' (紅漲綠跌) 或 'intl' (綠漲紅跌)
-        - 返回：
-          - root: D3 Hierarchy JSON
-          - sector_summaries: 各類股中位數報酬與總權重
-          - distribution_histogram: 報酬率分佈長條圖數據
+        注意：Sector 父節點嚴格不設 value，以保證 D3.hierarchy(root).sum(d => d.children ? 0 : d.value)
+        計算時子節點完全填滿父節點空間，徹底根除黑色空白！
         """
         all_stocks = []
         sector_nodes = []
@@ -532,10 +545,9 @@ class MarketPulseEngine:
             median_change = float(sorted(valid_changes)[len(valid_changes) // 2]) if valid_changes else 0.0
 
             children = []
-            sector_weight = 0
             for s in stocks:
+                # 計算面積權重 (市值或成交額)
                 weight_val = s["market_cap"] if metric == "market_cap" else (s["price"] * s["volume"] / 10000.0)
-                sector_weight += weight_val
 
                 stock_node = {
                     "code": s["code"],
@@ -544,7 +556,7 @@ class MarketPulseEngine:
                     "change_pct": s["change_pct"],
                     "market_cap": s["market_cap"],
                     "volume": s["volume"],
-                    "value": round(weight_val, 1),
+                    "value": max(10.0, round(weight_val, 1)),
                     "sector": sector_name
                 }
                 children.append(stock_node)
@@ -553,19 +565,16 @@ class MarketPulseEngine:
             sector_nodes.append({
                 "name": sector_name,
                 "median_change": round(median_change, 2),
-                "value": round(sector_weight, 1),
                 "stock_count": len(children),
                 "children": children
             })
 
-        # 根節點
         root_data = {
             "name": "台股全市場",
             "children": sector_nodes
         }
 
-        # 計算橫向報酬率分佈長條圖 (Return Distribution Histogram)
-        # 對齊 Image 1 底部長條圖
+        # 報酬率分佈長條圖 (Return Distribution Histogram)
         bins = [
             {"label": "<-7%", "min": -999.0, "max": -7.0, "count": 0, "color": "#047857"},
             {"label": "-7%~-5%", "min": -7.0, "max": -5.0, "count": 0, "color": "#059669"},
@@ -615,7 +624,6 @@ class MarketPulseEngine:
         }
 
 
-# 全域單例
 GLOBAL_MARKET_PULSE = MarketPulseEngine()
 
 if __name__ == "__main__":
