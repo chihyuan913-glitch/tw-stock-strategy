@@ -833,6 +833,104 @@
 
     </div>
 
+    <!-- 2. 十大量化策略選股庫 (Strategies) -->
+    <div id="view-strategies" class="space-y-6 hidden">
+      <!-- 策略子按鈕列 (01~11 全策略切換) -->
+      <div class="flex flex-wrap gap-2 border-b border-slate-800/60 pb-2">
+        <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700 shadow">
+          策略 01：布林下軌超跌反轉
+        </button>
+        <button onclick="loadStrategyData('02_institutional_momentum')" id="subbtn-02" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 02：法人籌碼集中起漲
+        </button>
+        <button onclick="loadStrategyData('03_short_momentum')" id="subbtn-03" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 03：弱勢破線做空避險
+        </button>
+        <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 04：可轉債定價伏擊
+        </button>
+        <button onclick="loadStrategyData('05_stock_futures_long')" id="subbtn-05" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 05：個股期法人強勢波段
+        </button>
+        <button onclick="loadStrategyData('06_volume_surge')" id="subbtn-06" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 06：盤中爆量起漲動能
+        </button>
+        <button onclick="loadStrategyData('07_margin_call_ambush')" id="subbtn-07" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 07：高融資斷頭伏擊
+        </button>
+        <button onclick="loadStrategyData('08_group_window_dressing')" id="subbtn-08" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 08：集團作帳母子伏擊
+        </button>
+        <button onclick="loadStrategyData('09_treasury_stock_buyback')" id="subbtn-09" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 09：庫藏股宣告護盤
+        </button>
+        <button onclick="loadStrategyData('10_investment_trust_sprint')" id="subbtn-10" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 10：投信認養衝刺股
+        </button>
+        <button onclick="loadStrategyData('11_revenue_volume_breakout')" id="subbtn-11" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
+          策略 11：營收創高量價突破
+        </button>
+      </div>
+
+      <!-- 策略內容容器 -->
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex flex-wrap justify-between items-center gap-3">
+          <div>
+            <h2 id="currentStrategyTitle" class="text-base font-bold text-white flex items-center gap-2">
+              <span>載入中...</span>
+            </h2>
+            <p id="currentStrategyDesc" class="text-xs text-slate-400 mt-0.5">即時載入最新選股結果與四大防線定價...</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="currentStrategyCount" class="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700">0 檔入選</span>
+            <div class="flex items-center p-0.5 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs">
+              <button onclick="setStrategyViewMode('cards')" id="btnViewCards" class="px-2 py-1 rounded bg-emerald-600 text-white font-semibold transition flex items-center gap-1">
+                <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> 字卡
+              </button>
+              <button onclick="setStrategyViewMode('table')" id="btnViewTable" class="px-2 py-1 rounded text-slate-400 hover:text-white font-semibold transition flex items-center gap-1">
+                <i data-lucide="table" class="w-3.5 h-3.5"></i> 表格
+              </button>
+            </div>
+            <button onclick="refreshCurrentStrategy()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="重新載入">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 模式 A：視覺化字卡列表 (Universal Visual Cards) -->
+        <div id="strategyCardsContainer" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <!-- 動態載入字卡 -->
+        </div>
+
+        <!-- 模式 B：完整量化數據表格 -->
+        <div id="strategyTableContainer" class="hidden overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs font-mono">
+            <thead>
+              <tr class="border-b border-slate-800 bg-slate-950/60 text-slate-400">
+                <th class="p-3">代碼</th>
+                <th class="p-3">名稱</th>
+                <th class="p-3">收盤現價</th>
+                <th class="p-3">漲跌幅</th>
+                <th class="p-3">🟢建議進場</th>
+                <th class="p-3">🔵動能加碼</th>
+                <th class="p-3">🔴目標停利</th>
+                <th class="p-3">🛑嚴格停損</th>
+                <th class="p-3">成交量</th>
+                <th class="p-3">星級評等</th>
+              </tr>
+            </thead>
+            <tbody id="strategyTableBody" class="divide-y divide-slate-800/60">
+              <tr>
+                <td colspan="10" class="p-8 text-center text-slate-500 font-sans">
+                  正在載入量化選股數據...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="view-radar" class="hidden space-y-6">
       <!-- 1. 頂部即時診斷搜尋列 -->
       <div class="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-800/90 p-6 shadow-2xl relative overflow-hidden">
@@ -2759,7 +2857,7 @@
 
     async function loadStrategyData(stratId) {
       currentStrategy = stratId;
-      const subbtns = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'];
+      const subbtns = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11'];
       subbtns.forEach(idx => {
         const b = document.getElementById(`subbtn-${idx}`);
         if (!b) return;
