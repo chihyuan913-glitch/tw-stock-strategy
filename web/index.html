@@ -179,6 +179,10 @@
   <main class="max-w-7xl mx-auto w-full px-6 py-6 flex-1 flex flex-col">
     <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-6">
       <div class="flex space-x-2" id="tabButtons">
+        <button onclick="switchTab('studio')" id="btn-tab-studio" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-cyan-900/30 flex items-center gap-1.5 border border-cyan-500/40">
+          <span>🤖 AI 策略助理</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-cyan-400/20 text-[10px] font-mono text-cyan-200 border border-cyan-400/30">FinLab Studio</span>
+        </button>
         <button onclick="switchTab('strategies')" id="btn-tab-strategies" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white shadow">
           📊 十大量化策略選股
         </button>
@@ -208,6 +212,273 @@
       <div class="text-xs text-slate-400 flex items-center gap-1.5">
         <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
         <span>四大防線標準：進場 ‧ 加碼 ‧ 停利 ‧ 停損</span>
+      </div>
+    </div>
+
+    
+    <!-- 視圖：🤖 FinLab Studio 風格 AI 策略助理與回測工作台 (studio.finlab.finance/chat 雙欄架構) -->
+    <div id="view-studio" class="space-y-4">
+      <!-- 頂部狀態橫幅 (MarketSky) -->
+      <div class="rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-slate-950 via-slate-900 to-[#071626] p-4 shadow-2xl flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-teal-400 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-cyan-500/20">
+            🤖
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-black text-white tracking-wide flex items-center gap-2">
+                <span>FinLab AI Quant Researcher</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                  雲端即時運算就緒
+                </span>
+              </h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">
+              對話式 AI 策略發想 ‧ 15年台股歷史 Point-in-Time 回測 ‧ 四大防線定價 ‧ 即時 Python 程式碼
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- 佈局切換按鈕 -->
+          <div class="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-700 text-xs">
+            <button onclick="setStudioLayout('split')" id="btnLayoutSplit" class="px-2.5 py-1 rounded-md font-semibold bg-cyan-600 text-white transition" title="左右雙欄工作台">
+              雙欄工作台
+            </button>
+            <button onclick="setStudioLayout('chat')" id="btnLayoutChat" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition" title="專注對話模式">
+              純對話
+            </button>
+            <button onclick="setStudioLayout('report')" id="btnLayoutReport" class="px-2.5 py-1 rounded-md font-semibold text-slate-400 hover:text-white transition" title="全螢幕回測戰報">
+              戰報全螢幕
+            </button>
+          </div>
+
+          <button onclick="resetStudioConversation()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition flex items-center gap-1">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>新對話</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 主分割工作區 (SplitBar: 左對話 + 右戰報) -->
+      <div id="studioSplitArea" class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- 左欄：AI 策略對話與思考階段軌跡 (ChatThread & StageTrack) -->
+        <div id="studioColChat" class="lg:col-span-5 rounded-2xl border border-slate-800 bg-[#0b0f19]/95 flex flex-col h-[780px] shadow-2xl backdrop-blur relative overflow-hidden">
+          
+          <!-- 聊天對話歷史區 (ChatThread) -->
+          <div id="studioChatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            <!-- 歡迎氣泡 -->
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-cyan-600/30 border border-cyan-500/40 flex items-center justify-center text-cyan-300 text-sm flex-shrink-0 mt-0.5">
+                🤖
+              </div>
+              <div class="space-y-2 max-w-[90%]">
+                <div class="p-3.5 rounded-2xl rounded-tl-none bg-slate-900 border border-slate-800 text-xs text-slate-200 leading-relaxed shadow-lg">
+                  <p class="font-bold text-cyan-300 mb-1">您好！我是您的 FinLab AI 量化策略研究員。</p>
+                  <p class="text-slate-300">
+                    您可以直接用中文告訴我任何投資想法，例如：
+                  </p>
+                  <ul class="list-disc pl-4 mt-1.5 space-y-1 text-slate-400">
+                    <li>「幫我找營收年增率大於 10% 且量價突破的黑馬股」</li>
+                    <li>「我想看投信連續買超超過 3 天的強勢認養股」</li>
+                    <li>「大盤現在震盪，有沒有弱勢破線做空避險策略？」</li>
+                    <li>「高融資斷頭清洗完畢後逆勢抄底的標的」</li>
+                  </ul>
+                  <p class="mt-2 text-slate-400">
+                    我會自動為您檢索全台股資料庫、執行多維度回測運算，並在右側產出完整互動戰報！
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 動態思考階段軌跡卡 (StageTrack) -->
+          <div id="studioStageTrackerBox" class="hidden px-4 py-2 bg-slate-950/80 border-t border-slate-800/80 text-xs">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-bold mb-1.5">
+              <span class="flex items-center gap-1.5 text-cyan-400">
+                <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-cyan-400"></i>
+                AI 量化思考與回測運算中...
+              </span>
+              <span id="studioStageProgress">步驟 4/4</span>
+            </div>
+            <div id="studioStageList" class="space-y-1 font-mono text-[11px]">
+              <!-- 動態渲染階段 -->
+            </div>
+          </div>
+
+          <!-- 靈感推薦快捷膠囊列 (PromptRow) -->
+          <div class="px-3 py-2 bg-slate-950/90 border-t border-slate-800/80">
+            <div class="text-[10px] text-slate-500 font-bold mb-1.5 flex items-center gap-1">
+              <i data-lucide="sparkles" class="w-3 h-3 text-cyan-400"></i>
+              <span>熱門量化策略靈感 (點擊一鍵測試)：</span>
+            </div>
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+              <button onclick="triggerStudioPrompt('幫我找營收年增率大於10%且量價突破的強勢成長股')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>🚀 營收創高突破 (S11)</span>
+              </button>
+              <button onclick="triggerStudioPrompt('我想看投信連續認養超過3天且籌碼集中的飆股')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-blue-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>💎 投信認養集中 (S10)</span>
+              </button>
+              <button onclick="triggerStudioPrompt('尋找摜破20MA月線且法人大賣的弱勢破線做空避險標的')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-rose-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>🛡️ 弱勢破線做空 (S03)</span>
+              </button>
+              <button onclick="triggerStudioPrompt('布林通道下軌極端超跌且法人逆勢買超的抄底股')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>📉 布林下軌抄底 (S01)</span>
+              </button>
+              <button onclick="triggerStudioPrompt('25大集團季底作帳母子共振點火策略')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>🏢 集團作帳共振 (S08)</span>
+              </button>
+              <button onclick="triggerStudioPrompt('高融資維持率斷頭浮額清洗完畢逆勢抄底標的')" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 text-[11px] font-medium border border-slate-700 whitespace-nowrap transition flex items-center gap-1">
+                <span>🎯 融資斷頭伏擊 (S07)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 底部輸入列 (Input Bar) -->
+          <div class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
+            <input type="text" id="studioPromptInput" placeholder="描述您的投資想法或選股條件... (例如: 投信認養突破股)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500" onkeydown="if(event.key==='Enter') sendStudioMessage()">
+            
+            <button onclick="sendStudioMessage()" id="btnStudioSend" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-cyan-950 transition flex items-center gap-1">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>發送</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 右欄：互動式量化策略戰報與回測工作台 (ChatReportPanel / ReportDocument) -->
+        <div id="studioColReport" class="lg:col-span-7 rounded-2xl border border-slate-800 bg-[#0f172a]/95 flex flex-col h-[780px] shadow-2xl backdrop-blur relative overflow-hidden">
+          
+          <!-- 戰報頂部標題與 Verdict 評級卡 -->
+          <div id="studioVerdictHeader" class="p-4 bg-gradient-to-r from-slate-950 to-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span id="studioStratIdBadge" class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold text-xs border border-cyan-500/40">
+                  Strategy 11
+                </span>
+                <h3 id="studioStratName" class="text-base font-black text-white tracking-wide">
+                  營收創高與量價突破成長動能
+                </h3>
+                <span id="studioStratGrade" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">
+                  🏆 S級 卓越主升
+                </span>
+                <span id="studioStratDir" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30">
+                  🟢 多方主升
+                </span>
+              </div>
+              <p id="studioStratPhilosophy" class="text-xs text-slate-400 mt-1 line-clamp-1 leading-relaxed">
+                以公開資訊觀測站 (MOPS) 單月營收創新高與 YoY >= 10% 為獲利護城河，放量突破起漲。
+              </p>
+            </div>
+
+            <!-- 子標籤切換 -->
+            <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-700 text-xs">
+              <button onclick="setStudioReportTab('curve')" id="btnTabCurve" class="px-3 py-1.5 rounded-md font-bold bg-cyan-600 text-white transition flex items-center gap-1">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                <span>回測曲線</span>
+              </button>
+              <button onclick="setStudioReportTab('holdings')" id="btnTabHoldings" class="px-3 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition flex items-center gap-1">
+                <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+                <span>推薦標的</span>
+                <span id="studioHoldingsCountBadge" class="px-1 py-0.2 rounded bg-slate-800 text-[10px] font-mono text-cyan-400">2</span>
+              </button>
+              <button onclick="setStudioReportTab('code')" id="btnTabCode" class="px-3 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition flex items-center gap-1">
+                <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                <span>Python代碼</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 8 大量化回測關鍵指標 4x2 矩陣 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 p-3.5 bg-slate-950/60 border-b border-slate-800 text-xs">
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-[10px] text-slate-400">年化報酬率 (CAGR)</div>
+              <div id="metricCAGR" class="text-base font-black font-mono text-emerald-400 mt-0.5">+38.6%</div>
+              <div class="text-[10px] text-slate-500 font-mono">大盤同期 +14.2%</div>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-[10px] text-slate-400">夏普比率 (Sharpe)</div>
+              <div id="metricSharpe" class="text-base font-black font-mono text-cyan-400 mt-0.5">1.85</div>
+              <div class="text-[10px] text-emerald-400 font-sans">極佳風險回報</div>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-[10px] text-slate-400">最大歷史回撤 (MDD)</div>
+              <div id="metricMDD" class="text-base font-black font-mono text-rose-400 mt-0.5">-11.4%</div>
+              <div class="text-[10px] text-slate-500 font-mono">大盤同期 -22.8%</div>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <div class="text-[10px] text-slate-400">整體交易勝率</div>
+              <div id="metricWinRate" class="text-base font-black font-mono text-amber-400 mt-0.5">71.4%</div>
+              <div class="text-[10px] text-slate-500 font-sans" id="metricProfitFactor">盈虧比 1:2.42</div>
+            </div>
+          </div>
+
+          <!-- 工作台內容區 (分頁切換) -->
+          <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            
+            <!-- 分頁 1：累積報酬回測曲線圖 (Equity Curve) -->
+            <div id="studioTabCurveContent" class="space-y-4">
+              <div class="flex items-center justify-between text-xs text-slate-400">
+                <span class="flex items-center gap-1.5 font-bold text-slate-200">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                  策略累積淨值 (3 年滾動回測) vs
+                  <span class="w-2.5 h-2.5 rounded-full bg-slate-500 ml-1"></span>
+                  加權報酬指數 (^TWII)
+                </span>
+                <span class="text-[11px] font-mono text-cyan-400">
+                  Alpha 超額報酬估算：+24.4%
+                </span>
+              </div>
+
+              <!-- Canvas 回測曲線 -->
+              <div class="w-full bg-[#080c14] border border-slate-800 rounded-xl p-3 relative shadow-inner">
+                <canvas id="studioEquityCanvas" class="w-full h-[280px]"></canvas>
+              </div>
+
+              <!-- 4+1 維度硬性標準檢核 -->
+              <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+                <div class="font-bold text-slate-300 text-xs mb-2 flex items-center gap-1.5">
+                  <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                  <span>4+1 維度量化選股鐵律檢核</span>
+                </div>
+                <div id="studioDimensionList" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-300 text-[11px]">
+                  <!-- 動態填入 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 分頁 2：最新入選推薦標的與實戰四大防線 (Holdings) -->
+            <div id="studioTabHoldingsContent" class="hidden space-y-3">
+              <div class="flex items-center justify-between text-xs text-slate-400">
+                <span>最新交易日入選標的 ‧ 實戰四大防線價位 (依臺灣證交所法定檔位方向性合規取整)：</span>
+                <button onclick="addCurrentStudioHoldingsToRadar()" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-1 shadow">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>一鍵批次掛入雷達</span>
+                </button>
+              </div>
+
+              <div id="studioHoldingsContainer" class="space-y-3">
+                <!-- 動態注入標的字卡 -->
+              </div>
+            </div>
+
+            <!-- 分頁 3：Python 量化原始碼 (Code Viewer) -->
+            <div id="studioTabCodeContent" class="hidden space-y-3">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">純粹化 Python 自動化閉環 ‧ screener.py 完整原始碼：</span>
+                <button onclick="copyStudioPythonCode()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-bold text-xs transition flex items-center gap-1">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  <span id="btnCopyCodeText">複製 Python 程式碼</span>
+                </button>
+              </div>
+              <div class="rounded-xl border border-slate-800 bg-[#090d16] p-4 overflow-x-auto text-[11px] font-mono text-slate-300 leading-relaxed max-h-[460px] custom-scrollbar">
+                <pre><code id="studioCodeBlock"># Python 程式碼載入中...</code></pre>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
       </div>
     </div>
 
@@ -1010,7 +1281,7 @@
 
     // 標籤切換
     function switchTab(tab) {
-      const tabs = ['strategies', 'advisor', 'pulse', 'radar', 'analyzer', 'weekly', 'hub'];
+      const tabs = ['studio', 'strategies', 'advisor', 'pulse', 'radar', 'analyzer', 'weekly', 'hub'];
       tabs.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`btn-tab-${t}`);
@@ -1023,7 +1294,9 @@
           btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800";
         }
       });
-      if (tab === 'radar') {
+      if (tab === 'studio') {
+        initStudio();
+      } else if (tab === 'radar') {
         loadRadarWatchlist();
       } else if (tab === 'advisor') {
         loadTomorrowAdvisorData();

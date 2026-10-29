@@ -1532,6 +1532,35 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
 
     return {"message": f"未知的動作: {action_name}"}
 
+# --------------------------------------------------------------------------
+# FinLab Studio 風格 AI 量化策略助理與回測工作台 API
+# --------------------------------------------------------------------------
+@app.get("/api/studio/catalog")
+async def get_studio_catalog_endpoint():
+    """取得 Studio 所有量化策略目錄與基準績效指標"""
+    import studio_manager
+    catalog = studio_manager.get_all_studio_catalog()
+    return {"status": "ok", "count": len(catalog), "catalog": catalog}
+
+@app.get("/api/studio/report/{folder_key}")
+async def get_studio_report_endpoint(folder_key: str):
+    """取得單一量化策略完整 FinLab Studio 回測報告與四大防線標的"""
+    import studio_manager
+    report = studio_manager.get_strategy_studio_report(folder_key)
+    return {"status": "ok", "report": report}
+
+@app.post("/api/studio/chat")
+async def studio_chat_endpoint(request: Request):
+    """處理 FinLab Studio AI 策略對話，產出 4 階思考軌跡與完整回測戰報"""
+    import studio_manager
+    body = await request.json()
+    prompt = body.get("prompt", "").strip()
+    depth = body.get("depth", "standard")
+    if not prompt:
+        return {"status": "error", "message": "請輸入提問內容"}
+    res = studio_manager.process_studio_query(prompt, depth)
+    return {"status": "ok", **res}
+
 @app.get("/health")
 @app.get("/ping")
 async def health():
