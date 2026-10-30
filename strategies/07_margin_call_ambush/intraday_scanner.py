@@ -213,8 +213,31 @@ def evaluate_intraday_alert(
     return (raw_event, event_title, event_desc)
 
 
+
+def _safe_float(val, default: float = 0.0) -> float:
+    if val is None or pd.isna(val):
+        return default
+    try:
+        s = str(val).strip()
+        if s in ('', '--', 'nan', 'NaN', 'None', 'null'):
+            return default
+        return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(val, default: int = 0) -> int:
+    if val is None or pd.isna(val):
+        return default
+    try:
+        s = str(val).strip()
+        if s in ('', '--', 'nan', 'NaN', 'None', 'null'):
+            return default
+        return int(float(s))
+    except (ValueError, TypeError):
+        return default
 def load_targets() -> dict:
-    """優先自 result.csv 載入最新斷頭伏擊與清洗標的與四大防線價位"""
+    """優先自 result.csv 載入最新斷頭伏擊與清洗標的與四大防線價位 (防呆安全解析)"""
     targets = {}
     if os.path.exists(CSV_FILE):
         try:
@@ -223,20 +246,20 @@ def load_targets() -> dict:
                 code = str(row['證券代號']).strip()
                 if not (code.isdigit() and len(code) == 4):
                     continue
-                close_p = float(row['收盤價'])
+                close_p = _safe_float(row.get('收盤價'), 0.0)
+                if close_p <= 0:
+                    continue
                 st_code = str(row.get('狀態代碼', '')).strip()
                 st_badge = str(row.get('多空狀態', '')).strip()
                 tier_label = str(row.get('門檻層級', '')).strip()
 
-                mc_val = float(row.get('130%追繳價', row.get('margin_call_price', 0.0)) or 0.0)
-                dist_mc = float(row.get('距追繳空間%', 0.0) or 0.0)
+                mc_val = _safe_float(row.get('130%追繳價', row.get('margin_call_price')), 0.0)
+                dist_mc = _safe_float(row.get('距追繳空間%'), 0.0)
                 mc_status = str(row.get('追繳狀態', '')).strip()
                 basis_d = str(row.get('價差(Basis)', '')).strip()
-                f_oi = str(row.get('期貨未平倉(OI)', '')).strip()
-                f_close_raw = str(row.get('期貨收盤價', '')).strip()
-                f_close_val = float(f_close_raw) if (f_close_raw and f_close_raw != '--') else close_p
-                m_1lot_raw = str(row.get('1口保證金(約)', '')).strip()
-                m_1lot_val = int(float(m_1lot_raw)) if (m_1lot_raw and m_1lot_raw != '--') else 0
+                f_oi = _safe_int(row.get('期貨未平倉(OI)'), 0)
+                f_close_val = _safe_float(row.get('期貨收盤價'), close_p)
+                m_1lot_val = _safe_int(row.get('1口保證金(約)'), 0)
 
                 targets[code] = {
                     'code': code,
@@ -251,11 +274,11 @@ def load_targets() -> dict:
                     '多空狀態': st_badge,
                     'tier_level': tier_label,
                     '門檻層級': tier_label,
-                    'entry_price': float(row.get('進場價位', row.get('現貨進場', close_p))),
-                    'addon_price': float(row.get('加碼價位', row.get('現貨加碼', close_p))),
-                    'tp1_price': float(row.get('停利TP1', row.get('現貨TP1', close_p))),
-                    'tp2_price': float(row.get('停利TP2', row.get('現貨TP2', close_p))),
-                    'sl_price': float(row.get('停損價位', row.get('現貨停損', close_p))),
+                    'entry_price': _safe_float(row.get('進場價位', row.get('現貨進場')), close_p),
+                    'addon_price': _safe_float(row.get('加碼價位', row.get('現貨加碼')), close_p),
+                    'tp1_price': _safe_float(row.get('停利TP1', row.get('現貨TP1')), close_p),
+                    'tp2_price': _safe_float(row.get('停利TP2', row.get('現貨TP2')), close_p),
+                    'sl_price': _safe_float(row.get('停損價位', row.get('現貨停損')), close_p),
                     'margin_call_price': mc_val,
                     '130%追繳價': mc_val,
                     'distance_to_margin_call_pct': dist_mc,
@@ -278,16 +301,16 @@ def load_targets() -> dict:
                     '次月進場參考': str(row.get('次月進場參考', '')).strip(),
                     'og_risk': str(row.get('隔日沖風控', '')).strip(),
                     '隔日沖風控': str(row.get('隔日沖風控', '')).strip(),
-                    'maintenance_ratio': float(row.get('融資維持率%', 0.0) or 0.0),
-                    '融資維持率%': float(row.get('融資維持率%', 0.0) or 0.0),
-                    'usage_ratio': float(row.get('融資使用率%', 0.0) or 0.0),
-                    '融資使用率%': float(row.get('融資使用率%', 0.0) or 0.0),
-                    'avg_cost': float(row.get('預估融資均價', 0.0) or 0.0),
-                    '預估融資均價': float(row.get('預估融資均價', 0.0) or 0.0),
-                    'volume_ratio': float(row.get('量增比率', 1.0) or 1.0),
-                    '量增比率': float(row.get('量增比率', 1.0) or 1.0),
-                    'rr_ratio': float(row.get('盈虧比', 2.0) or 2.0),
-                    '盈虧比': float(row.get('盈虧比', 2.0) or 2.0),
+                    'maintenance_ratio': _safe_float(row.get('融資維持率%'), 0.0),
+                    '融資維持率%': _safe_float(row.get('融資維持率%'), 0.0),
+                    'usage_ratio': _safe_float(row.get('融資使用率%'), 0.0),
+                    '融資使用率%': _safe_float(row.get('融資使用率%'), 0.0),
+                    'avg_cost': _safe_float(row.get('預估融資均價'), 0.0),
+                    '預估融資均價': _safe_float(row.get('預估融資均價'), 0.0),
+                    'volume_ratio': _safe_float(row.get('量增比率'), 1.0),
+                    '量增比率': _safe_float(row.get('量增比率'), 1.0),
+                    'rr_ratio': _safe_float(row.get('盈虧比'), 2.0),
+                    '盈虧比': _safe_float(row.get('盈虧比'), 2.0),
                     'stars': str(row.get('星級推薦', '★★★★☆')).strip()
                 }
             if targets:

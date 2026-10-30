@@ -46,6 +46,9 @@ TRAILING_STOPPED = scanner_06.TRAILING_STOPPED
 TRIGGERED_LEVELS = scanner_06.TRIGGERED_LEVELS
 TZ_TW = scanner_06.TZ_TW
 from adaptive_regime_manager import load_adaptive_config, get_strategy_adaptive_params
+from four_price_engine import calculate_four_prices_long, get_twse_tick_size
+from futures_helper import load_stock_futures_pool, calculate_futures_pricing
+from market_schedule import should_suppress_push, is_market_open_today
 from line_sender import resolve_strategy_meta
 from run_all import STRATEGIES as RUN_ALL_STRATEGIES
 from run_all_intraday import INTRADAY_STRATEGIES as RUN_INTRADAY_STRATEGIES
@@ -486,3 +489,115 @@ class TestIntradayTrailingStop:
             target, snap_further_drop, activation_pct=4.5, pullback_limit_pct=2.0, force_pass=True
         )
         assert ok_dup is False
+
+
+
+class TestFuturesHelperIntegration:
+    """九、股票期貨 (Stock Futures) 深度聯動測試"""
+
+    def test_futures_pool_and_pricing_calculation(self):
+        """測試股票期貨池載入與台積電等核心標的價差/保證金計算"""
+        f_pool = load_stock_futures_pool()
+        assert isinstance(f_pool, dict)
+        assert '2330' in f_pool, "期交所標的池未收錄 2330 台積電"
+        assert f_pool['2330']['contract'] in ('QF', 'CD')
+
+        mock_fut_quote = {
+            'price': 1065.0,
+            'close': 1065.0,
+            'open_interest': 12500,
+            'contract_sym': 'CDF 202611'
+        }
+        res = calculate_futures_pricing(
+            spot_close=1060.0,
+            futures_quote=mock_fut_quote,
+            entry_spot=1070.0,
+            addon_spot=1085.0,
+            tp1_spot=1140.0,
+            tp2_spot=1215.0,
+            sl_spot=1020.0,
+            contract_base='CD',
+            is_long=True
+        )
+        assert res['has_contract'] is True
+        assert res['has_real_quote'] is True
+        assert res['futures_close'] == 1065.0
+        assert res['basis'] == 5.0
+        assert res['margin_1lot'] > 0
+
+
+class TestMarketScheduleAndHolidayGuard:
+    """十、未開盤日防護與夜間數據沉澱守門員測試"""
+
+    def test_weekend_push_suppression(self):
+        """測試週六週日固定休市且推播自動攔截"""
+        saturday = datetime.date(2026, 10, 24)
+        is_open, reason = is_market_open_today(date_val=saturday)
+        assert is_open is False
+        assert "2026-10-24" in reason
+
+        suppress, sup_reason = should_suppress_push(date_val=saturday, task_type="測試盤後戰報")
+        assert suppress is True
+        assert "休市不推送" in sup_reason
+
+    def test_force_flag_bypass_suppression(self):
+        """測試 --force 旗標可強制放行開發除錯"""
+        saturday = datetime.date(2026, 10, 24)
+        suppress, _ = should_suppress_push(force=True, date_val=saturday)
+        assert suppress is False
+
+
+class TestReportExportIntegrity:
+    """十一、報表匯出與 rolling_retention_manager 整合防崩潰測試"""
+
+    def test_export_reports_empty_and_populated_no_unbound_error(self, tmp_path):
+        """測試 export_reports 於無標的與有標的時皆絕不引發 today_str UnboundLocalError"""
+        test_csv = tmp_path / "result.csv"
+        test_md = tmp_path / "result.md"
+
+        export_reports = screener_06.export_reports
+
+        # 1. 空清單匯出
+        export_reports([], csv_path=str(test_csv), md_path=str(test_md))
+        assert test_csv.exists()
+        assert test_md.exists()
+
+        # 2. 具備標的匯出
+        mock_stock = {
+            '證券代號': '2330',
+            '證券名稱': '台積電',
+            '收盤價': 1060.0,
+            '當日漲跌%': 2.45,
+            '成交量(張)': 32000,
+            '5日均量(張)': 12000,
+            '量比倍數(Rvol)': 2.67,
+            '實體紅棒比例': 0.85,
+            '月線(20MA)': 1020.0,
+            '月線乖離%': 3.92,
+            '外資買超(張)': 5000,
+            '投信買超(張)': 1200,
+            '換手品質': '🟢 法人吃貨鎖碼',
+            '綜合評分': 92,
+            '星級推薦': '★★★★★',
+            '隔日沖警示': '安全・無顯著集中',
+            '大盤位階': '標準箱型',
+            '建議進場價': 1070.0,
+            '動能加碼價': 1085.0,
+            '停利TP1': 1140.0,
+            '停利TP2': 1215.0,
+            '嚴格停損價': 1020.0,
+            '盈虧比': 2.33,
+            '股票期貨代碼': 'CD',
+            '期貨收盤價': 1065.0,
+            '期現價差': 5.0,
+            '一口保證金': 286200,
+            '換月提醒': '常態月份',
+            '空手者策略': '掛單進場',
+            '持股者策略': '持股續抱'
+        }
+        export_reports([mock_stock], csv_path=str(test_csv), md_path=str(test_md))
+        assert test_csv.exists()
+        assert test_md.exists()
+        content_md = test_md.read_text(encoding='utf-8')
+        assert "2330" in content_md
+        assert "台積電" in content_md

@@ -921,7 +921,7 @@ def build_price_alert_card(
                             "layout": "horizontal",
                             "contents": [
                                 {"type": "text", "text": "期貨未平倉", "size": "xs", "color": "#64748B", "flex": 3},
-                                {"type": "text", "text": f"{int(target.get('futures_oi') or target.get('期貨未平倉(OI)') or 0):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
+                                {"type": "text", "text": f"{int(float(str(target.get('futures_oi') or target.get('期貨未平倉(OI)') or 0).replace(',', ''))):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
                             ]
                         }
                     ] if (target.get('futures_oi') or target.get('期貨未平倉(OI)')) else []) + ([
@@ -1417,13 +1417,13 @@ def build_screener_carousel(
         score = r.get('評分') or r.get('score') or '--'
         price = r.get('收盤價') or r.get('現價') or r.get('最新現價') or 0.0
 
-        entry_val = r.get('進場價位') or r.get('進場買進上限') or r.get('空單進場') or r.get('entry_price')
-        addon_val = r.get('加碼價位') or r.get('續強加碼價') or r.get('加空價位') or r.get('addon_price')
+        entry_val = r.get('進場價位') or r.get('建議進場價') or r.get('進場買進上限') or r.get('空單進場') or r.get('entry_price')
+        addon_val = r.get('加碼價位') or r.get('動能加碼價') or r.get('續強加碼價') or r.get('加空價位') or r.get('addon_price')
         tp1_val = r.get('停利TP1') or r.get('目標停利TP1') or r.get('tp1_price')
         tp2_val = r.get('停利TP2') or r.get('目標停利TP2') or r.get('tp2_price')
         sl_val = r.get('停損價位') or r.get('嚴格停損價') or r.get('停損回補') or r.get('sl_price')
-        og_risk = r.get('隔日沖風控') or r.get('隔日沖風險') or r.get('og_risk') or ''
-        vol = r.get('當日成交量(張)') or r.get('日成交量(張)') or r.get('當日成交量') or 0
+        og_risk = r.get('隔日沖風控') or r.get('隔日沖警示') or r.get('隔日沖風險') or r.get('og_risk') or ''
+        vol = r.get('當日成交量(張)') or r.get('成交量(張)') or r.get('日成交量(張)') or r.get('當日成交量') or 0
 
         fut_contract = r.get('期貨契約') or r.get('contract_sym') or r.get('contract') or ''
         fut_month = r.get('期貨月份') or r.get('month') or ''
@@ -1599,7 +1599,7 @@ def build_screener_carousel(
                                 "layout": "horizontal",
                                 "contents": [
                                     {"type": "text", "text": "期貨未平倉", "size": "xs", "color": "#64748B", "flex": 3},
-                                    {"type": "text", "text": f"{int(r.get('futures_oi') or r.get('期貨未平倉(OI)') or 0):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
+                                    {"type": "text", "text": f"{int(float(str(r.get('futures_oi') or r.get('期貨未平倉(OI)') or 0).replace(',', ''))):,} 口", "size": "xs", "weight": "bold", "color": "#0F766E", "flex": 7}
                                 ]
                             }
                         ] if (r.get('futures_oi') or r.get('期貨未平倉(OI)')) else []) + ([

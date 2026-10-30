@@ -277,9 +277,10 @@ def merge_rolling_records(
             GLOBAL_TRADE_HISTORY.record_closed_trade(old_r)
             continue
 
+        row_is_short = is_short or (str(old_r.get('狀態代碼', '')).strip() in ('SHORT_BREAKDOWN', 'SHORT', 'BEAR', 'GROUP_UNWIND')) or any(w in str(old_r.get('多空狀態', '')) for w in ['放空', '做空', '空單', '助跌', '結帳'])
         # (C) 若在 5 日內，檢核是否觸發停損/停利等不符條件退場
         should_remove, reason, exit_price = evaluate_removal_trigger(
-            old_r, today_date=today_norm, is_short=is_short
+            old_r, today_date=today_norm, is_short=row_is_short
         )
 
         if should_remove:
@@ -300,7 +301,7 @@ def merge_rolling_records(
                 avg_entry = entry_1 if entry_1 > 0 else (entry_2 or exit_price)
 
             if avg_entry > 0 and exit_price > 0:
-                pnl_pct = _calc_pnl(avg_entry, exit_price, is_short=is_short)
+                pnl_pct = _calc_pnl(avg_entry, exit_price, is_short=row_is_short)
                 old_r["操作損益率%"] = pnl_pct
                 old_r["損益狀態"] = "WIN" if pnl_pct > 0.01 else ("LOSS" if pnl_pct < -0.01 else "FLAT")
             
@@ -369,8 +370,9 @@ def merge_rolling_records(
             row_dict["生命週期狀態"] = "ACTIVE"
             row_dict["選股日期"] = today_norm
 
+        row_is_short = is_short or (str(row_dict.get('狀態代碼', '')).strip() in ('SHORT_BREAKDOWN', 'SHORT', 'BEAR', 'GROUP_UNWIND')) or any(w in str(row_dict.get('多空狀態', '')) for w in ['放空', '做空', '空單', '助跌', '結帳'])
         # 透過四大防線標準定價引擎 V4.0 全面校準
-        row_dict = apply_four_prices_to_record(row_dict, is_short=is_short)
+        row_dict = apply_four_prices_to_record(row_dict, is_short=row_is_short)
         processed_new_rows.append(row_dict)
 
     # --------------------------------------------------------------------------
