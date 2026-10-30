@@ -248,33 +248,34 @@
     <div class="sidebar no-print">
       <div class="card">
         <div class="card-title">⚙️ 策略池與複合因子選擇</div>
-        <label>選擇策略 (9大實盤策略 ＋ 8大核心因子 ＋ 5種複合範本)</label>
+        <label>選擇策略 (11大實盤策略 ＋ 5大複合範本 ＋ 5大單因子積木)</label>
         <select id="strategyId" onchange="onParamChange()">
-          <optgroup label="8 大核心單/雙因子策略">
-            <option value="01">01 - 布林通道下軌＋乖離率回歸 (做多)</option>
-            <option value="02">02 - 三大法人連續買超動能 (做多)</option>
-            <option value="06">06 - 量價突破創高動能 (做多)</option>
-            <option value="11">11 - KD 黃金交叉 (9,3,3) 低檔轉強</option>
-            <option value="12">12 - 均線多頭排列 (5>20>60MA)</option>
-            <option value="13">13 - 跳空缺口強勢突破 (不補缺口)</option>
-            <option value="14">14 - 月營收創新高 (次月10日錨定)</option>
-            <option value="15">15 - 融資減少籌碼沉澱＋均線轉強</option>
-            <option value="03">03 - 弱勢破線法人提款 (做空避險)</option>
+          <optgroup label="🌟 實盤 11 大旗艦量化策略 (S01~S11)">
+            <option value="11" selected>11 - 營收創高與量價突破成長動能 (做多)</option>
+            <option value="01">01 - 布林通道下軌超跌抄底反轉 (做多)</option>
+            <option value="02">02 - 三大法人籌碼集中起漲動能 (做多)</option>
+            <option value="03">03 - 均線弱勢破線做空避險對沖 (做空)</option>
+            <option value="04">04 - 可轉債 (CB) 定價伏擊與債券保底 (做多)</option>
+            <option value="05">05 - 個股期貨法人強勢波段多方 (做多)</option>
+            <option value="06">06 - 盤中爆量起漲動能黑馬 (做多)</option>
+            <option value="07">07 - 高融資斷頭伏擊與浮額清洗 (雙向)</option>
+            <option value="08">08 - 台股25大集團作帳母子共振 (做多)</option>
+            <option value="09">09 - 庫藏股宣告護盤與低估值事件 (做多)</option>
+            <option value="10">10 - 投信認養集中度爆發飆股 (做多)</option>
           </optgroup>
-          <optgroup label="5 大複合因子積木範本">
+          <optgroup label="🧩 5 大機構複合多因子積木範本">
             <option value="tpl_01">範本1 - 均線多頭＋RSI強勢＋乖離防追高</option>
             <option value="tpl_02">範本2 - KD黃金交叉＋超跌均值回歸</option>
             <option value="tpl_03">範本3 - 量價倍增突破＋月營收正成長</option>
             <option value="tpl_04">範本4 - 融資減肥沉澱＋站穩月線</option>
             <option value="tpl_05">範本5 - 弱勢破月線＋RSI空頭避險 (做空)</option>
           </optgroup>
-          <optgroup label="實盤進階策略映射 (04/05/07/08/09/10)">
-            <option value="04">04 - 可轉債 (CB) 定價伏擊博弈</option>
-            <option value="05">05 - 個股期貨法人強勢波段多方</option>
-            <option value="07">07 - 高融資斷頭伏擊與浮額清洗</option>
-            <option value="08">08 - 台股25大集團作帳母子共振</option>
-            <option value="09">09 - 庫藏股宣告護盤與低估值事件</option>
-            <option value="10">10 - 投信認養集中度爆發飆股</option>
+          <optgroup label="🔬 經典技術與籌碼單因子積木">
+            <option value="kd">KD - 低檔黃金交叉 (9,3,3)</option>
+            <option value="12">12 - 均線多頭排列 (5>20>60MA)</option>
+            <option value="13">13 - 跳空缺口強勢突破 (不補缺口)</option>
+            <option value="14">14 - 月營收創新高 (次月10日錨定)</option>
+            <option value="15">15 - 融資減少籌碼沉澱＋均線轉強</option>
           </optgroup>
         </select>
 

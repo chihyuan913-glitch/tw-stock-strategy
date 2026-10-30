@@ -399,17 +399,42 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
                 return_quality=True
             )
 
-            # 四大實戰價位精算 (自適應動態定價，嚴守數學單調性)
-            entry_p = round(curr_close * 1.01, 2)       # 建議進場買進上限
-            addon_p = round(max(q['high'] * 1.005, entry_p + 0.05), 2)  # 突破今日高點動能加碼
-            tp1_mult = 1.0 + (adaptive_tp1_pct / 100.0)
-            tp2_mult = 1.0 + (adaptive_tp2_pct / 100.0)
-            sl_pct_abs = abs(adaptive_sl_pct)
-            sl_mult = 1.0 - (sl_pct_abs / 100.0)
+            # 四大實戰價位精算 (V4.0 臺灣證交所法定檔位合規引擎 + ATR 波動自適應)
+            regime_pricing_params = {
+                "tp1_pct": adaptive_tp1_pct,
+                "tp2_pct": adaptive_tp2_pct,
+                "stop_loss_pct": adaptive_sl_pct,
+                "bias_max_pct": effective_bias_max
+            }
+            fp_calc = calculate_four_prices_long(
+                curr_price=curr_close,
+                high=q.get('high'),
+                low=q.get('low'),
+                ma20=ma20_now,
+                regime_params=regime_pricing_params
+            )
+            entry_p = fp_calc['entry_price']
+            addon_p = fp_calc['addon_price']
+            tp1_p = fp_calc['tp1_price']
+            tp2_p = fp_calc['tp2_price']
+            sl_p = fp_calc['sl_price']
+            rr_ratio = fp_calc.get('rr_ratio', fp_calc.get('risk_reward_ratio', 2.0))
 
-            tp1_p = round(max(curr_close * tp1_mult, addon_p + 0.05), 2)
-            tp2_p = round(max(curr_close * tp2_mult, tp1_p + 0.05), 2)
-            sl_p = round(min(curr_close * 0.985, max(q['low'], curr_close * sl_mult)), 2)
+            # 股票期貨 (Stock Futures) 深度聯動與價差試算
+            f_info = futures_map.get(code, {'contract': '--', 'name': q['name']})
+            contract_base = f_info.get('contract', '--')
+            fut_q = taifex_quotes.get(contract_base) if contract_base != '--' else None
+            fut_pricing = calculate_futures_pricing(
+                spot_close=curr_close,
+                futures_quote=fut_q,
+                entry_spot=entry_p,
+                addon_spot=addon_p,
+                tp1_spot=tp1_p,
+                tp2_spot=tp2_p,
+                sl_spot=sl_p,
+                contract_base=contract_base,
+                is_long=True
+            )
 
             # 錦囊指引
             playbook_cash = f"【自適應{global_ctrl.get('mode', '標準')}】於 {curr_close}~{entry_p} 區間掛單，超過 {entry_p} 嚴禁追高。"
@@ -434,10 +459,21 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
                 '隔日沖警示': broker_guard.get('tag', '安全・無顯著集中'),
                 '大盤位階': regime_info.get('label', '標準箱型'),
                 '建議進場價': entry_p,
+                '進場價位': entry_p,
                 '動能加碼價': addon_p,
+                '加碼價位': addon_p,
                 '停利TP1': tp1_p,
                 '停利TP2': tp2_p,
                 '嚴格停損價': sl_p,
+                '停損價位': sl_p,
+                '盈虧比': rr_ratio,
+                '評分': score,
+                '當日成交量(張)': curr_vol_lots,
+                '股票期貨代碼': fut_pricing.get('contract_code', '--'),
+                '期貨收盤價': fut_pricing.get('futures_close', '--'),
+                '期現價差': fut_pricing.get('basis', '--'),
+                '一口保證金': fut_pricing.get('margin_required', fut_pricing.get('margin_1lot', '--')),
+                '換月提醒': fut_pricing.get('rollover_alert', fut_pricing.get('settlement_banner', '--')),
                 '空手者策略': playbook_cash,
                 '持股者策略': playbook_hold
             })
@@ -457,25 +493,25 @@ def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FIL
     global_ctrl = adaptive_cfg.get("global_controls", {})
     adaptive_params = get_strategy_adaptive_params("06")
     rec_limit = int(adaptive_params.get("recommendation_limit", 6))
+    today_str = datetime.date.today().strftime('%Y/%m/%d')
 
     if not stocks:
         empty_cols = ['證券代號', '證券名稱', '收盤價', '當日漲跌%', '成交量(張)', '5日均量(張)',
-                      '量比倍數(Rvol)', '換手品質', '建議進場價', '動能加碼價', '停利TP1', '停利TP2', '嚴格停損價']
+                      '量比倍數(Rvol)', '換手品質', '建議進場價', '動能加碼價', '停利TP1', '停利TP2', '嚴格停損價', '盈虧比']
         df_empty = pd.DataFrame(columns=empty_cols)
         from rolling_retention_manager import save_rolling_result_csv
-        save_rolling_result_csv(csv_path, df_empty, today_date_str=datetime.date.today().strftime('%Y/%m/%d'), max_days=5)
+        save_rolling_result_csv(csv_path, df_empty, today_date_str=today_str, max_days=5)
         with open(md_path, 'w', encoding='utf-8') as f:
             f.write(f"# 【{STRATEGY_NAME}】最新選股戰報\n\n")
             f.write(f"> [!NOTE]\n> **當前大盤位階**：{regime_info.get('label', '標準箱型')} ｜ **操盤模式**：{global_ctrl.get('mode', '標準')} ｜ **建議現金水位**：{global_ctrl.get('cash_target_pct', 40)}%\n\n")
             f.write("今日無標的符合 4+1 維度爆量條件，建議保留現金耐心觀望。\n")
         return
 
+    today_str = datetime.date.today().strftime('%Y/%m/%d')
     df = pd.DataFrame(stocks)
     from rolling_retention_manager import save_rolling_result_csv
     df = save_rolling_result_csv(csv_path, df, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功匯出 CSV 報表至: {csv_path}")
-
-    today_str = datetime.date.today().strftime('%Y/%m/%d')
 
     # 產出標準 Markdown 字卡
     cards_md = format_screener_markdown_cards(
@@ -496,8 +532,13 @@ def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FIL
     print(f"[✓] 已成功匯出 Markdown 戰報至: {md_path}")
 
 
-def push_to_line(stocks: list, date_str: str = None):
-    """使用 line_sender 推播橫向輪播卡片與純文字備援至策略 06 專屬群組"""
+def push_to_line(stocks: list, date_str: str = None, force: bool = False):
+    """使用 line_sender 推播橫向輪播卡片與純文字備援至策略 06 專屬群組 (支援未開盤日防護)"""
+    suppress, sup_reason = should_suppress_push(force=force, task_type=f"{STRATEGY_NAME} 盤後戰報")
+    if suppress:
+        print(f"[🛡️ 守衛攔截] {sup_reason}")
+        return
+
     if not stocks:
         msg = f"📊【{STRATEGY_NAME}】今日盤後選股無符合條件標的。"
         send_to_line(msg, strategy=STRATEGY_ID)
@@ -529,13 +570,24 @@ def push_to_line(stocks: list, date_str: str = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤後選股器 (V2.0 旗艦自適應版)")
+    parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤後選股器 (V2.5 旗艦全合規版)")
     parser.add_argument("--date", type=str, default=None, help="指定日期 (YYYYMMDD)")
     parser.add_argument("--max-bias", type=float, default=None, help="20MA 正乖離上限百分比(%%)，留空則自動載入自適應參數")
     parser.add_argument("--min-rvol", type=float, default=None, help="最低量比倍數門檻，留空則自動載入自適應參數")
     parser.add_argument("--line", action="store_true", help="執行後推播 LINE 戰報")
-    parser.add_argument("--export", type=str, default=CSV_FILE, help="匯出 CSV 路徑")
+    parser.add_argument("--export", nargs="?", const=CSV_FILE, default=CSV_FILE, help="匯出 CSV 路徑 (可不帶參數直接輸出預設 result.csv)")
+    parser.add_argument("--force", action="store_true", help="強制執行 (忽略休市與未開盤守衛)")
     args = parser.parse_args()
+
+    # 開休市檢核守門
+    if not args.force and not args.date:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤後選股"):
+            return
+
+    # 夜間官方數據沉澱守門 (若在夜間 20:00 後執行且無指定歷史日期)
+    now_hour = datetime.datetime.now().hour
+    if now_hour >= 20 and not args.date and not args.force:
+        verify_twse_data_settlement()
 
     results = screen_volume_surge(
         date_str=args.date,
@@ -545,7 +597,7 @@ def main():
     export_reports(results, csv_path=args.export, md_path=MD_FILE)
 
     if args.line:
-        push_to_line(results)
+        push_to_line(results, force=args.force)
 
 
 if __name__ == "__main__":

@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--scenario", type=str, default="bb_reversal", help="測試行情情境 (bb_reversal / trend_up / chop)")
     parser.add_argument("--days", type=int, default=100, help="模擬天數 (預設: 100天)")
     parser.add_argument("--list", action="store_true", help="列出實驗室所有可用策略")
-    parser.add_argument("--daily-advisor", action="store_true", help="自動讀取今日 01~09 實盤選股池執行回測，產出明日建議買賣清單")
+    parser.add_argument("--daily-advisor", action="store_true", help="自動讀取今日 01~11 全實盤選股池執行回測，產出明日建議買賣清單")
     parser.add_argument("--leaderboard", action="store_true", help="執行 14 支核心與複合因子策略橫向 PK 排行榜評比")
     parser.add_argument("--line", action="store_true", help="將實驗室產出之明日買賣建議戰報推播至 LINE")
     parser.add_argument("--top-n", type=int, default=2, help="每支實盤策略抽取前 N 檔個股回測 (預設: 2)")
@@ -58,7 +58,7 @@ def main():
             loader=loader,
             initial_cash=args.cash,
         )
-        print("\n================ 🏆 量化策略實驗室・14 支策略橫向 PK 排行榜 ================")
+        print("\n================ 🏆 量化策略實驗室・全策略橫向 PK 排行榜 ================")
         for r in lb["leaderboard"]:
             print(
                 f"  #{r['rank']:02d} | {r['grade']} | {r['name']:<32} | "

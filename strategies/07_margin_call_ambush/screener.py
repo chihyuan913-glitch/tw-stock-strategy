@@ -40,6 +40,14 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from four_price_engine import normalize_to_tick, get_twse_tick_size
+try:
+    from market_schedule import should_suppress_push, is_market_open_today
+except ImportError:
+    def should_suppress_push(force=False, task_type=""):
+        return False, "無 market_schedule 模組"
+    def is_market_open_today():
+        return True, "預設開盤" 
 from futures_helper import (
     load_stock_futures_pool,
     fetch_taifex_futures_quotes,
@@ -105,6 +113,7 @@ CSV_COLUMNS = [
     "停利TP1",
     "停利TP2",
     "停損價位",
+    "盈虧比",
     "現貨進場",
     "現貨加碼",
     "現貨TP1",
@@ -253,7 +262,7 @@ def calculate_margin_cost_and_maintenance(
     }
 
 
-def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None) -> dict:
+def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None, normalize_ticks: bool = False) -> dict:
     """
     雙向狀態機分流與四大防線定價 (支援大盤位階自適應參數)
     狀態分流：
@@ -334,6 +343,29 @@ def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None
         if sl_p >= entry_p:
             sl_p = round(entry_p * 0.96, 2)
 
+        if normalize_ticks:
+            sl_p = normalize_to_tick(sl_p, direction='down')
+            entry_p = normalize_to_tick(entry_p, direction='up')
+            addon_p = normalize_to_tick(addon_p, direction='up')
+            tp1_p = normalize_to_tick(tp1_p, direction='down')
+            tp2_p = normalize_to_tick(tp2_p, direction='down')
+            if addon_p <= entry_p:
+                addon_p = round(entry_p + get_twse_tick_size(entry_p), 2)
+            if tp1_p <= addon_p:
+                tp1_p = round(addon_p + get_twse_tick_size(addon_p), 2)
+            if tp2_p < tp1_p:
+                tp2_p = tp1_p
+            if sl_p >= entry_p:
+                sl_p = round(entry_p - get_twse_tick_size(entry_p), 2)
+            pot_risk = entry_p - sl_p
+            if pot_risk > 0 and (tp1_p - entry_p) < 1.5 * pot_risk:
+                tp1_p = normalize_to_tick(entry_p + 1.5 * pot_risk, direction='up')
+                if tp2_p < tp1_p:
+                    tp2_p = normalize_to_tick(tp1_p * 1.04, direction='up')
+
+        pot_risk_final = entry_p - sl_p
+        rr_ratio = round((tp1_p - entry_p) / pot_risk_final, 2) if pot_risk_final > 0 else 2.0
+
         return {
             "state_code": state_code,
             "state_badge": state_badge,
@@ -344,6 +376,8 @@ def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None
             "tp1_price": tp1_p,
             "tp2_price": tp2_p,
             "sl_price": sl_p,
+            "rr_ratio": rr_ratio,
+            "盈虧比": rr_ratio,
             "lower_shadow_ratio": round(lower_shadow_ratio, 2),
             "margin_call_price": mc_price,
             "distance_to_margin_call_pct": dist_mc_pct,
@@ -376,6 +410,29 @@ def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None
         if sl_p <= entry_p:
             sl_p = round(entry_p * 1.025, 2)
 
+        if normalize_ticks:
+            sl_p = normalize_to_tick(sl_p, direction='up')
+            entry_p = normalize_to_tick(entry_p, direction='down')
+            addon_p = normalize_to_tick(addon_p, direction='down')
+            tp1_p = normalize_to_tick(tp1_p, direction='down')
+            tp2_p = normalize_to_tick(tp2_p, direction='down')
+            if addon_p >= entry_p:
+                addon_p = round(entry_p - get_twse_tick_size(entry_p), 2)
+            if tp1_p >= addon_p:
+                tp1_p = round(addon_p - get_twse_tick_size(addon_p), 2)
+            if tp2_p > tp1_p:
+                tp2_p = tp1_p
+            if sl_p <= entry_p:
+                sl_p = round(entry_p + get_twse_tick_size(entry_p), 2)
+            pot_risk = sl_p - entry_p
+            if pot_risk > 0 and (entry_p - tp1_p) < 1.5 * pot_risk:
+                tp1_p = normalize_to_tick(entry_p - 1.5 * pot_risk, direction='down')
+                if tp2_p > tp1_p:
+                    tp2_p = normalize_to_tick(tp1_p * 0.96, direction='down')
+
+        pot_risk_final = sl_p - entry_p
+        rr_ratio = round((entry_p - tp1_p) / pot_risk_final, 2) if pot_risk_final > 0 else 2.0
+
         return {
             "state_code": state_code,
             "state_badge": state_badge,
@@ -386,6 +443,8 @@ def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None
             "tp1_price": tp1_p,
             "tp2_price": tp2_p,
             "sl_price": sl_p,
+            "rr_ratio": rr_ratio,
+            "盈虧比": rr_ratio,
             "lower_shadow_ratio": round(lower_shadow_ratio, 2),
             "margin_call_price": mc_price,
             "distance_to_margin_call_pct": dist_mc_pct,
@@ -402,6 +461,8 @@ def classify_dual_state_and_pricing(stock_info: dict, regime_params: dict = None
             "tp1_price": round(close, 2),
             "tp2_price": round(close, 2),
             "sl_price": round(close, 2),
+            "rr_ratio": 2.0,
+            "盈虧比": 2.0,
             "lower_shadow_ratio": round(lower_shadow_ratio, 2),
             "margin_call_price": mc_price,
             "distance_to_margin_call_pct": dist_mc_pct,
@@ -984,6 +1045,15 @@ def run_screening(date_str: str = None) -> list:
         # 軟評分系統 (V2.0 換手與追繳加分)
         score, stars = calculate_margin_soft_score(item, broker_guard, fut_pricing)
 
+        # 重新執行法定檔位取整與盈虧比檢核
+        st_priced = classify_dual_state_and_pricing(item, regime_params=regime_params, normalize_ticks=True)
+        item['entry_price'] = st_priced['entry_price']
+        item['addon_price'] = st_priced['addon_price']
+        item['tp1_price'] = st_priced['tp1_price']
+        item['tp2_price'] = st_priced['tp2_price']
+        item['sl_price'] = st_priced['sl_price']
+        rr_ratio = st_priced.get('rr_ratio', 2.0)
+
         # 決定最終報價：若有期貨且具備真實報價則期貨優先
         has_fut = fut_pricing.get('has_real_quote', False)
         entry_final = fut_pricing['futures_entry'] if has_fut else item['entry_price']
@@ -1022,6 +1092,7 @@ def run_screening(date_str: str = None) -> list:
             "停利TP1": tp1_final,
             "停利TP2": tp2_final,
             "停損價位": sl_final,
+            "盈虧比": rr_ratio,
             "現貨進場": item['entry_price'],
             "現貨加碼": item['addon_price'],
             "現貨TP1": item['tp1_price'],
@@ -1047,11 +1118,12 @@ def run_screening(date_str: str = None) -> list:
 
 
 def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FILE):
-    """匯出 UTF-8-BOM CSV 與高對比字卡 Markdown 戰報"""
+    """匯出 UTF-8-BOM CSV 與高對比字卡 Markdown 戰報 (含 CMoney 自選股與剪貼簿)"""
+    today_str = datetime.date.today().strftime('%Y/%m/%d')
     if not stocks:
         df_empty = pd.DataFrame(columns=CSV_COLUMNS)
         from rolling_retention_manager import save_rolling_result_csv
-        save_rolling_result_csv(csv_path, df_empty, today_date_str=datetime.date.today().strftime('%Y/%m/%d'), max_days=5)
+        save_rolling_result_csv(csv_path, df_empty, today_date_str=today_str, max_days=5)
         with open(md_path, 'w', encoding='utf-8') as f:
             f.write(f"# 【{STRATEGY_NAME}】最新選股戰報\n\n今日無標的符合斷頭高危或浮額清洗條件。\n")
         print(f"[✓] 今日無入選標的，已建立空白報表: {csv_path}")
@@ -1068,7 +1140,20 @@ def export_reports(stocks: list, csv_path: str = CSV_FILE, md_path: str = MD_FIL
     df = save_rolling_result_csv(csv_path, df, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功匯出 CSV 報表至: {csv_path}")
 
-    today_str = datetime.date.today().strftime('%Y/%m/%d')
+    # 匯出 CMoney 籌碼K線文字檔與複製至 Windows 剪貼簿 (Rule 22)
+    try:
+        txt_path = os.path.join(os.path.dirname(csv_path), "籌碼K線_自選股匯入_策略07.txt")
+        codes = [str(s.get('證券代號', '')).strip() for s in stocks if str(s.get('證券代號', '')).strip()]
+        if codes:
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(codes) + "\n")
+            print(f"[✓] 已成功匯出籌碼K線自選股匯入檔至: {txt_path}")
+            if sys.platform == 'win32':
+                import subprocess
+                subprocess.run(['clip'], input=",".join(codes[:6]).encode('utf-8'), check=False)
+                print(f"[✓] 已將前 {min(len(codes), 6)} 檔精選標的代碼載入 Windows 系統剪貼簿 (Ctrl+V 即貼上)")
+    except Exception:
+        pass
     cards_md = format_screener_markdown_cards(
         results=stocks[:8],
         date_str=today_str,
@@ -1120,10 +1205,26 @@ def main():
     parser.add_argument("--date", type=str, default=None, help="指定日期 (YYYYMMDD)")
     parser.add_argument("--line", action="store_true", help="執行後推播 LINE 戰報")
     parser.add_argument("--export", type=str, default=CSV_FILE, help="匯出 CSV 路徑")
+    parser.add_argument("--force", action="store_true", help="強制執行選股 (略過休市防禦)")
+    parser.add_argument("--cmoney", action="store_true", help="自動同步至 CMoney 籌碼K線雲端自選股")
     args = parser.parse_args()
+
+    # 休市防護檢驗 (未開盤日自動停止，避免覆蓋歷史有效戰報)
+    if not args.force and not args.date:
+        suppress, reason = should_suppress_push(force=False, task_type="盤後選股")
+        if suppress:
+            print(f"🛑 [休市防禦] 台股今日未開盤: {reason}，已自動取消盤後選股。使用 --force 可強制執行。")
+            return
 
     results = run_screening(date_str=args.date)
     export_reports(results, csv_path=args.export, md_path=MD_FILE)
+
+    if args.cmoney and results:
+        try:
+            from cmoney_sync import sync_stocks_to_cmoney
+            sync_stocks_to_cmoney([s['證券代號'] for s in results], group_name="策略07_融資斷頭伏擊")
+        except Exception as e:
+            print(f"[!] CMoney 雲端同步失敗: {e}")
 
     if args.line:
         push_to_line(results, date_str=args.date)

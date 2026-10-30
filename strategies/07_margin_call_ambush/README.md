@@ -1,6 +1,6 @@
-# 策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略 (Margin Call Ambush Screener V2.0 旗艦演化版)
+# 策略 07：高融資使用率×低維持率斷頭伏擊與浮額清洗策略 (Margin Call Ambush Screener V2.5 旗艦合規升級版)
 
-> 本策略為「台股量化選股策略最高總指揮中心」旗下旗艦級多空雙向對沖策略，鎖定市場最脆弱的融資槓桿部位，透過「官方融資流水帳成本遞推引擎」、「130% 追繳臨界價精算模型」、「全域自適應位階引擎」與「雙向狀態機」，精準捕捉融資多殺多與籌碼換手後的暴力轉折。
+> 本策略為「台股量化選股策略最高總指揮中心」旗下旗艦級多空雙向對沖策略，鎖定市場最脆弱的融資槓桿部位，透過「官方融資流水帳成本遞推引擎」、「130% 追繳臨界價精算模型」、「全域自適應位階引擎」、「臺灣證交所法定檔位方向性合規取整」、「健康盈虧比強制檢核」與「雙向狀態機」，精準捕捉融資多殺多與籌碼換手後的暴力轉折。
 
 ---
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 🧮 二、官方融資流水帳成本與 130% 追繳梯隊模型 (V2.0 升級)
+## 🧮 二、官方融資流水帳成本與 130% 追繳梯隊模型
 
 本策略連線臺灣證券交易所 (TWSE) `MI_MARGN` 與櫃買中心 (TPEx)，取得每日買進、賣出、現金償還與餘額流水帳，逐日動態遞推加權融資持倉均價 $\bar{C}$：
 
@@ -36,7 +36,7 @@ $$
 MR = \frac{\text{收盤價}}{\bar{C} \times 0.6} \times 100\%
 $$
 
-### 🌟 V2.0 融資 130% 追繳臨界價 (Margin Call Trigger Price) 精算：
+### 🌟 融資 130% 追繳臨界價 (Margin Call Trigger Price) 精算：
 融資借款本金以 6 成為基準，當擔保維持率跌至 130% 時，券商將於收盤正式寄發「追繳通知書」：
 
 $$
@@ -76,79 +76,88 @@ $$
 
 ---
 
-## 🔄 五、全域自適應市場位階引擎動態掛載 (Adaptive Engine)
+## ⚡ 五、操盤實戰四大防線價位與法定檔位取整 (Four-Price Standard V4.0)
 
-本策略全面遵循總指揮中心第 19 條標準，掛載 `adaptive_regime_manager.py`：
-- 自動載入每週日依加權指數趨勢校準之 `regime_config.json`：
-  - **🟢 多頭良性主升段 (`BULL_MOMENTUM`)**：多方浮額清洗目標擴大（TP1 +6%~+8%），放空門檻嚴格防軋空。
-  - **🟡 高檔箱型洗盤段 (`SIDEWAYS_CONSOLIDATION`)**：高出低進，多空雙向精準操作，嚴守月線與支撐點位。
-  - **🟣 空頭回檔修正段 (`BEAR_DEFENSIVE`)**：空方放空獵殺目標下看（TP1 -8%~-10%），多方抄底採超短線快進快出。
-- 嚴格受量化風控三鐵律保護（單筆停損最大安全閥 $\le -7.0\%$、成交量 $\ge 1,000$ 張底線）。
+全策略全面遵循總指揮中心第 7 條規範，所有價位**100% 嚴格合規於臺灣證交所 6 階法定升降檔位**（<10: 0.01, 10~50: 0.05, 50~100: 0.10, 100~500: 0.50, 500~1000: 1.00, >=1000: 5.00），並落實方向性取整與盈虧比檢核（$RR \ge 1.5$）：
+
+### 🔴 空方斷頭獵殺 (`SHORT_BREAKDOWN`)
+- 🟢 **進場價位 (Entry)**：收盤價向下取整合規檔位（空單建倉上限）
+- 🔵 **加碼價位 (Add-on)**：$\min(\text{Low} \times 0.995, \text{Close} \times 0.975)$ 向下取整合規檔位（破底加空追擊）
+- 🔴 **停利目標 (TP1 / TP2)**：TP1 $\text{Close} \times 0.92$ (-8%) ｜ TP2 $\text{Close} \times 0.85$ (-15%)，向下取整以利撮合
+- 🛑 **嚴格停損 (Stop-Loss)**：$\max(\min(\text{MA20} \times 1.01, \text{Close} \times 1.035), \text{Close} \times 1.025)$ 向上取整合規檔位（突破月線嚴格回補）
+- 幾何單調性：$\text{TP2} \le \text{TP1} < \text{Add-on} < \text{Entry} < \text{Stop-Loss}$
+- 盈虧比：$RR = \frac{\text{Entry} - \text{TP1}}{\text{Stop-Loss} - \text{Entry}} \ge 1.5$
+
+### 🟢 多方浮額清洗 (`LONG_REVERSAL`)
+- 🟢 **進場價位 (Entry)**：收盤價向上取整合規檔位（分批多方買進上限）
+- 🔵 **加碼價位 (Add-on)**：$\max(\text{High} \times 1.01, \text{Close} \times 1.025)$ 向上取整合規檔位（突破日高轉強加碼）
+- 🔴 **停利目標 (TP1 / TP2)**：TP1 $\max(\text{MA20}, \text{Close} \times 1.07)$ (+7%) ｜ TP2 $\text{Close} \times 1.14$ (+14%)，向下取整以利撮合
+- 🛑 **嚴格停損 (Stop-Loss)**：$\min(\text{Low} \times 0.985, \text{Close} \times 0.96)$ 向下取整合規檔位（破止跌低點無條件停損）
+- 幾何單調性：$\text{Stop-Loss} < \text{Entry} < \text{Add-on} < \text{TP1} \le \text{TP2}$
+- 盈虧比：$RR = \frac{\text{TP1} - \text{Entry}}{\text{Entry} - \text{Stop-Loss}} \ge 1.5$
 
 ---
 
-## 📈 六、三大法人真實多日累計與巨量換手特徵 (V2.0 升級)
+## 🚨 六、盤中即時雷達與 130% 斷頭追繳警報 (Intraday Scanner)
 
-1. **消除概估數據**：透過證交所官方 T86 歷史接口，計算真實 1日、近 3日累計與近 5日累計三大法人買賣超，杜絕粗暴乘以 2/3 的偽籌碼。
-2. **爆量換手止跌 (Volume Turnover)**：
-   $$\text{量增比率} = \frac{\text{當日成交量}}{\text{5日均量}}$$
-   - 多方清洗抄底若伴隨 $\text{量增比率} \ge 1.3$ 且下影線 $\ge 30\%$，代表主力大舉吃下散戶斷頭籌碼，軟評分額外加 5 分。
-   - 空方破線若逼近 130% 追繳線且法人連賣，額外加 5 分並加強警示。
-
----
-
-## 🚨 七、盤中即時雷達與 130% 斷頭追繳警報
-
-盤中雷達 (`intraday_scanner.py`) 整合 `algo_guards` 之 `GLOBAL_TICK_GUARD` 防毛刺雙重確認機制，支援六大到價事件：
-1. 🛑 `STOP_LOSS`：突破/跌破停損線，無條件強制離場。
+盤中雷達 (`intraday_scanner.py`) 整合 `algo_guards` 之 `GLOBAL_TICK_GUARD` 防毛刺雙重確認機制，完整載入 `result.csv` 之四大防線與 130% 追繳門檻，支援六大到價事件：
+1. 🛑 `STOP_LOSS`：突破/跌破停損線，無條件強制離場（最高優先級）。
 2. 🎯 `TP2`：波段獲利滿足點，全數獲利了結。
 3. 💰 `TP1`：第一目標達標，分批拔檔 1/2。
-4. 🚨 `MARGIN_CALL` (V2.0 新增)：現價摜破 130% 追繳警戒線，多殺多賣壓加速！
+4. 🚨 `MARGIN_CALL`：現價摜破 130% 追繳警戒線，多殺多賣壓加速！
 5. ⚡ `ADDON`：突破加碼價，右側動能確認追擊。
 6. 🟢/🔻 `ENTRY`：落入黃金建倉區間，啟動分批佈局。
 
 ---
 
-## ⚡ 五、操盤實戰四大防線價位 (Four-Price Standard)
+## ⏸️ 七、台股未開盤日全域不推送守門員 (Rule 21)
 
-### 🔴 空方斷頭獵殺 (`SHORT_BREAKDOWN`)
-- 🟢 **進場價位 (Entry)**：收盤價基準（空單建倉上限）
-- 🔵 **加碼價位 (Add-on)**：$\min(\text{Low} \times 0.995, \text{Close} \times 0.975)$（破底加空追擊）
-- 🔴 **停利目標 (TP1 / TP2)**：TP1 $\text{Close} \times 0.92$ (-8%) ｜ TP2 $\text{Close} \times 0.85$ (-15%)
-- 🛑 **嚴格停損 (Stop-Loss)**：$\max(\min(\text{MA20} \times 1.01, \text{Close} \times 1.045), \text{Close} \times 1.025)$（突破月線嚴格回補）
-
-### 🟢 多方浮額清洗 (`LONG_REVERSAL`)
-- 🟢 **進場價位 (Entry)**：收盤價基準（分批多方買進）
-- 🔵 **加碼價位 (Add-on)**：$\max(\text{High} \times 1.01, \text{Close} \times 1.025)$（突破日高轉強加碼）
-- 🔴 **停利目標 (TP1 / TP2)**：TP1 $\max(\text{MA20}, \text{Close} \times 1.07)$ (+7%) ｜ TP2 $\text{Close} \times 1.14$ (+14%)
-- 🛑 **嚴格停損 (Stop-Loss)**：$\min(\text{Low} \times 0.985, \text{Close} \times 0.96)$（破止跌低點無條件停損）
+本策略全面整合根目錄之 `market_schedule.py`：
+- 自動檢測週末例休、國定假日、農曆春節長假與颱風假緊急公告。
+- 遇休市日，`screener.py` 與 `intraday_scanner.py` 自動靜默退出，不覆蓋既有有效報表，節省運算與通訊資源。
+- 支援 `--force` 旗標於非交易日強制執行除錯與驗證。
 
 ---
 
-## 📁 六、模組檔案結構
+## 📊 八、籌碼K線 (CMoney) 雙群組自選股同步 (Rule 22)
+
+- 盤後選股完成後自動匯出 `籌碼K線_自選股匯入_策略07.txt`。
+- 在 Windows 環境下自動將核心標的代碼寫入系統剪貼簿，打開電腦版籌碼K線按下 Ctrl+V 即可 1 秒匯入。
+- 支援 `--cmoney` 參數直接連線 CMoney 雲端自選股群組自動更新。
+
+---
+
+## 📁 九、模組檔案結構
 
 ```text
 strategies/07_margin_call_ambush/
-├── screener.py          # 盤後選股器 (支援 --date, --line, --export)
-├── intraday_scanner.py  # 盤中即時雷達 (支援 --once, --interval, --test-push)
+├── screener.py          # 盤後選股器 (支援 --date, --line, --export, --force, --cmoney)
+├── intraday_scanner.py  # 盤中即時雷達 (支援 --once, --interval, --test-push, --test-alert, --force)
 ├── run_daily.bat        # 每日盤後排程執行檔 (自動探測 runtime/python.exe)
 ├── start_intraday.bat   # 盤中即時雷達一鍵啟動檔
-├── result.csv           # 最新選股 40 欄位報表 (UTF-8-BOM)
+├── result.csv           # 最新選股 45 欄位報表 (UTF-8-BOM 編碼，含 盈虧比、130%追繳價)
 ├── result.md            # Markdown 視覺化字卡戰報
+├── 籌碼K線_自選股匯入_策略07.txt # CMoney 自選股匯入檔 (Windows 剪貼簿連動)
 └── README.md            # 本策略完整技術手冊
 ```
 
 ---
 
-## 🚀 七、執行指令
+## 🚀 十、執行指令
 
 ### 1. 盤後選股
 ```bash
-# 產出最新報表
+# 產出最新報表 (遇休市自動靜默防禦)
 python screener.py
 
+# 強制執行 (略過休市防禦)
+python screener.py --force
+
 # 產出報表並推播至 LINE 策略 07 專屬群組
-python screener.py --line
+python screener.py --line --force
+
+# 產出報表並同步至 CMoney 籌碼K線雲端自選股
+python screener.py --cmoney --force
 
 # 指定歷史日期複盤
 python screener.py --date 20261016
@@ -157,10 +166,13 @@ python screener.py --date 20261016
 ### 2. 盤中即時到價雷達
 ```bash
 # 單次快篩巡邏
-python intraday_scanner.py --once
+python intraday_scanner.py --once --force
 
 # 盤中 60 秒常駐輪詢盯盤
 python intraday_scanner.py --interval 60
+
+# 測試特定到價警報 (例如融資追繳 MARGIN_CALL)
+python intraday_scanner.py --test-alert MARGIN_CALL
 
 # 測試 LINE 到價推播連線
 python intraday_scanner.py --test-push

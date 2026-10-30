@@ -191,7 +191,7 @@ def evaluate_treasury_execution_reliability(code: str, history_dict: dict) -> tu
 
 
 def calculate_treasury_four_price(price: float, price_min: float, price_max: float, book_value: float,
-                                  high: float = None, low: float = None) -> dict:
+                                  high: float = None, low: float = None, adaptive_params: dict = None) -> dict:
     """
     計算策略 09 實戰四大防線價位 (Four-Price Defense Model)
     幾何錨定法：
@@ -215,11 +215,27 @@ def calculate_treasury_four_price(price: float, price_min: float, price_max: flo
     ref_high = high if high and high > price else price * 1.03
     addon_price = round(max(ref_high * 1.01, entry_price * 1.035), 2)
 
-    tp1_price = round(max(price_max * 0.96, addon_price * 1.06), 2)
-    tp2_price = round(max(book_value, price_max * 1.04, tp1_price * 1.05), 2)
-
-    ref_low = low if low and low < price else price * 0.95
-    sl_price = round(min(ref_low * 0.985, price_min * 0.98, price * 0.94), 2)
+    if adaptive_params:
+        tp1_pct = float(adaptive_params.get("tp1_pct", 6.0))
+        tp2_pct = float(adaptive_params.get("tp2_pct", 12.0))
+        sl_pct_raw = float(adaptive_params.get("stop_loss_pct", -5.0))
+        market_tp1 = price * (1.0 + tp1_pct / 100.0)
+        market_tp2 = price * (1.0 + tp2_pct / 100.0)
+        market_sl = price * (1.0 - abs(sl_pct_raw) / 100.0)
+        tp1_price = round(max(min(price_max * 0.98, market_tp1), addon_price * 1.04), 2)
+        tp2_price = round(max(book_value, price_max * 1.04, market_tp2, tp1_price * 1.05), 2)
+        ref_low = low if low and low < price else price * 0.96
+        # 嚴守總指揮中心量化風控鐵律：停損安全閥嚴格控制在 -4.0% ~ -7.0% 間，絕不容許放大至下限跌幅
+        tech_sl = min(ref_low * 0.985, market_sl)
+        floor_sl = price * 0.93  # 最大 -7.0% 安全底線
+        sl_price = round(max(tech_sl, floor_sl), 2)
+    else:
+        tp1_price = round(max(price_max * 0.96, addon_price * 1.06), 2)
+        tp2_price = round(max(book_value, price_max * 1.04, tp1_price * 1.05), 2)
+        ref_low = low if low and low < price else price * 0.96
+        tech_sl = min(ref_low * 0.985, price * 0.95)
+        floor_sl = price * 0.93
+        sl_price = round(max(tech_sl, floor_sl), 2)
 
     # 2. 嚴格數學單調性強制修正
     if sl_price >= price:

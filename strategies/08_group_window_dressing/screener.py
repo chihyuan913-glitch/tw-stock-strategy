@@ -46,6 +46,16 @@ from futures_helper import (
     fetch_taifex_futures_quotes,
     calculate_futures_pricing
 )
+from four_price_engine import (
+    normalize_to_tick,
+    get_twse_tick_size,
+    get_limit_prices
+)
+from market_schedule import (
+    check_market_open_or_exit,
+    verify_twse_data_settlement,
+    should_suppress_push
+)
 from line_sender import (
     send_to_line,
     build_screener_carousel,
@@ -82,6 +92,7 @@ CSV_COLUMNS = [
     "集團狀態",
     "集團旗艦母股",
     "母子位階角色",
+    "價差戰術地位",
     "同集團共振家數",
     "集團共振率%",
     "同集團轉強兄弟股",
@@ -109,6 +120,9 @@ CSV_COLUMNS = [
     "現貨TP1",
     "現貨TP2",
     "現貨停損",
+    "漲停價",
+    "跌停價",
+    "盈虧比",
     "期貨契約",
     "期貨月份",
     "期貨收盤價",
@@ -213,6 +227,374 @@ def evaluate_window_dressing_calendar(target_date=None) -> dict:
         "season_bonus": 5,
         "unwind_bonus": 0
     }
+
+
+def evaluate_spread_tactical_status(
+    spread_vs_parent_pct: float,
+    parent_ret_5d: float,
+    parent_above_ma20: bool,
+    member_ret_5d: float
+) -> str:
+    """
+    母子動態價差乖離指數 (Spread Anomaly Index) 戰術定位：
+    1. 🚀【低基期落後補漲】：spread <= -3.0% 且母公司強勢 (parent_ret >= 1.5 或 站上月線)。母公司拉開空間，子公司具均值回歸補漲動能。
+    2. ⚠️【正乖離過大・防母提款】：spread >= 8.0% 且子公司漲幅 >= 10.0%。子公司漲幅遠超母公司，慎防母公司高檔調節處分持股。
+    3. 👑【動能領頭羊先行】：spread >= 2.0% 且子公司漲幅 > 0。
+    4. 🟢【母子步調一致】：其餘正常價差區間。
+    """
+    if spread_vs_parent_pct <= -3.0 and (parent_ret_5d >= 1.5 or parent_above_ma20):
+        return "🚀【低基期落後補漲】"
+    elif spread_vs_parent_pct >= 8.0 and member_ret_5d >= 10.0:
+        return "⚠️【正乖離過大・防母提款】"
+    elif spread_vs_parent_pct >= 2.0 and member_ret_5d > 0:
+        return "👑【動能領頭羊先行】"
+    else:
+        return "🟢【母子步調一致】"
+
+
+def calculate_group_resonance_and_hierarchy(stock_records: list) -> list:
+    """
+    計算同集團內部的多維共振率與母子層級角色分工 (Hierarchy Role)
+    輸入: stock_records (list of dict)
+    每筆欄位需包含:
+      code, name, group_id, group_name, flagship_code, flagship_name,
+      close, ma20, ret_5d_pct, inst_1d_lots, inst_5d_lots
+    回傳: 補充了 group_resonance_ratio, group_active_count, sibling_leaders,
+          hierarchy_role, spread_vs_parent_pct 等欄位的 list of dict
+    """
+    if not stock_records:
+        return []
+
+    # 依 group_id 建立索引分組
+    grouped = {}
+    for r in stock_records:
+        gid = str(r.get('group_id', '')).strip()
+        grouped.setdefault(gid, []).append(r)
+
+    enriched_records = []
+
+    for gid, members in grouped.items():
+        group_total_count = len(members)
+        if group_total_count <= 0:
+            continue
+
+        # 1. 判定每檔成分股當日是否「轉強 (is_member_active)」
+        active_members = []
+        for m in members:
+            close = float(m.get('close', 0.0))
+            ma20 = float(m.get('ma20', close))
+            inst_1d = float(m.get('inst_1d_lots', 0.0))
+            inst_5d = float(m.get('inst_5d_lots', 0.0))
+            ret_5d = float(m.get('ret_5d_pct', 0.0))
+
+            is_active = (close >= ma20) and (inst_1d > 0 or inst_5d > 0 or ret_5d > 0)
+            m['is_member_active'] = is_active
+            if is_active:
+                active_members.append(m)
+
+        group_active_count = len(active_members)
+        group_resonance_ratio = round((group_active_count / group_total_count) * 100.0, 2) if group_total_count > 0 else 0.0
+
+        # 2. 尋找母公司 (flagship) 資訊以計算母子利差
+        sample_m = members[0]
+        flagship_code = str(sample_m.get('flagship_code', '')).strip()
+
+        flagship_record = None
+        for m in members:
+            if str(m.get('code', '')).strip() == flagship_code:
+                flagship_record = m
+                break
+
+        if not flagship_record:
+            # 若無明確母公司代號比對，找 role == FLAGSHIP 或以第一檔為基準
+            for m in members:
+                if str(m.get('role', '')).upper() == 'FLAGSHIP':
+                    flagship_record = m
+                    break
+        if not flagship_record:
+            flagship_record = members[0]
+
+        parent_close = float(flagship_record.get('close', 0.0))
+        parent_ma20 = float(flagship_record.get('ma20', parent_close))
+        parent_ret_5d = float(flagship_record.get('ret_5d_pct', 0.0))
+        parent_above_ma20 = (parent_close >= parent_ma20)
+
+        # 集團內最高 5日漲幅
+        max_ret_5d = max([float(m.get('ret_5d_pct', 0.0)) for m in members]) if members else 0.0
+
+        # 3. 為各成員計算專屬欄位與角色判定
+        for m in members:
+            code = str(m.get('code', '')).strip()
+            name = str(m.get('name', '')).strip()
+            close = float(m.get('close', 0.0))
+            ma20 = float(m.get('ma20', close))
+            ret_5d = float(m.get('ret_5d_pct', 0.0))
+            inst_1d = float(m.get('inst_1d_lots', 0.0))
+            inst_5d = float(m.get('inst_5d_lots', 0.0))
+
+            spread_vs_parent_pct = round(ret_5d - parent_ret_5d, 2)
+            spread_tactical_status = evaluate_spread_tactical_status(
+                spread_vs_parent_pct=spread_vs_parent_pct,
+                parent_ret_5d=parent_ret_5d,
+                parent_above_ma20=parent_above_ma20,
+                member_ret_5d=ret_5d
+            )
+
+            # 同集團協同動能夥伴 (排除自己，最多取前 4 檔)
+            sibling_leaders = [
+                f"{act.get('code', '')} {act.get('name', '')}".strip()
+                for act in active_members
+                if str(act.get('code', '')).strip() != code
+            ][:4]
+
+            # 角色階層判定 (Hierarchy Role)
+            # 條件一：高檔結帳提款
+            if (close < ma20) and (inst_1d <= -300 or inst_5d <= -800 or ret_5d < -2.0):
+                hierarchy_role = "⚠️【高檔結帳提款】"
+            # 條件二：集團領頭羊主攻
+            elif (code == flagship_code and close >= ma20) or (
+                close >= ma20 and ret_5d == max_ret_5d and ret_5d > 0 and (parent_ret_5d - ret_5d < 1.0)
+            ):
+                hierarchy_role = "👑【集團領頭羊主攻】"
+            # 條件三：母強子落後補漲
+            elif (
+                close >= ma20
+                and (parent_ret_5d >= 1.5 or parent_above_ma20)
+                and ((parent_ret_5d - ret_5d) >= 1.0)
+            ):
+                hierarchy_role = "🚀【母強子落後補漲】"
+            # 條件四：集團協同齊漲
+            else:
+                hierarchy_role = "🟢【集團協同齊漲】"
+
+            item = dict(m)
+            item['group_total_count'] = group_total_count
+            item['group_active_count'] = group_active_count
+            item['group_resonance_ratio'] = group_resonance_ratio
+            item['sibling_leaders'] = sibling_leaders
+            item['sibling_leaders_str'] = " / ".join(sibling_leaders) if sibling_leaders else "集團獨立先鋒"
+            item['spread_vs_parent_pct'] = spread_vs_parent_pct
+            item['hierarchy_role'] = hierarchy_role
+            item['spread_tactical_status'] = spread_tactical_status
+            item['parent_ret_5d_pct'] = parent_ret_5d
+
+            enriched_records.append(item)
+
+    return enriched_records
+
+
+def classify_dual_state_and_pricing(stock_info: dict, adaptive_params: dict = None) -> dict:
+    """
+    雙向狀態機分流與四大防線定價 (Four-Price Standards V4.0)
+    狀態分流：
+      1. GROUP_IGNITION: 🟢【作帳點火・母子共振】(多方)
+      2. GROUP_UNWIND:   🔴【集團結帳・順勢放空】(空方)
+      3. NEUTRAL:        ⚪【中性觀望】
+    四大防線嚴格保證 TWSE 法定檔位合規取整與幾何單調性：
+      - 多方: LimitDown <= sl_price < entry_price < addon_price < tp1_price < tp2_price <= LimitUp
+      - 空方: LimitDown <= tp2_price < tp1_price < addon_price < entry_price < sl_price <= LimitUp
+    """
+    close = float(stock_info.get('close', stock_info.get('收盤價', 0.0)))
+    open_price = float(stock_info.get('open_price', stock_info.get('open', close)))
+    high = float(stock_info.get('high', close))
+    low = float(stock_info.get('low', close))
+    ma20 = float(stock_info.get('ma20', stock_info.get('20MA', close)))
+    prev_close = float(stock_info.get('prev_close', stock_info.get('昨收', close)))
+    limit_up, limit_down = get_limit_prices(prev_close if prev_close > 0 else close)
+
+    inst_1d = float(stock_info.get('inst_1d_lots', stock_info.get('法人當日買賣超(張)', 0.0)))
+    inst_5d = float(stock_info.get('inst_5d_lots', stock_info.get('法人5日買賣超(張)', 0.0)))
+    ret_5d = float(stock_info.get('ret_5d_pct', stock_info.get('近5日漲跌幅%', 0.0)))
+
+    # K 棒上下影線佔比
+    candle_range = max(high - low, 0.01)
+    upper_shadow = high - max(open_price, close)
+    lower_shadow = min(open_price, close) - low
+    upper_shadow_pct = round(max(0.0, upper_shadow / candle_range) * 100.0, 2)
+    lower_shadow_pct = round(max(0.0, lower_shadow / candle_range) * 100.0, 2)
+
+    force_long = bool(stock_info.get('force_long', False))
+
+    # 1. 多方 GROUP_IGNITION 條件判斷
+    candle_weak = not (close >= open_price or lower_shadow_pct >= 25.0)
+    is_ignition = (
+        (close >= ma20)
+        and (inst_1d >= 200 or (inst_5d >= 500 and inst_1d > 0))
+        and (upper_shadow_pct < 45.0)
+    )
+
+    # 2. 空方 GROUP_UNWIND 條件判斷
+    is_unwind = (
+        (close < ma20)
+        and (inst_1d <= -300 or inst_5d <= -800)
+        and (close < open_price or upper_shadow_pct >= 35.0 or ret_5d <= -2.0)
+    )
+
+    if force_long and not is_ignition and not is_unwind:
+        is_ignition = True
+
+    if is_ignition:
+        state_code = "GROUP_IGNITION"
+        state_badge = "🟢【作帳點火・母子共振】"
+
+        # 自適應市場位階動態停利停損係數
+        tp1_mult = 1.0 + (float(adaptive_params.get("tp1_pct", 7.0)) / 100.0) if adaptive_params else 1.07
+        tp2_mult = 1.0 + (float(adaptive_params.get("tp2_pct", 14.0)) / 100.0) if adaptive_params else 1.14
+        sl_pct_raw = float(adaptive_params.get("stop_loss_pct", -4.5)) if adaptive_params else -4.5
+        sl_mult = 1.0 - (abs(sl_pct_raw) / 100.0)
+
+        # 價差戰術加乘：若為落後補漲，目標空間向上延展；若正乖離過大防母提款，縮緊停利防線
+        spread_status = stock_info.get('spread_tactical_status', '')
+        if spread_status == "🚀【低基期落後補漲】":
+            tp1_mult = max(tp1_mult, 1.08)
+            tp2_mult = max(tp2_mult, 1.16)
+        elif spread_status == "⚠️【正乖離過大・防母提款】":
+            tp1_mult = min(tp1_mult, 1.05)
+
+        raw_entry = close
+        entry_tick = get_twse_tick_size(raw_entry)
+        raw_addon = max(high * 1.005, close * 1.02, raw_entry + entry_tick)
+        raw_tp1 = max(raw_addon * 1.025, close * tp1_mult, raw_addon + get_twse_tick_size(raw_addon))
+        raw_tp2 = max(raw_tp1 * 1.035, close * tp2_mult, raw_tp1 + get_twse_tick_size(raw_tp1))
+        raw_sl = min(low * 0.99, ma20 * 0.99, close * sl_mult, raw_entry - entry_tick)
+        # 嚴守最大安全閥 -7.0%
+        raw_sl = max(raw_sl, close * 0.93)
+
+        if limit_up > 0:
+            raw_tp2 = min(raw_tp2, limit_up)
+            raw_tp1 = min(raw_tp1, limit_up)
+            raw_addon = min(raw_addon, limit_up)
+            raw_entry = min(raw_entry, limit_up)
+        if limit_down > 0:
+            raw_sl = max(raw_sl, limit_down)
+
+        entry_price = normalize_to_tick(raw_entry, direction='up')
+        addon_price = normalize_to_tick(raw_addon, direction='up')
+        tp1_price = normalize_to_tick(raw_tp1, direction='down')
+        tp2_price = normalize_to_tick(raw_tp2, direction='down')
+        sl_price = normalize_to_tick(raw_sl, direction='down')
+
+        # 嚴格數學單調性與法定檔位階梯守護 (sl < entry < addon < tp1 < tp2)
+        if entry_price < close:
+            entry_price = normalize_to_tick(close, direction='up')
+        if addon_price <= entry_price:
+            step = get_twse_tick_size(entry_price)
+            addon_price = normalize_to_tick(entry_price + step, direction='up')
+        if tp1_price <= addon_price:
+            step = get_twse_tick_size(addon_price)
+            tp1_price = normalize_to_tick(addon_price + step, direction='up')
+        if tp2_price <= tp1_price:
+            step = get_twse_tick_size(tp1_price)
+            tp2_price = normalize_to_tick(tp1_price + step, direction='up')
+        if sl_price >= entry_price:
+            step = get_twse_tick_size(entry_price)
+            sl_price = normalize_to_tick(entry_price - step, direction='down')
+
+        potential_risk = entry_price - sl_price
+        potential_reward = tp1_price - entry_price
+        rr_ratio = round(potential_reward / potential_risk, 2) if potential_risk > 0 else 2.0
+
+        return {
+            "state_code": state_code,
+            "state_badge": state_badge,
+            "badge": state_badge,
+            "多空狀態": state_badge,
+            "entry_price": entry_price,
+            "addon_price": addon_price,
+            "tp1_price": tp1_price,
+            "tp2_price": tp2_price,
+            "sl_price": sl_price,
+            "limit_up": limit_up,
+            "limit_down": limit_down,
+            "risk_reward_ratio": rr_ratio,
+            "rr_ratio": rr_ratio,
+            "candle_weak": candle_weak,
+            "upper_shadow_pct": upper_shadow_pct,
+            "lower_shadow_pct": lower_shadow_pct
+        }
+
+    elif is_unwind:
+        state_code = "GROUP_UNWIND"
+        state_badge = "🔴【集團結帳・順勢放空】"
+
+        raw_entry = close
+        entry_tick = get_twse_tick_size(raw_entry)
+        raw_addon = min(low * 0.995, close * 0.975, raw_entry - entry_tick)
+        raw_tp1 = min(raw_addon * 0.96, close * 0.92, raw_addon - get_twse_tick_size(raw_addon))
+        raw_tp2 = min(raw_tp1 * 0.94, close * 0.85, raw_tp1 - get_twse_tick_size(raw_tp1))
+        raw_sl = max(ma20 * 1.01, high * 1.01, close * 1.035, raw_entry + entry_tick)
+
+        if limit_up > 0:
+            raw_sl = min(raw_sl, limit_up)
+        if limit_down > 0:
+            raw_tp2 = max(raw_tp2, limit_down)
+            raw_tp1 = max(raw_tp1, limit_down)
+            raw_addon = max(raw_addon, limit_down)
+            raw_entry = max(raw_entry, limit_down)
+
+        entry_price = normalize_to_tick(raw_entry, direction='down')
+        addon_price = normalize_to_tick(raw_addon, direction='down')
+        tp1_price = normalize_to_tick(raw_tp1, direction='up')
+        tp2_price = normalize_to_tick(raw_tp2, direction='up')
+        sl_price = normalize_to_tick(raw_sl, direction='up')
+
+        # 嚴格數學單調性保護: tp2 < tp1 < addon < entry < sl
+        if entry_price > close:
+            entry_price = normalize_to_tick(close, direction='down')
+        if addon_price >= entry_price:
+            step = get_twse_tick_size(entry_price)
+            addon_price = normalize_to_tick(entry_price - step, direction='down')
+        if tp1_price >= addon_price:
+            step = get_twse_tick_size(addon_price)
+            tp1_price = normalize_to_tick(addon_price - step, direction='down')
+        if tp2_price >= tp1_price:
+            step = get_twse_tick_size(tp1_price)
+            tp2_price = normalize_to_tick(tp1_price - step, direction='down')
+        if sl_price <= entry_price:
+            step = get_twse_tick_size(entry_price)
+            sl_price = normalize_to_tick(entry_price + step, direction='up')
+
+        potential_risk = sl_price - entry_price
+        potential_reward = entry_price - tp1_price
+        rr_ratio = round(potential_reward / potential_risk, 2) if potential_risk > 0 else 2.0
+
+        return {
+            "state_code": state_code,
+            "state_badge": state_badge,
+            "badge": state_badge,
+            "多空狀態": state_badge,
+            "entry_price": entry_price,
+            "addon_price": addon_price,
+            "tp1_price": tp1_price,
+            "tp2_price": tp2_price,
+            "sl_price": sl_price,
+            "limit_up": limit_up,
+            "limit_down": limit_down,
+            "risk_reward_ratio": rr_ratio,
+            "rr_ratio": rr_ratio,
+            "upper_shadow_pct": upper_shadow_pct,
+            "lower_shadow_pct": lower_shadow_pct
+        }
+
+    else:
+        norm_close = normalize_to_tick(close)
+        return {
+            "state_code": "NEUTRAL",
+            "state_badge": "⚪【中性觀望】",
+            "badge": "⚪【中性觀望】",
+            "多空狀態": "⚪【中性觀望】",
+            "entry_price": norm_close,
+            "addon_price": norm_close,
+            "tp1_price": norm_close,
+            "tp2_price": norm_close,
+            "sl_price": norm_close,
+            "limit_up": limit_up,
+            "limit_down": limit_down,
+            "risk_reward_ratio": 1.0,
+            "rr_ratio": 1.0,
+            "upper_shadow_pct": upper_shadow_pct,
+            "lower_shadow_pct": lower_shadow_pct
+        }
 
 
 def evaluate_spread_tactical_status(
@@ -1248,7 +1630,7 @@ def format_group_ranking_text(ranking: list, items: list, date_str: str,
     return "\n".join(lines)
 
 
-def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple:
+def run_screener(export_path: str = None, send_line_flag: bool = False, cmoney_flag: bool = False) -> tuple:
     """
     執行策略 08 完整選股流水線：
     1. 載入 25 大集團池
@@ -1398,6 +1780,7 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
             "集團狀態": it.get('group_status', ''),
             "集團旗艦母股": flagship_info,
             "母子位階角色": it.get('hierarchy_role', it.get('role', '')),
+            "價差戰術地位": it.get('spread_tactical_status', ''),
             "同集團共振家數": it.get('group_active_count', 0),
             "集團共振率%": it.get('group_resonance_ratio', 0.0),
             "同集團轉強兄弟股": siblings_str,
@@ -1425,6 +1808,9 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
             "現貨TP1": it.get('tp1_price', 0.0),
             "現貨TP2": it.get('tp2_price', 0.0),
             "現貨停損": it.get('sl_price', 0.0),
+            "漲停價": it.get('limit_up', 0.0),
+            "跌停價": it.get('limit_down', 0.0),
+            "盈虧比": it.get('risk_reward_ratio', 2.0),
             "期貨契約": fut.get('contract_sym', '--'),
             "期貨月份": fut.get('month', '--'),
             "期貨收盤價": fut.get('futures_close', '--'),
@@ -1440,13 +1826,23 @@ def run_screener(export_path: str = None, send_line_flag: bool = False) -> tuple
         }
         output_rows.append(row)
 
+    today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d')
     df_out = pd.DataFrame(output_rows, columns=CSV_COLUMNS)
     from rolling_retention_manager import save_rolling_result_csv
     df_out = save_rolling_result_csv(export_path, df_out, today_date_str=today_str, max_days=5)
     print(f"[✓] 已成功輸出選股報表至: {export_path}")
 
+    # 籌碼K線 (CMoney) 自選股雲端與本地同步 (Rule 22)
+    if cmoney_flag and not df_out.empty:
+        try:
+            from cmoney_sync import sync_stocks_to_cmoney
+            codes = [str(r.get('證券代號')).strip() for r in output_rows if str(r.get('證券代號')).strip()]
+            priority = [str(r.get('證券代號')).strip() for r in output_rows if 'Tier-1' in str(r.get('門檻層級', '')) or r.get('tier_mode') == 'TIER1_RESONANCE']
+            sync_stocks_to_cmoney(stock_codes=codes, priority_codes=priority[:5] if priority else codes[:5], verbose=True)
+        except Exception as e:
+            print(f"[!] 籌碼K線自選股同步跳過或失敗: {e}")
+
     # 產出 Markdown 戰報 result.md：排行榜 → 各集團個股集中排列 → 個股完整字卡
-    today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y-%m-%d')
     records_for_cards = df_out.to_dict(orient='records')
     try:
         cards_md = format_screener_markdown_cards(
@@ -1522,9 +1918,22 @@ def main():
     parser = argparse.ArgumentParser(description="台股策略 08：集團作帳與母子聯動伏擊選股器")
     parser.add_argument("--export", default=CSV_FILE, help="匯出 CSV 檔案路徑")
     parser.add_argument("--line", action="store_true", help="執行後推播最新戰訊至 LINE 專屬群組")
+    parser.add_argument("--force", action="store_true", help="強制執行，跳過開休市與未開盤日檢核 (Rule 21)")
+    parser.add_argument("--date", default=None, help="指定歷史交易日期 (YYYY-MM-DD 或 YYYYMMDD)")
+    parser.add_argument("--cmoney", action="store_true", help="同步入選名單至 CMoney 籌碼K線自選股與剪貼簿 (Rule 22)")
     args = parser.parse_args()
 
-    run_screener(export_path=args.export, send_line_flag=args.line)
+    # 開休市檢核守門 (若非強制執行且未指定歷史日期)
+    if not args.force and not args.date:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤後選股"):
+            return
+
+    # 夜間官方數據沉澱守門 (若在夜間 20:00 後執行且無指定歷史日期且未強制執行)
+    now_hour = datetime.datetime.now().hour
+    if now_hour >= 20 and not args.date and not args.force:
+        verify_twse_data_settlement()
+
+    run_screener(export_path=args.export, send_line_flag=args.line, cmoney_flag=args.cmoney)
 
 
 if __name__ == '__main__':

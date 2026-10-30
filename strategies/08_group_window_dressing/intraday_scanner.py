@@ -50,6 +50,7 @@ from line_sender import (
     format_clean_aggregated_text
 )
 from algo_guards import GLOBAL_TICK_GUARD
+from market_schedule import check_market_open_or_exit, should_suppress_push
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -202,6 +203,17 @@ def evaluate_intraday_alert(
         if not passed:
             return (None, "", "")
 
+    # 核心推薦分級警報標記 (Rule 24 Priority Alert Badging)
+    tier_info = str(target.get('門檻層級') or target.get('tier_mode') or '')
+    rank_val = target.get('集團排名') or target.get('group_rank', 99)
+    try:
+        rank_int = int(rank_val)
+    except (ValueError, TypeError):
+        rank_int = 99
+    is_priority = ('Tier-1' in tier_info or tier_info == 'TIER1_RESONANCE' or rank_int == 1)
+    if is_priority and not event_title.startswith("🔥【今日集團作帳首選】"):
+        event_title = f"🔥【今日集團作帳首選】{event_title}"
+
     alerted_set.add(alert_key)
     return (raw_event, event_title, event_desc)
 
@@ -291,7 +303,7 @@ def load_scanner_targets() -> list:
         return []
 
 
-def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = False):
+def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = False, force: bool = False):
     """盤中雷達掃描主迴圈"""
     print("=" * 75)
     print(f"📡 啟動【{STRATEGY_NAME}】盤中即時雷達")
@@ -305,11 +317,11 @@ def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = 
 
     print(f"[✓] 成功掛入 {len(targets)} 檔集團作帳與母子聯動監控標的：")
     for idx, t in enumerate(targets, 1):
-        gname = t.get('集團名稱', '')
-        role = t.get('集團角色', '')
+        gname = t.get('所屬集團') or t.get('集團名稱', '')
+        role = t.get('母子位階角色') or t.get('集團角色', '')
         state = t.get('多空狀態', '')
-        ep = t.get('進場價位', 0)
-        sl = t.get('停損價位', 0)
+        ep = t.get('進場價位', t.get('entry_price', 0))
+        sl = t.get('停損價位', t.get('sl_price', 0))
         print(f"  {idx}. {t['code']} {t['name']} [{gname}・{role}] | {state} | 進: {ep} / 損: {sl}")
 
     # 測試推播模式
@@ -354,7 +366,7 @@ def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = 
 
         # 盤中交易時段判定 (平日 09:00 ~ 13:35)
         # 若為 once 模式則允許非交易時段單次執行
-        if not once and (t_int < 900 or t_int > 1335):
+        if not once and not force and (t_int < 900 or t_int > 1335):
             print(f"[*] 目前非盤中交易時段 ({now_tw.strftime('%H:%M:%S')})，雷達休眠等待開盤...")
             time.sleep(30)
             continue
@@ -411,9 +423,15 @@ def main():
     parser.add_argument("--once", action="store_true", help="執行單次快速巡邏後結束")
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
     parser.add_argument("--test-push", action="store_true", help="發送一筆模擬到價推播以驗證 LINE 連線與卡片排版")
+    parser.add_argument("--force", action="store_true", help="強制執行，跳過開休市與未開盤日檢核 (Rule 21)")
     args = parser.parse_args()
 
-    run_intraday_scan(once=args.once, interval=args.interval, test_push=args.test_push)
+    # 開休市檢核守門 (若非強制且非測試)
+    if not args.force and not args.test_push and not args.once:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤中雷達"):
+            return
+
+    run_intraday_scan(once=args.once, interval=args.interval, test_push=args.test_push, force=args.force)
 
 
 if __name__ == '__main__':

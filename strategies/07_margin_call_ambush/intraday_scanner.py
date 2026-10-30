@@ -50,6 +50,13 @@ from line_sender import (
     format_clean_aggregated_text
 )
 from algo_guards import GLOBAL_TICK_GUARD
+try:
+    from market_schedule import should_suppress_push, is_market_open_today
+except ImportError:
+    def should_suppress_push(force=False, task_type=""):
+        return False, "無 market_schedule 模組"
+    def is_market_open_today():
+        return True, "預設開盤" 
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -221,6 +228,16 @@ def load_targets() -> dict:
                 st_badge = str(row.get('多空狀態', '')).strip()
                 tier_label = str(row.get('門檻層級', '')).strip()
 
+                mc_val = float(row.get('130%追繳價', row.get('margin_call_price', 0.0)) or 0.0)
+                dist_mc = float(row.get('距追繳空間%', 0.0) or 0.0)
+                mc_status = str(row.get('追繳狀態', '')).strip()
+                basis_d = str(row.get('價差(Basis)', '')).strip()
+                f_oi = str(row.get('期貨未平倉(OI)', '')).strip()
+                f_close_raw = str(row.get('期貨收盤價', '')).strip()
+                f_close_val = float(f_close_raw) if (f_close_raw and f_close_raw != '--') else close_p
+                m_1lot_raw = str(row.get('1口保證金(約)', '')).strip()
+                m_1lot_val = int(float(m_1lot_raw)) if (m_1lot_raw and m_1lot_raw != '--') else 0
+
                 targets[code] = {
                     'code': code,
                     '證券代號': code,
@@ -239,10 +256,38 @@ def load_targets() -> dict:
                     'tp1_price': float(row.get('停利TP1', row.get('現貨TP1', close_p))),
                     'tp2_price': float(row.get('停利TP2', row.get('現貨TP2', close_p))),
                     'sl_price': float(row.get('停損價位', row.get('現貨停損', close_p))),
+                    'margin_call_price': mc_val,
+                    '130%追繳價': mc_val,
+                    'distance_to_margin_call_pct': dist_mc,
+                    '距追繳空間%': dist_mc,
+                    'margin_call_status': mc_status,
+                    '追繳狀態': mc_status,
                     'contract': str(row.get('期貨契約', '--')).strip(),
                     'month': str(row.get('期貨月份', '--')).strip(),
-                    'futures_close': float(row.get('期貨收盤價', close_p)),
-                    'margin_1lot': int(row.get('1口保證金(約)', 0)),
+                    'futures_close': f_close_val,
+                    'basis_desc': basis_d,
+                    '價差(Basis)': basis_d,
+                    'futures_oi': f_oi,
+                    '期貨未平倉(OI)': f_oi,
+                    'margin_1lot': m_1lot_val,
+                    'settlement_tag': str(row.get('結算倒數', '')).strip(),
+                    '結算倒數': str(row.get('結算倒數', '')).strip(),
+                    'next_month': str(row.get('次月合約', '')).strip(),
+                    '次月合約': str(row.get('次月合約', '')).strip(),
+                    'next_entry': str(row.get('次月進場參考', '')).strip(),
+                    '次月進場參考': str(row.get('次月進場參考', '')).strip(),
+                    'og_risk': str(row.get('隔日沖風控', '')).strip(),
+                    '隔日沖風控': str(row.get('隔日沖風控', '')).strip(),
+                    'maintenance_ratio': float(row.get('融資維持率%', 0.0) or 0.0),
+                    '融資維持率%': float(row.get('融資維持率%', 0.0) or 0.0),
+                    'usage_ratio': float(row.get('融資使用率%', 0.0) or 0.0),
+                    '融資使用率%': float(row.get('融資使用率%', 0.0) or 0.0),
+                    'avg_cost': float(row.get('預估融資均價', 0.0) or 0.0),
+                    '預估融資均價': float(row.get('預估融資均價', 0.0) or 0.0),
+                    'volume_ratio': float(row.get('量增比率', 1.0) or 1.0),
+                    '量增比率': float(row.get('量增比率', 1.0) or 1.0),
+                    'rr_ratio': float(row.get('盈虧比', 2.0) or 2.0),
+                    '盈虧比': float(row.get('盈虧比', 2.0) or 2.0),
                     'stars': str(row.get('星級推薦', '★★★★☆')).strip()
                 }
             if targets:
@@ -410,9 +455,9 @@ def scan_once(targets: dict, notified_events: dict, force_test: bool = False) ->
     return triggered_alerts
 
 
-def send_test_push():
-    """發送一則模擬到價卡片以驗證 LINE 連線與 Flex 排版"""
-    print("[*] 正在發送【策略 07：融資斷頭與浮額清洗】測試推播...")
+def send_test_push(alert_type: str = "ADDON"):
+    """發送一則模擬到價卡片以驗證 LINE 連線與 Flex 排版 (支援 MARGIN_CALL 等全事件)"""
+    print(f"[*] 正在發送【策略 07：融資斷頭與浮額清洗】測試推播 (事件: {alert_type})...")
     test_target = {
         'code': '2603',
         'name': '長榮',
@@ -424,6 +469,9 @@ def send_test_push():
         'tp1_price': 170.0,
         'tp2_price': 157.0,
         'sl_price': 191.5,
+        'margin_call_price': 172.5,
+        'distance_to_margin_call_pct': 4.2,
+        'margin_call_status': '⚠️ 逼近追繳警戒',
         'contract': 'CZF',
         'month': '202611',
         'futures_close': 184.5,
@@ -432,20 +480,39 @@ def send_test_push():
         'stars': '★★★★★'
     }
     test_rt = {
-        'price': 180.0,
+        'price': 172.0 if alert_type == 'MARGIN_CALL' else 180.0,
         'open': 184.0,
         'high': 185.0,
-        'low': 179.5,
+        'low': 171.5 if alert_type == 'MARGIN_CALL' else 179.5,
         'volume': 15600,
         'time': datetime.datetime.now().strftime('%H:%M:%S')
     }
 
+    if alert_type == 'MARGIN_CALL':
+        ev_title = "🚨【融資追繳觸發・多殺多加速】"
+        ev_desc = "現價 172.00 摜破 130% 追繳警戒線 (172.50 元)！融資追繳令引爆斷頭賣壓，空單續抱擴大戰果！"
+    elif alert_type == 'STOP_LOSS':
+        ev_title = "🛑【空單停損・破線反抽】"
+        ev_desc = "現價 192.00 突破停損價 191.50，空單嚴格強制回補離場！"
+    elif alert_type == 'TP1':
+        ev_title = "💰【斷頭停利・初段回補】"
+        ev_desc = "現價 170.00 摜破第一目標 170.00，建議回補 1/2 保留勝果！"
+    elif alert_type == 'TP2':
+        ev_title = "🎯【波段滿足・全數獲利】"
+        ev_desc = "現價 157.00 摜破第二目標 157.00，斷頭骨牌滿足，空單全數獲利了結！"
+    elif alert_type == 'ENTRY':
+        ev_title = "🔻【起跌建倉・空方出擊】"
+        ev_desc = "現價 185.00 落入空方建倉區間，啟動放空佈局！"
+    else:
+        ev_title = "⚡【破底加空・空頭延續】"
+        ev_desc = "現價 180.00 摜破加碼價 180.50，融資斷頭賣壓傾瀉，動能確認加空追擊！"
+
     card = build_price_alert_card(
         target=test_target,
         rt=test_rt,
-        event_type="ADDON",
-        event_title="⚡【破底加空・空頭延續】",
-        event_desc="現價 180.00 摜破加碼價 180.50，融資斷頭賣壓傾瀉，動能確認加空追擊！",
+        event_type=alert_type,
+        event_title=ev_title,
+        event_desc=ev_desc,
         strategy_id=STRATEGY_ID
     )
 
@@ -468,11 +535,20 @@ def main():
     parser.add_argument("--once", action="store_true", help="執行單次快篩巡邏後結束")
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
     parser.add_argument("--test-push", action="store_true", help="發送一則模擬到價推播以測試連線")
+    parser.add_argument("--test-alert", type=str, default=None, choices=["MARGIN_CALL", "STOP_LOSS", "TP1", "TP2", "ADDON", "ENTRY"], help="模擬特定到價事件推播測試")
+    parser.add_argument("--force", action="store_true", help="強制執行雷達監控 (略過休市防禦)")
     args = parser.parse_args()
 
-    if args.test_push:
-        send_test_push()
+    if args.test_push or args.test_alert:
+        send_test_push(alert_type=args.test_alert or "ADDON")
         return
+
+    # 休市防護檢驗 (未開盤日自動靜默結束，節省運算與通訊資源)
+    if not args.force:
+        suppress, reason = should_suppress_push(force=False, task_type="盤中雷達")
+        if suppress:
+            print(f"🛑 [休市防禦] 台股今日未開盤: {reason}，已自動靜默結束盤中雷達。使用 --force 可強制執行。")
+            return
 
     targets = load_targets()
     notified_events = {}

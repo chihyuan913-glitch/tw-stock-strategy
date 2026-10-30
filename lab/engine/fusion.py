@@ -24,13 +24,14 @@ KNOWN_STRATEGIES_MAP = {
     "01_bollinger_reversal": {"id": "01", "folder": "01_bollinger_reversal", "name": "策略01・布林通道下軌超跌反轉", "lab_strategy_id": "01", "scenario": "bb_reversal"},
     "02_institutional_momentum": {"id": "02", "folder": "02_institutional_momentum", "name": "策略02・法人籌碼集中起漲動能", "lab_strategy_id": "02", "scenario": "trend_up"},
     "03_short_momentum": {"id": "03", "folder": "03_short_momentum", "name": "策略03・弱勢破線做空與股期避險", "lab_strategy_id": "03", "scenario": "trend_down"},
-    "04_cb_pricing_ambush": {"id": "04", "folder": "04_cb_pricing_ambush", "name": "策略04・可轉債(CB)定價伏擊博弈", "lab_strategy_id": "01", "scenario": "bb_reversal"},
-    "05_stock_futures_long": {"id": "05", "folder": "05_stock_futures_long", "name": "策略05・個股期貨法人強勢波段多方", "lab_strategy_id": "02", "scenario": "trend_up"},
+    "04_cb_pricing_ambush": {"id": "04", "folder": "04_cb_pricing_ambush", "name": "策略04・可轉債(CB)定價伏擊博弈", "lab_strategy_id": "04", "scenario": "bb_reversal"},
+    "05_stock_futures_long": {"id": "05", "folder": "05_stock_futures_long", "name": "策略05・個股期貨法人強勢波段多方", "lab_strategy_id": "05", "scenario": "trend_up"},
     "06_volume_surge": {"id": "06", "folder": "06_volume_surge", "name": "策略06・成交量異常爆量起漲動能", "lab_strategy_id": "06", "scenario": "trend_up"},
-    "07_margin_call_ambush": {"id": "07", "folder": "07_margin_call_ambush", "name": "策略07・高融資斷頭伏擊與浮額清洗", "lab_strategy_id": "15", "scenario": "bb_reversal"},
-    "08_group_window_dressing": {"id": "08", "folder": "08_group_window_dressing", "name": "策略08・台股25大集團作帳母子共振", "lab_strategy_id": "12", "scenario": "trend_up"},
-    "09_treasury_stock_buyback": {"id": "09", "folder": "09_treasury_stock_buyback", "name": "策略09・庫藏股宣告護盤與低估值事件", "lab_strategy_id": "01", "scenario": "bb_reversal"},
-    "10_investment_trust_sprint": {"id": "10", "folder": "10_investment_trust_sprint", "name": "策略10・投信認養集中度爆發飆股", "lab_strategy_id": "02", "scenario": "trend_up"},
+    "07_margin_call_ambush": {"id": "07", "folder": "07_margin_call_ambush", "name": "策略07・高融資斷頭伏擊與浮額清洗", "lab_strategy_id": "07", "scenario": "panic"},
+    "08_group_window_dressing": {"id": "08", "folder": "08_group_window_dressing", "name": "策略08・台股25大集團作帳母子共振", "lab_strategy_id": "08", "scenario": "quarter_end"},
+    "09_treasury_stock_buyback": {"id": "09", "folder": "09_treasury_stock_buyback", "name": "策略09・庫藏股宣告護盤與低估值事件", "lab_strategy_id": "09", "scenario": "panic"},
+    "10_investment_trust_sprint": {"id": "10", "folder": "10_investment_trust_sprint", "name": "策略10・投信認養集中度爆發飆股", "lab_strategy_id": "10", "scenario": "quarter_end"},
+    "11_revenue_volume_breakout": {"id": "11", "folder": "11_revenue_volume_breakout", "name": "策略11・營收創高與量價突破成長動能", "lab_strategy_id": "11", "scenario": "trend_up"},
 }
 LIVE_STRATEGIES_META = list(KNOWN_STRATEGIES_MAP.values())
 
@@ -498,20 +499,27 @@ class ScreenerFusionBridge:
         is_box_regime = ("震盪" in regime_label) or ("箱型" in regime_label)
 
         candidate_list = [
-            {"id": "01", "name": "01・布林下軌超跌反轉 (Mean Reversion)", "category": "均值回歸", "scenario": "bb_reversal"},
-            {"id": "02", "name": "02・法人籌碼集中起漲 (Inst. Momentum)", "category": "籌碼動能", "scenario": "trend_up"},
-            {"id": "03", "name": "03・弱勢破線做空避險 (Short Breakdown)", "category": "空方避險", "scenario": "trend_down"},
-            {"id": "06", "name": "06・量價爆量突破 (Volume Surge)", "category": "量價動能", "scenario": "trend_up"},
-            {"id": "11", "name": "11・KD(9,3,3) 低檔黃金交叉", "category": "技術指標", "scenario": "bb_reversal"},
-            {"id": "12", "name": "12・均線多頭排列 (MA5>10>20)", "category": "趨勢順勢", "scenario": "trend_up"},
-            {"id": "13", "name": "13・向上跳空缺口不補", "category": "型態突破", "scenario": "trend_up"},
-            {"id": "14", "name": "14・月營收創高＋次月10日錨定", "category": "基本面動能", "scenario": "trend_up"},
-            {"id": "15", "name": "15・融資減少散戶退場沉澱", "category": "籌碼沉澱", "scenario": "bb_reversal"},
+            {"id": "01", "name": "01・布林下軌超跌反轉 (Bollinger Reversal)", "category": "實盤策略", "scenario": "bb_reversal"},
+            {"id": "02", "name": "02・法人籌碼集中起漲 (Inst. Momentum)", "category": "實盤策略", "scenario": "trend_up"},
+            {"id": "03", "name": "03・弱勢破線做空避險 (Short Breakdown)", "category": "實盤策略", "scenario": "trend_down"},
+            {"id": "04", "name": "04・可轉債定價伏擊 (CB Pricing Ambush)", "category": "實盤策略", "scenario": "bb_reversal"},
+            {"id": "05", "name": "05・個股期貨法人波段 (Futures Long)", "category": "實盤策略", "scenario": "trend_up"},
+            {"id": "06", "name": "06・量價爆量突破 (Volume Surge)", "category": "實盤策略", "scenario": "trend_up"},
+            {"id": "07", "name": "07・高融資斷頭伏擊 (Margin Call Ambush)", "category": "實盤策略", "scenario": "panic"},
+            {"id": "08", "name": "08・集團作帳母子共振 (Group Dressing)", "category": "實盤策略", "scenario": "quarter_end"},
+            {"id": "09", "name": "09・庫藏股宣告護盤 (Treasury Buyback)", "category": "實盤策略", "scenario": "panic"},
+            {"id": "10", "name": "10・投信認養爆發飆股 (Trust Sprint)", "category": "實盤策略", "scenario": "quarter_end"},
+            {"id": "11", "name": "11・營收創高量價突破 (Revenue Breakout)", "category": "實盤策略", "scenario": "trend_up"},
             {"id": "tpl_01", "name": "範本1・法人連買＋均線多頭共振", "category": "複合多因子", "scenario": "trend_up"},
             {"id": "tpl_02", "name": "範本2・KD低檔金叉＋RSI超賣反彈", "category": "複合多因子", "scenario": "bb_reversal"},
             {"id": "tpl_03", "name": "範本3・月營收年增＋量價突破", "category": "複合多因子", "scenario": "trend_up"},
             {"id": "tpl_04", "name": "範本4・融資清洗＋法人逆勢抄底", "category": "複合多因子", "scenario": "bb_reversal"},
             {"id": "tpl_05", "name": "範本5・破月線＋法人出貨順勢放空", "category": "複合多因子", "scenario": "trend_down"},
+            {"id": "kd", "name": "因子積木・KD(9,3,3) 低檔金叉", "category": "技術指標", "scenario": "bb_reversal"},
+            {"id": "12", "name": "因子積木・均線多頭排列 (MA5>10>20)", "category": "趨勢順勢", "scenario": "trend_up"},
+            {"id": "13", "name": "因子積木・向上跳空缺口不補", "category": "型態突破", "scenario": "trend_up"},
+            {"id": "14", "name": "因子積木・月營收創高＋次月10日錨定", "category": "基本面動能", "scenario": "trend_up"},
+            {"id": "15", "name": "因子積木・融資減少散戶退場沉澱", "category": "籌碼沉澱", "scenario": "bb_reversal"},
         ]
 
         # 自動納入使用者儲存之「自訂策略積木」

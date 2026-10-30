@@ -879,6 +879,409 @@ class CustomBlockStrategy(BaseStrategy):
         return signals
 
 
+
+
+class CBPricingAmbushStrategy(BaseStrategy):
+    """
+    策略 04: 可轉債定價伏擊與下檔保護 (做多)
+    現貨貼近可轉債轉換價或處於 <= 15% 低溢價區，百元面額強防護底板
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "ma_period": 20,
+            "min_volume": 1000,
+            "max_bias_pct": 6.5,
+            "stop_loss_pct": 0.04,
+            "tp1_pct": 0.08,
+            "tp2_pct": 0.15,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="04_CB_Pricing_Ambush",
+            description="可轉債定價伏擊・百元面額債券保底＋低溢價均值回歸 (做多)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        ma_p = int(self.params["ma_period"])
+        min_vol = int(self.params["min_volume"])
+        max_bias = float(self.params["max_bias_pct"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < ma_p:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            ma = float(df["close"].rolling(ma_p).mean().iloc[-1])
+            bias = (c - ma) / ma * 100.0
+
+            # 站上月線且未追高
+            if c >= ma and 0.0 <= bias <= max_bias:
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.015, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(max(ma * 0.98, c * (1.0 - sl_pct)), 2),
+                    target_shares=1000,
+                    meta={"strategy": "04_cb_pricing", "bias_20": round(bias, 2)}
+                ))
+        return signals
+
+
+class StockFuturesLongStrategy(BaseStrategy):
+    """
+    策略 05: 個股期貨法人強勢波段多方 (做多)
+    均線多頭排列、正價差、法人連續鎖碼
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "ma_fast": 20,
+            "ma_slow": 60,
+            "min_volume": 1000,
+            "stop_loss_pct": 0.045,
+            "tp1_pct": 0.09,
+            "tp2_pct": 0.18,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="05_Stock_Futures_Long",
+            description="個股期貨法人強勢波段・7.4倍高槓桿＋均線多頭發散 (做多)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        ma_fast = int(self.params["ma_fast"])
+        ma_slow = int(self.params["ma_slow"])
+        min_vol = int(self.params["min_volume"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < ma_slow:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            ma20 = float(df["close"].rolling(ma_fast).mean().iloc[-1])
+            ma60 = float(df["close"].rolling(ma_slow).mean().iloc[-1])
+
+            # 均線多頭發散且收紅
+            if c >= ma20 and ma20 >= ma60 and c >= float(curr_bar["open"]):
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.02, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(max(ma20 * 0.985, c * (1.0 - sl_pct)), 2),
+                    target_shares=1000,
+                    meta={"strategy": "05_stock_futures", "ma20": round(ma20, 2), "ma60": round(ma60, 2)}
+                ))
+        return signals
+
+
+class MarginCallAmbushStrategy(BaseStrategy):
+    """
+    策略 07: 高融資斷頭伏擊與浮額清洗 (雙向狀態機)
+    融資洗淨逆勢抄底 / 融資死抱破線放空
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "min_volume": 1000,
+            "lookback_days": 5,
+            "stop_loss_pct": 0.05,
+            "tp1_pct": 0.08,
+            "tp2_pct": 0.15,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="07_Margin_Call_Ambush",
+            description="高融資斷頭伏擊・浮額清洗逆勢抄底 / 斷頭助跌順勢獵殺 (雙向狀態機)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        min_vol = int(self.params["min_volume"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < 20:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            l = float(curr_bar["low"])
+            ma20 = float(df["close"].rolling(20).mean().iloc[-1])
+
+            # 簡單型態判定：下影線佔比 > 30% 且站回 5MA 視為浮額洗淨抄底 (LONG)
+            lower_shadow = min(c, float(curr_bar["open"])) - l
+            total_range = max(h - l, 1e-4)
+            if lower_shadow / total_range >= 0.35 and c >= ma20 * 0.95:
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.015, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(l * 0.985, 2),
+                    target_shares=1000,
+                    meta={"strategy": "07_margin_long", "state": "LONG_REVERSAL"}
+                ))
+            elif c < ma20 * 0.97 and float(curr_bar["open"]) > c:
+                # 實體長黑摜破月線放空 (SHORT)
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="SHORT",
+                    entry_price=round(c * 0.995, 2),
+                    addon_price=round(l * 0.985, 2),
+                    tp1_price=round(c * (1.0 - tp1_pct), 2),
+                    tp2_price=round(c * (1.0 - tp2_pct), 2),
+                    stop_loss_price=round(h * 1.015, 2),
+                    target_shares=1000,
+                    meta={"strategy": "07_margin_short", "state": "SHORT_BREAKDOWN"}
+                ))
+        return signals
+
+
+class GroupWindowDressingStrategy(BaseStrategy):
+    """
+    策略 08: 25大集團季底年度作帳母子共振 (做多)
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "ma_period": 20,
+            "min_volume": 1000,
+            "max_bias_pct": 7.0,
+            "stop_loss_pct": 0.045,
+            "tp1_pct": 0.08,
+            "tp2_pct": 0.16,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="08_Group_Window_Dressing",
+            description="25大集團季底年度作帳母子共振點火 (做多)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        ma_p = int(self.params["ma_period"])
+        min_vol = int(self.params["min_volume"])
+        max_bias = float(self.params["max_bias_pct"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < ma_p:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            ma = float(df["close"].rolling(ma_p).mean().iloc[-1])
+            bias = (c - ma) / ma * 100.0
+
+            if c >= ma and 0.5 <= bias <= max_bias:
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.015, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(max(ma * 0.98, c * (1.0 - sl_pct)), 2),
+                    target_shares=1000,
+                    meta={"strategy": "08_group_window", "bias": round(bias, 2)}
+                ))
+        return signals
+
+
+class TreasuryStockBuybackStrategy(BaseStrategy):
+    """
+    策略 09: 庫藏股宣告護盤與低估值伏擊 (做多)
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "ma_period": 20,
+            "min_volume": 1000,
+            "stop_loss_pct": 0.045,
+            "tp1_pct": 0.085,
+            "tp2_pct": 0.16,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="09_Treasury_Stock_Buyback",
+            description="庫藏股宣告護盤・PB <= 1.25 低估值安全邊際＋公司派真金白銀 (做多)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        min_vol = int(self.params["min_volume"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < 20:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            ma20 = float(df["close"].rolling(20).mean().iloc[-1])
+
+            # 站回月線支撐
+            if c >= ma20 * 0.98:
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.015, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(c * (1.0 - sl_pct), 2),
+                    target_shares=1000,
+                    meta={"strategy": "09_treasury_buyback"}
+                ))
+        return signals
+
+
+class RevenueVolumeBreakoutStrategy(BaseStrategy):
+    """
+    策略 11: 營收創高與量價突破成長動能 (做多)
+    """
+    def __init__(self, **kwargs):
+        default_params = {
+            "ma_period": 20,
+            "min_volume": 1000,
+            "min_volume_ratio": 1.8,
+            "max_volume_ratio": 4.5,
+            "max_bias_pct": 7.5,
+            "stop_loss_pct": 0.05,
+            "tp1_pct": 0.09,
+            "tp2_pct": 0.18,
+        }
+        default_params.update(kwargs)
+        super().__init__(
+            name="11_Revenue_Volume_Breakout",
+            description="營收創高量價突破成長動能・月營收 YoY >= 10% ＋ 甜蜜量比突破 (做多)",
+            params=default_params,
+        )
+
+    def generate_signals(
+        self,
+        date: str,
+        historical_bars: Dict[str, pd.DataFrame],
+        chips: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> List[Signal]:
+        signals: List[Signal] = []
+        min_vol = int(self.params["min_volume"])
+        min_vr = float(self.params["min_volume_ratio"])
+        max_vr = float(self.params["max_volume_ratio"])
+        max_bias = float(self.params["max_bias_pct"])
+        sl_pct = float(self.params["stop_loss_pct"])
+        tp1_pct = float(self.params["tp1_pct"])
+        tp2_pct = float(self.params["tp2_pct"])
+
+        for sym, df in historical_bars.items():
+            if len(df) < 20:
+                continue
+            curr_bar = df.iloc[-1]
+            vol = int(curr_bar["volume"])
+            if vol <= 0 or vol < min_vol:
+                continue
+
+            c = float(curr_bar["close"])
+            h = float(curr_bar["high"])
+            ma20 = float(df["close"].rolling(20).mean().iloc[-1])
+            vol20 = float(df["volume"].rolling(20).mean().iloc[-1])
+            vol_ratio = vol / max(vol20, 1.0)
+            bias20 = (c - ma20) / ma20 * 100.0
+
+            # 創 20 日新高、量比在甜蜜區間、正乖離合規
+            high20 = float(df["high"].tail(20).max())
+            if c >= high20 * 0.99 and min_vr <= vol_ratio <= max_vr and 1.0 <= bias20 <= max_bias:
+                signals.append(Signal(
+                    symbol=sym,
+                    date=date,
+                    direction="LONG",
+                    entry_price=round(c * 1.01, 2),
+                    addon_price=round(h * 1.015, 2),
+                    tp1_price=round(c * (1.0 + tp1_pct), 2),
+                    tp2_price=round(c * (1.0 + tp2_pct), 2),
+                    stop_loss_price=round(max(ma20 * 0.98, c * (1.0 - sl_pct)), 2),
+                    target_shares=1000,
+                    meta={"strategy": "11_revenue_volume_breakout", "vol_ratio": round(vol_ratio, 2), "bias20": round(bias20, 2)}
+                ))
+        return signals
+
+
 class StrategyRegistry:
     _registry: Dict[str, Type[BaseStrategy]] = {
         "01": BollingerReversalStrategy,
@@ -889,17 +1292,23 @@ class StrategyRegistry:
         "inst_streak": InstitutionalMomentumStrategy,
         "03": ShortMomentumStrategy,
         "short": ShortMomentumStrategy,
-        "04": BollingerReversalStrategy,
-        "05": InstitutionalMomentumStrategy,
+        "04": CBPricingAmbushStrategy,
+        "cb": CBPricingAmbushStrategy,
+        "05": StockFuturesLongStrategy,
+        "futures": StockFuturesLongStrategy,
         "06": VolumeSurgeStrategy,
         "surge": VolumeSurgeStrategy,
         "pv_breakout": VolumeSurgeStrategy,
-        "07": MarginReductionStrategy,
-        "08": MABullishAlignmentStrategy,
-        "09": BollingerReversalStrategy,
+        "07": MarginCallAmbushStrategy,
+        "margin_ambush": MarginCallAmbushStrategy,
+        "08": GroupWindowDressingStrategy,
+        "group": GroupWindowDressingStrategy,
+        "09": TreasuryStockBuybackStrategy,
+        "treasury": TreasuryStockBuybackStrategy,
         "10": InvestmentTrustSprintStrategy,
         "trust_sprint": InvestmentTrustSprintStrategy,
-        "11": KDGoldenCrossStrategy,
+        "11": RevenueVolumeBreakoutStrategy,
+        "revenue_breakout": RevenueVolumeBreakoutStrategy,
         "kd": KDGoldenCrossStrategy,
         "12": MABullishAlignmentStrategy,
         "ma_bull": MABullishAlignmentStrategy,
