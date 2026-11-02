@@ -409,7 +409,11 @@ class ScreenerFusionBridge:
                         )
 
                 resonance_bonus = 12.0 if is_resonance else 0.0
-                composite_rank = round(p["score"] * 0.5 + hist_wr * 0.3 + hist_ret * 1.2 + rr_ratio * 2.5 + resonance_bonus, 1)
+                tier_bonus_map = {"11": 10.0, "06": 9.0, "05": 8.5, "10": 8.5, "08": 7.5, "02": 6.5, "04": 6.0, "01": 5.0, "09": 4.5, "07": 4.0, "03": 4.0}
+                tier_badge_map = {"11": "👑 S級主攻", "06": "👑 S級主攻", "05": "👑 S級主攻", "10": "👑 S級主攻", "08": "⚔️ A級催化", "02": "⚔️ A級催化", "04": "⚔️ A級催化", "01": "🛡️ B級防禦", "09": "🛡️ B級防禦", "07": "⚡ 避險戰術", "03": "⚡ 避險戰術"}
+                strat_tier_bonus = tier_bonus_map.get(meta["id"], 4.0)
+                strat_tier_badge = tier_badge_map.get(meta["id"], "⚔️ A級催化")
+                composite_rank = round(p["score"] * 0.5 + hist_wr * 0.3 + hist_ret * 1.2 + rr_ratio * 2.5 + resonance_bonus + strat_tier_bonus, 1)
 
                 recommendations.append({
                     "priority": priority,
@@ -418,6 +422,7 @@ class ScreenerFusionBridge:
                     "name": p["name"],
                     "date": p["date"],
                     "source_strategy": meta["name"],
+                    "strategy_tier_badge": strat_tier_badge if "strat_tier_badge" in locals() else "⚔️ A級催化",
                     "lab_strategy_id": lab_sid,
                     "direction": p["direction"],
                     "is_resonance": is_resonance,
@@ -545,7 +550,7 @@ class ScreenerFusionBridge:
 
         base_seed = sum(ord(c) for c in "".join(target_symbols)) % 900 + 10
         scenario_data_cache: Dict[str, Dict[str, Any]] = {}
-        for scen in ("trend_up", "bb_reversal", "trend_down"):
+        for scen in ("trend_up", "bb_reversal", "trend_down", "panic", "quarter_end"):
             m_data = {}
             for idx_s, s in enumerate(target_symbols):
                 key_sym = f"{s}_{scen}"
@@ -598,12 +603,18 @@ class ScreenerFusionBridge:
             else:
                 grade = "🥉 C級・觀察候補"
 
+            cap_weight_map = {
+                "11": 16.0, "06": 12.0, "05": 12.0, "10": 12.0,
+                "08": 10.0, "02": 10.0, "04": 8.0, "01": 8.0,
+                "09": 6.0, "07": 3.0, "03": 3.0
+            }
             leaderboard.append({
                 "strategy_id": item["id"],
                 "name": item["name"],
                 "category": item["category"],
                 "grade": grade,
                 "score": score,
+                "capital_weight_pct": cap_weight_map.get(item["id"], 5.0),
                 "total_return_pct": ret,
                 "win_rate_pct": wr,
                 "sharpe_ratio": sharpe,

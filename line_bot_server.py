@@ -58,6 +58,20 @@ CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or ENV.get("L
 
 app = FastAPI(title="台股盤中即時隨傳隨回 LINE Bot")
 
+STRATEGIES = [
+    "01_bollinger_reversal",
+    "02_institutional_momentum",
+    "03_short_momentum",
+    "04_cb_pricing_ambush",
+    "05_stock_futures_long",
+    "06_volume_surge",
+    "07_margin_call_ambush",
+    "08_group_window_dressing",
+    "09_treasury_stock_buyback",
+    "10_investment_trust_sprint",
+    "11_revenue_volume_breakout"
+]
+
 try:
     from lab.web.router import router as lab_router
     app.include_router(lab_router)
@@ -910,6 +924,17 @@ async def refresh_market_pulse():
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/strategy/tiers")
+async def get_strategy_tiers_api():
+    """提供台股量化策略四級優化分級 (S/A/B/HEDGE) 與動態資金配置矩陣"""
+    try:
+        from adaptive_regime_manager import get_strategy_tier_grading, load_adaptive_config
+        cfg = load_adaptive_config()
+        regime_key = cfg.get("market_regime", {}).get("key", "SIDEWAYS_CONSOLIDATION")
+        return get_strategy_tier_grading(regime_key=regime_key)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/overview")
 async def get_overview():
     """提供大盤現況與全策略入選總數概覽"""
@@ -929,7 +954,8 @@ async def get_overview():
         "07_margin_call_ambush",
         "08_group_window_dressing",
         "09_treasury_stock_buyback",
-        "10_investment_trust_sprint"
+        "10_investment_trust_sprint",
+        "11_revenue_volume_breakout"
     ]
     for s in strat_dirs:
         csv_file = Path(__file__).resolve().parent / "strategies" / s / "result.csv"
@@ -996,6 +1022,10 @@ async def get_strategy_data(strat_id: str):
         "10_investment_trust_sprint": {
             "name": "策略 10：投信認養集中度爆發飆股策略",
             "desc": "鎖定投信連續重金吃貨認養、籌碼高度集中鎖碼、均線多頭起漲且嚴守乖離防追高之中小型爆發飆股。"
+        },
+        "11_revenue_volume_breakout": {
+            "name": "策略 11：台股營收創高與量價突破成長動能策略",
+            "desc": "結合月營收高速成長與放量突破 20 日新高，前置 VCP 波動收斂，雙軌操盤四大防線與到價即時雷達。"
         }
     }
 

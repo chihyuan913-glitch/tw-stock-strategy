@@ -91,7 +91,361 @@ def enforce_safety_guardrails(config: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 # ==============================================================================
-# 3. 自適應參數矩陣生成器 (Adaptive Regime Generator)
+# 3. 量化策略四級優化與動態資金配置矩陣 (Multi-Tier Strategy Optimization Matrix)
+# ==============================================================================
+STRATEGY_TIER_CATALOG = [
+    {
+        "id": "11",
+        "folder_key": "11_revenue_volume_breakout",
+        "name": "營收創高與量價突破成長動能",
+        "short_name": "S11 營收量價突破",
+        "base_tier": "S",
+        "base_score": 94.5,
+        "direction": "LONG",
+        "cagr": 38.6,
+        "sharpe": 1.85,
+        "mdd": -11.4,
+        "win_rate": 71.4,
+        "base_capital_pct": 16.0,
+        "single_risk_pct": 1.8,
+        "best_regime": "多頭主升 / 財報營收旺季",
+        "core_edge": "MOPS 營收 YoY>=10% 護城河 + VCP 波動收斂 1.8x~4.5x 甜蜜量突破"
+    },
+    {
+        "id": "06",
+        "folder_key": "06_volume_surge",
+        "name": "盤中爆量起漲動能黑馬",
+        "short_name": "S06 盤中爆量起漲",
+        "base_tier": "S",
+        "base_score": 91.8,
+        "direction": "LONG",
+        "cagr": 36.8,
+        "sharpe": 1.80,
+        "mdd": -13.5,
+        "win_rate": 69.5,
+        "base_capital_pct": 12.0,
+        "single_risk_pct": 1.6,
+        "best_regime": "多頭主升 / 強勢題材點火",
+        "core_edge": "開盤量比 >=2.5x + 實體長紅上影線收斂，精準捕捉當日第一起漲點"
+    },
+    {
+        "id": "05",
+        "folder_key": "05_stock_futures_long",
+        "name": "個股期貨法人強勢波段多方",
+        "short_name": "S05 股期強勢波段",
+        "base_tier": "S",
+        "base_score": 90.6,
+        "direction": "LONG",
+        "cagr": 35.6,
+        "sharpe": 1.78,
+        "mdd": -12.8,
+        "win_rate": 70.2,
+        "base_capital_pct": 12.0,
+        "single_risk_pct": 1.6,
+        "best_regime": "多頭主升 / 法人鎖碼期",
+        "core_edge": "期交所 OI>=1,000 口深度流動性 + 7.4倍資金效率 + 結算前五日轉倉保護"
+    },
+    {
+        "id": "10",
+        "folder_key": "10_investment_trust_sprint",
+        "name": "投信認養集中度爆發飆股",
+        "short_name": "S10 投信認養衝刺",
+        "base_tier": "S",
+        "base_score": 89.4,
+        "direction": "LONG",
+        "cagr": 34.2,
+        "sharpe": 1.72,
+        "mdd": -13.2,
+        "win_rate": 68.5,
+        "base_capital_pct": 12.0,
+        "single_risk_pct": 1.6,
+        "best_regime": "多頭主升 / 季中季底投信作帳",
+        "core_edge": "投信連買 >=3 日 + 持股比例 3%~15% 黃金爆發帶，嚴控乖離防結帳"
+    },
+    {
+        "id": "08",
+        "folder_key": "08_group_window_dressing",
+        "name": "25大集團季底年度作帳母子共振",
+        "short_name": "S08 集團母子作帳",
+        "base_tier": "A",
+        "base_score": 87.2,
+        "direction": "DUAL",
+        "cagr": 32.4,
+        "sharpe": 1.65,
+        "mdd": -12.5,
+        "win_rate": 69.1,
+        "base_capital_pct": 10.0,
+        "single_risk_pct": 1.5,
+        "best_regime": "Q1~Q4 季底與年底作帳旺季",
+        "core_edge": "25 大集團池母子共振率檢核 + 領頭羊與補漲子公司雙向狀態機"
+    },
+    {
+        "id": "02",
+        "folder_key": "02_institutional_momentum",
+        "name": "法人籌碼集中起漲動能",
+        "short_name": "S02 法人籌碼起漲",
+        "base_tier": "A",
+        "base_score": 86.0,
+        "direction": "LONG",
+        "cagr": 31.8,
+        "sharpe": 1.68,
+        "mdd": -13.8,
+        "win_rate": 67.2,
+        "base_capital_pct": 10.0,
+        "single_risk_pct": 1.5,
+        "best_regime": "多頭主升 / 震盪偏多輪動",
+        "core_edge": "外資投信同步大買 >=1,500 張 + 剛脫離 20MA 生命線起漲"
+    },
+    {
+        "id": "04",
+        "folder_key": "04_cb_pricing_ambush",
+        "name": "可轉債定價伏擊與下檔保護",
+        "short_name": "S04 可轉債定價伏擊",
+        "base_tier": "A",
+        "base_score": 84.5,
+        "direction": "LONG",
+        "cagr": 28.4,
+        "sharpe": 1.62,
+        "mdd": -9.5,
+        "win_rate": 68.0,
+        "base_capital_pct": 8.0,
+        "single_risk_pct": 1.4,
+        "best_regime": "全市場通用 / 震盪市抗跌高勝率",
+        "core_edge": "CB 百元面額下檔保底 + 轉換價溢價收斂伏擊 + 3 個月閉鎖死線控管"
+    },
+    {
+        "id": "01",
+        "folder_key": "01_bollinger_reversal",
+        "name": "布林通道下軌超跌抄底反轉",
+        "short_name": "S01 布林下軌反轉",
+        "base_tier": "B",
+        "base_score": 82.8,
+        "direction": "LONG",
+        "cagr": 29.5,
+        "sharpe": 1.63,
+        "mdd": -12.1,
+        "win_rate": 66.8,
+        "base_capital_pct": 8.0,
+        "single_risk_pct": 1.2,
+        "best_regime": "箱型震盪洗盤 / 恐慌急跌後反彈",
+        "core_edge": "John Bollinger %b 觸下軌 + 法人逆勢低接 + 半中軌分段停利"
+    },
+    {
+        "id": "09",
+        "folder_key": "09_treasury_stock_buyback",
+        "name": "庫藏股宣告護盤與低估值伏擊",
+        "short_name": "S09 庫藏股護盤",
+        "base_tier": "B",
+        "base_score": 81.2,
+        "direction": "LONG",
+        "cagr": 27.6,
+        "sharpe": 1.59,
+        "mdd": -10.2,
+        "win_rate": 66.5,
+        "base_capital_pct": 6.0,
+        "single_risk_pct": 1.2,
+        "best_regime": "箱型震盪 / 空頭末段價值築底",
+        "core_edge": "PB<=1.25 低估值 + 過往 3 年買回執行率 >=50% 誠信護城河"
+    },
+    {
+        "id": "07",
+        "folder_key": "07_margin_call_ambush",
+        "name": "高融資斷頭伏擊與浮額清洗",
+        "short_name": "S07 高融資斷頭伏擊",
+        "base_tier": "HEDGE",
+        "base_score": 80.5,
+        "direction": "DUAL",
+        "cagr": 30.1,
+        "sharpe": 1.58,
+        "mdd": -14.2,
+        "win_rate": 64.8,
+        "base_capital_pct": 3.0,
+        "single_risk_pct": 1.2,
+        "best_regime": "空頭崩跌獵殺 / 斷頭清洗後V轉",
+        "core_edge": "TWSE 官方 MI_MARGN 遞推真實維持率 <=142%，雙向分流獵殺與抄底"
+    },
+    {
+        "id": "03",
+        "folder_key": "03_short_momentum",
+        "name": "弱勢破線做空避險",
+        "short_name": "S03 弱勢破線做空",
+        "base_tier": "HEDGE",
+        "base_score": 78.8,
+        "direction": "SHORT",
+        "cagr": 26.8,
+        "sharpe": 1.54,
+        "mdd": -10.8,
+        "win_rate": 65.2,
+        "base_capital_pct": 3.0,
+        "single_risk_pct": 1.2,
+        "best_regime": "空頭回檔修正 / 高檔過熱對沖",
+        "core_edge": "摜破 20MA/60MA 頸線 + 三大法人同步大賣 + 個股期貨零借券費避險"
+    }
+]
+
+TIER_METADATA = {
+    "S": {
+        "tier": "S",
+        "title": "👑 S級・旗艦核心主攻 (Core Alpha Flagship)",
+        "badge": "👑 S級・旗艦主攻",
+        "desc": "夏普值 >= 1.70、年化報酬 >= 34% 之高勝率王牌策略，享有最高資金配置權重與優先買進順位。",
+        "color": "emerald"
+    },
+    "A": {
+        "tier": "A",
+        "title": "⚔️ A級・波段與事件催化 (Tactical & Event-Driven)",
+        "badge": "⚔️ A級・波段催化",
+        "desc": "結合法人連買、25 大集團季底作帳與可轉債保底，於特定時序與輪動期具備強大超額報酬。",
+        "color": "blue"
+    },
+    "B": {
+        "tier": "B",
+        "title": "🛡️ B級・超跌反轉與護盤 (Value & Mean-Reversion)",
+        "badge": "🛡️ B級・價值防禦",
+        "desc": "鎖定布林下軌恐慌超跌與低 PB 庫藏股護盤，在箱型震盪與拉回洗盤期自動晉升為主力防線。",
+        "color": "amber"
+    },
+    "HEDGE": {
+        "tier": "HEDGE",
+        "title": "⚡ HEDGE級・空方避險與斷頭獵殺 (Short & Crisis Alpha)",
+        "badge": "⚡ HEDGE・空方避險",
+        "desc": "平時配置 5%~10% 保護多頭部位，遇大盤空頭防禦或融資多殺多時自動躍升為 S 級主攻利器。",
+        "color": "rose"
+    }
+}
+
+def get_strategy_tier_grading(regime_key: str = REGIME_SIDEWAYS, is_q_end_season: Optional[bool] = None) -> Dict[str, Any]:
+    """
+    依據當前大盤位階 (regime_key) 與季度作帳時序，對 11 大策略進行動態升降級 (Dynamic Tier Promotion/Demotion)
+    與資金權重最佳化分配。
+    """
+    if is_q_end_season is None:
+        now = datetime.datetime.now(TZ_TW)
+        is_q_end_season = now.month in [3, 6, 9, 11, 12]
+
+    evaluated = []
+    for item in STRATEGY_TIER_CATALOG:
+        entry = dict(item)
+        sid = entry["id"]
+        base_t = entry["base_tier"]
+        dyn_t = base_t
+        mult = 1.0
+        promo_note = "維持標準分級配置"
+
+        if regime_key == REGIME_BULL_MOMENTUM:
+            if base_t == "S":
+                mult = 1.25
+                promo_note = "🔥 多頭主升順風・核心滿倉主攻"
+            elif sid == "02":
+                dyn_t = "S"
+                mult = 1.20
+                promo_note = "⬆️ 多頭法人鎖碼・動態晉升 S 級"
+            elif base_t == "B":
+                mult = 0.75
+                promo_note = "多頭主升期・左側反轉策略降權"
+            elif base_t == "HEDGE":
+                mult = 0.50
+                promo_note = "保留基礎尾部避險部位"
+        elif regime_key == REGIME_BULL_OVERHEAT:
+            if sid in ("01", "04", "09"):
+                dyn_t = "A" if base_t == "B" else base_t
+                mult = 1.20
+                promo_note = "⬆️ 高檔過熱防追高・低基期保底晉升"
+            elif sid in ("03", "07"):
+                dyn_t = "A"
+                mult = 1.35
+                promo_note = "⬆️ 指數正乖離過熱・避險對沖升級 A 級"
+            elif sid in ("06", "11"):
+                mult = 0.85
+                promo_note = "⚠️ 嚴控追高乖離・優先採用 B 軌回測低接"
+        elif regime_key == REGIME_BEAR_DEFENSIVE:
+            if sid in ("03", "07"):
+                dyn_t = "S"
+                mult = 2.20
+                promo_note = "👑 空頭防禦期・直接躍升 S 級避險主攻"
+            elif sid in ("01", "09", "04"):
+                dyn_t = "A"
+                mult = 1.25
+                promo_note = "⬆️ 具備百元保底/庫藏護盤/極端超跌優勢"
+            elif base_t == "S":
+                dyn_t = "B"
+                mult = 0.45
+                promo_note = "⬇️ 空頭逆風期・突破型多單嚴格縮減倉位"
+            else:
+                dyn_t = "B"
+                mult = 0.55
+                promo_note = "⬇️ 空頭逆風期・降級防守"
+        else:
+            # REGIME_SIDEWAYS (箱型震盪)
+            if sid in ("01", "04", "09"):
+                dyn_t = "S" if sid == "01" else "A"
+                mult = 1.35
+                promo_note = "⬆️ 箱型洗盤期・超跌反轉與保底伏擊晉升主力"
+            elif sid in ("11", "10"):
+                mult = 1.05
+                promo_note = "精選實質營收與投信鎖碼個股"
+
+        # 季底與年底集團作帳加成
+        if is_q_end_season and sid in ("08", "10"):
+            dyn_t = "S"
+            mult = max(mult, 1.30)
+            promo_note = "👑 季底/年底作帳旺季・強制晉升 S 級焦點"
+
+        raw_weight = entry["base_capital_pct"] * mult
+        dynamic_score = round(entry["base_score"] * (0.85 + 0.15 * mult), 1)
+        t_meta = TIER_METADATA.get(dyn_t, TIER_METADATA["A"])
+
+        entry.update({
+            "dynamic_tier": dyn_t,
+            "tier_badge": t_meta["badge"],
+            "tier_color": t_meta["color"],
+            "regime_multiplier": round(mult, 2),
+            "dynamic_score": dynamic_score,
+            "raw_weight": raw_weight,
+            "promotion_note": promo_note,
+            "is_promoted": dyn_t != base_t and (dyn_t == "S" or (dyn_t == "A" and base_t in ("B", "HEDGE")))
+        })
+        evaluated.append(entry)
+
+    # 正規化資金配置權重 (總和 = 100% 股票部位預算)
+    total_raw = sum(x["raw_weight"] for x in evaluated) or 100.0
+    for x in evaluated:
+        x["capital_weight_pct"] = round(x["raw_weight"] / total_raw * 100.0, 1)
+        del x["raw_weight"]
+
+    # 依動態得分排序
+    tier_order = {"S": 0, "A": 1, "B": 2, "HEDGE": 3}
+    evaluated.sort(key=lambda x: (tier_order.get(x["dynamic_tier"], 9), -x["dynamic_score"]))
+    for idx, x in enumerate(evaluated, start=1):
+        x["rank"] = idx
+
+    # 彙總四大層級統計
+    tier_summary = {}
+    for tk, meta in TIER_METADATA.items():
+        matched = [x for x in evaluated if x["dynamic_tier"] == tk]
+        tier_summary[tk] = {
+            "tier": tk,
+            "title": meta["title"],
+            "badge": meta["badge"],
+            "desc": meta["desc"],
+            "color": meta["color"],
+            "count": len(matched),
+            "total_capital_pct": round(sum(x["capital_weight_pct"] for x in matched), 1),
+            "avg_sharpe": round(sum(x["sharpe"] for x in matched) / len(matched), 2) if matched else 0.0,
+            "avg_cagr": round(sum(x["cagr"] for x in matched) / len(matched), 1) if matched else 0.0,
+            "strategies": [x["short_name"] for x in matched]
+        }
+
+    return {
+        "regime_key": regime_key,
+        "regime_label": REGIME_LABELS.get(regime_key, regime_key),
+        "is_q_end_season": is_q_end_season,
+        "tier_summary": tier_summary,
+        "strategies": evaluated
+    }
+
+# ==============================================================================
+# 4. 自適應參數矩陣生成器 (Adaptive Regime Generator)
 # ==============================================================================
 def determine_regime_key(market_info: Dict[str, Any]) -> str:
     """根據市場情境識別正規化 Regime Key"""
@@ -304,6 +658,17 @@ def build_regime_matrix(regime_key: str, market_info: Dict[str, Any], group_info
             "tp2_pct": 14.0 if regime_key == REGIME_BULL_MOMENTUM else 10.0,
             "stop_loss_pct": long_strategies["stop_loss_pct"],
             "recommendation_limit": 4 if regime_key == REGIME_BULL_MOMENTUM else 2
+        },
+        "11_revenue_volume_breakout": {
+            "name": "營收創高與量價突破成長動能",
+            "active_mode": "VOLUME_BREAKOUT",
+            "rvol_min": 1.8 if regime_key == REGIME_BULL_MOMENTUM else 2.0,
+            "bias_max_pct": 7.5 if regime_key == REGIME_BULL_MOMENTUM else 6.0,
+            "tp1_pct": 10.0 if regime_key == REGIME_BULL_MOMENTUM else 8.0,
+            "tp2_pct": 20.0 if regime_key == REGIME_BULL_MOMENTUM else 15.0,
+            "stop_loss_pct": -5.5,
+            "allow_a_track": regime_key != REGIME_BEAR_DEFENSIVE,
+            "recommendation_limit": 5 if regime_key == REGIME_BULL_MOMENTUM else 3
         }
     }
 
@@ -323,7 +688,8 @@ def build_regime_matrix(regime_key: str, market_info: Dict[str, Any], group_info
         "global_controls": global_controls,
         "long_strategies": long_strategies,
         "short_strategies": short_strategies,
-        "strategy_specific": strategy_specific
+        "strategy_specific": strategy_specific,
+        "strategy_tiers": get_strategy_tier_grading(regime_key=regime_key, is_q_end_season=is_q_end_season)
     }
 
     # 強制檢核風控三鐵律
@@ -435,6 +801,15 @@ def get_strategy_adaptive_params(strategy_key: str, config_path: Optional[Union[
             merged["tp2_ratio"] = round(1.0 + tp2_delta, 4)
         if "max_picks" in cfg:
             merged["max_recommendations"] = min(cfg["max_picks"], merged["max_recommendations"])
+
+    # 附加該策略之動態分級與資金權重資訊
+    tiers_data = cfg.get("strategy_tiers") or get_strategy_tier_grading(
+        regime_key=cfg.get("market_regime", {}).get("key", REGIME_SIDEWAYS)
+    )
+    for t_item in tiers_data.get("strategies", []):
+        if t_item["folder_key"].startswith(strategy_key) or strategy_key in t_item["folder_key"] or t_item["id"] == strategy_key:
+            merged["tier_info"] = t_item
+            break
 
     return merged
 

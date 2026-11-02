@@ -893,40 +893,148 @@
 
     <!-- 2. 十大量化策略選股庫 (Strategies) -->
     <div id="view-strategies" class="space-y-6 hidden">
-      <!-- 策略子按鈕列 (01~11 全策略切換) -->
+      <!-- ★★★ 全策略四級優化分級與動態資金配置矩陣總覽 ★★★ -->
+      <div class="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-800/90 p-5 shadow-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-400 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-emerald-500/20">
+              🧭
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-base font-black text-white tracking-wide">台股量化策略優化分級與動態資金配置矩陣</h2>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                  機構級 4-Tier 體系
+                </span>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">依據加權指數趨勢位階 (Regime) 與歷史風報比，動態指引各層級資產配置權重與單筆風控上限</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400">目前位階適配：</span>
+            <span id="tierRegimeBadge" class="px-3 py-1 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
+              箱型高出低進 · 動態調校生效中
+            </span>
+          </div>
+        </div>
+
+        <!-- 四大層級橫向卡片 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <!-- 👑 S 級：核心主攻 -->
+          <div class="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-950/20 shadow space-y-2 hover:border-emerald-400/60 transition">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-emerald-400 flex items-center gap-1.5 text-sm">
+                <span>👑</span> S級・旗艦核心主攻
+              </span>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-black text-xs border border-emerald-500/30">
+                52.0% 權重
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              夏普 1.70+、CAGR 34%+ 之最高勝率王牌。享有最優先建倉順位與最大部位。
+            </p>
+            <div class="pt-1 border-t border-emerald-500/20 flex flex-wrap gap-1 text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-emerald-300 border border-slate-700">S11 營收突破 16%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-emerald-300 border border-slate-700">S06 爆量起漲 12%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-emerald-300 border border-slate-700">S05 股期波段 12%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-emerald-300 border border-slate-700">S10 投信認養 12%</span>
+            </div>
+          </div>
+
+          <!-- ⚔️ A 級：波段與事件催化 -->
+          <div class="p-3.5 rounded-xl border border-blue-500/40 bg-blue-950/20 shadow space-y-2 hover:border-blue-400/60 transition">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-blue-400 flex items-center gap-1.5 text-sm">
+                <span>⚔️</span> A級・波段與事件催化
+              </span>
+              <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono font-black text-xs border border-blue-500/30">
+                28.0% 權重
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              鎖定集團作帳、法人籌碼密集吃貨與可轉債保底，於季度節奏具超額爆發力。
+            </p>
+            <div class="pt-1 border-t border-blue-500/20 flex flex-wrap gap-1 text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-blue-300 border border-slate-700">S08 集團作帳 10%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-blue-300 border border-slate-700">S02 法人起漲 10%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-blue-300 border border-slate-700">S04 可轉債 8%</span>
+            </div>
+          </div>
+
+          <!-- 🛡️ B 級：超跌反轉與價值護盤 -->
+          <div class="p-3.5 rounded-xl border border-amber-500/40 bg-amber-950/20 shadow space-y-2 hover:border-amber-400/60 transition">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-amber-400 flex items-center gap-1.5 text-sm">
+                <span>🛡️</span> B級・價值防禦與反轉
+              </span>
+              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-black text-xs border border-amber-500/30">
+                14.0% 權重
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              布林下軌恐慌超跌與低估值庫藏股，在拉回洗盤或震盪市自動升級為第一線主力。
+            </p>
+            <div class="pt-1 border-t border-amber-500/20 flex flex-wrap gap-1 text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700">S01 布林超跌 8%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700">S09 庫藏宣告 6%</span>
+            </div>
+          </div>
+
+          <!-- ⚡ HEDGE 級：空方避險與斷頭獵殺 -->
+          <div class="p-3.5 rounded-xl border border-rose-500/40 bg-rose-950/20 shadow space-y-2 hover:border-rose-400/60 transition">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-rose-400 flex items-center gap-1.5 text-sm">
+                <span>⚡</span> HEDGE・空方避險對沖
+              </span>
+              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-black text-xs border border-rose-500/30">
+                6.0% (防禦期40%)
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              多頭期作為尾部對沖保護；大盤空頭或融資多殺多時自動躍升為 S 級獵殺主力。
+            </p>
+            <div class="pt-1 border-t border-rose-500/20 flex flex-wrap gap-1 text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-rose-300 border border-slate-700">S07 斷頭伏擊 3%</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-900 text-rose-300 border border-slate-700">S03 破線做空 3%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 策略子按鈕列 (01~11 全策略切換，帶有分級符號) -->
       <div class="flex flex-wrap gap-2 border-b border-slate-800/60 pb-2">
-        <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700 shadow">
-          策略 01：布林下軌超跌反轉
+        <button onclick="loadStrategyData('11_revenue_volume_breakout')" id="subbtn-11" class="px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 text-emerald-400 border border-slate-700 shadow flex items-center gap-1">
+          <span class="text-[10px]">👑 S級</span><span>11 營收量價突破</span>
         </button>
-        <button onclick="loadStrategyData('02_institutional_momentum')" id="subbtn-02" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 02：法人籌碼集中起漲
+        <button onclick="loadStrategyData('06_volume_surge')" id="subbtn-06" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">👑 S級</span><span>06 盤中爆量起漲</span>
         </button>
-        <button onclick="loadStrategyData('03_short_momentum')" id="subbtn-03" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 03：弱勢破線做空避險
+        <button onclick="loadStrategyData('05_stock_futures_long')" id="subbtn-05" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">👑 S級</span><span>05 個股期強勢波段</span>
         </button>
-        <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 04：可轉債定價伏擊
+        <button onclick="loadStrategyData('10_investment_trust_sprint')" id="subbtn-10" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">👑 S級</span><span>10 投信認養衝刺</span>
         </button>
-        <button onclick="loadStrategyData('05_stock_futures_long')" id="subbtn-05" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 05：個股期法人強勢波段
+        <button onclick="loadStrategyData('08_group_window_dressing')" id="subbtn-08" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">⚔️ A級</span><span>08 集團作帳母子</span>
         </button>
-        <button onclick="loadStrategyData('06_volume_surge')" id="subbtn-06" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 06：盤中爆量起漲動能
+        <button onclick="loadStrategyData('02_institutional_momentum')" id="subbtn-02" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">⚔️ A級</span><span>02 法人籌碼起漲</span>
         </button>
-        <button onclick="loadStrategyData('07_margin_call_ambush')" id="subbtn-07" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 07：高融資斷頭伏擊
+        <button onclick="loadStrategyData('04_cb_pricing_ambush')" id="subbtn-04" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">⚔️ A級</span><span>04 可轉債定價伏擊</span>
         </button>
-        <button onclick="loadStrategyData('08_group_window_dressing')" id="subbtn-08" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 08：集團作帳母子伏擊
+        <button onclick="loadStrategyData('01_bollinger_reversal')" id="subbtn-01" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">🛡️ B級</span><span>01 布林超跌反轉</span>
         </button>
-        <button onclick="loadStrategyData('09_treasury_stock_buyback')" id="subbtn-09" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 09：庫藏股宣告護盤
+        <button onclick="loadStrategyData('09_treasury_stock_buyback')" id="subbtn-09" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">🛡️ B級</span><span>09 庫藏宣告護盤</span>
         </button>
-        <button onclick="loadStrategyData('10_investment_trust_sprint')" id="subbtn-10" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 10：投信認養衝刺股
+        <button onclick="loadStrategyData('07_margin_call_ambush')" id="subbtn-07" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">⚡ 避險</span><span>07 高融資斷頭伏擊</span>
         </button>
-        <button onclick="loadStrategyData('11_revenue_volume_breakout')" id="subbtn-11" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200">
-          策略 11：營收創高量價突破
+        <button onclick="loadStrategyData('03_short_momentum')" id="subbtn-03" class="px-3 py-1.5 rounded text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <span class="text-[10px]">⚡ 避險</span><span>03 弱勢破線做空</span>
         </button>
       </div>
 
@@ -2931,7 +3039,22 @@
         const resp = await fetch(`/api/strategy/${stratId}`);
         const data = await resp.json();
         currentStrategyRawData = data;
-        document.getElementById('currentStrategyTitle').innerText = data.name || stratId;
+        const tierBadges = {
+          '11': '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">👑 S級・旗艦核心主攻 (資金 16% · 單筆風險 1.8%)</span>',
+          '06': '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">👑 S級・極速爆量主攻 (資金 12% · 單筆風險 1.6%)</span>',
+          '05': '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">👑 S級・股期強勢波段 (資金 12% · 單筆風險 1.6%)</span>',
+          '10': '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">👑 S級・投信認養衝刺 (資金 12% · 單筆風險 1.6%)</span>',
+          '08': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・集團作帳催化 (資金 10% · 季底作帳旺季加成)</span>',
+          '02': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・法人籌碼起漲 (資金 10% · 單筆風險 1.5%)</span>',
+          '04': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・可轉債定價伏擊 (資金 8% · 百元保底高勝率)</span>',
+          '01': '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">🛡️ B級・布林超跌反轉 (資金 8% · 箱型震盪自動升級)</span>',
+          '09': '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">🛡️ B級・庫藏股價值護盤 (資金 6% · PB<=1.25 安全邊際)</span>',
+          '07': '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/40">⚡ HEDGE・斷頭伏擊 (資金 3% · 空頭期躍升S級獵殺)</span>',
+          '03': '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/40">⚡ HEDGE・弱勢破線做空 (資金 3% · 股期零借券費避險)</span>'
+        };
+        const sKey = stratId.substring(0, 2);
+        const tBadge = tierBadges[sKey] || '';
+        document.getElementById('currentStrategyTitle').innerHTML = `<span>${data.name || stratId}</span> ${tBadge}`;
         document.getElementById('currentStrategyDesc').innerText = data.desc || '';
         const dateTag = data.date ? `（最新選股日：${data.date}）` : '';
         const total = data.total_count !== undefined ? data.total_count : (data.rows ? data.rows.length : 0);

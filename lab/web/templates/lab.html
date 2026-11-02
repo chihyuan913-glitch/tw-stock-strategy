@@ -1006,6 +1006,7 @@
         <th>夏普值 (Sharpe)</th>
         <th>最大回撤 (MDD)</th>
         <th>風報比 (Calmar)</th>
+        <th>建議資金配置</th>
         <th>綜合得分</th>
         <th>操作</th>
       </tr></thead><tbody>`;
@@ -1022,6 +1023,7 @@
           <td><strong>${r.sharpe_ratio}</strong></td>
           <td class="neg">-${r.max_drawdown_pct}%</td>
           <td>${r.calmar_ratio}</td>
+          <td><span class="tag tag-buy" style="font-family:monospace; font-weight:700;">${r.capital_weight_pct || 5}%</span></td>
           <td><strong>${r.score}</strong></td>
           <td><button class="btn btn-inline" onclick="importFromScreener('${r.strategy_id}', document.getElementById('symbols').value)">🚀 載入此策略</button></td>
         </tr>`;
