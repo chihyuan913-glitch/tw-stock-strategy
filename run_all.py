@@ -88,6 +88,12 @@ STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "11_revenue_volume_breakout" / "screener.py",
         "export": "result.csv",
     },
+    {
+        "id": "12_etf_event_radar",
+        "name": "全台 ETF 跨市場折溢價與價格行為事件雷達",
+        "script": ROOT_DIR / "strategies" / "12_etf_event_radar" / "screener.py",
+        "export": "result.csv",
+    },
 ]
 
 def run_strategy(strat_info, line=False, force=False):
@@ -142,6 +148,19 @@ def main():
 
     # 夜間官方數據沉澱完整性檢核 (若為 17:00 後執行，確認官方信用交易與法人結算到位)
     verify_twse_data_settlement(verbose=True)
+
+    # --------------------------------------------------------------------------
+    # 🏛️ 台股盤後總體宏觀與信用交易全戰報分析 (Market Analyst)
+    # 只要台股有開盤，自動執行信用交易、三大法人、融資維持率與未來盤勢研判
+    # --------------------------------------------------------------------------
+    try:
+        from market_analyst import run_market_analysis
+        print("\n" + "=" * 70)
+        print("🏛️ [排程聯動] 啟動台股盤後總體宏觀與信用交易解析引擎...")
+        print("=" * 70)
+        run_market_analysis(line=args.line, force=args.force)
+    except Exception as e_analyst:
+        print(f"[!] 台股盤後總體宏觀解析執行失敗或跳過: {e_analyst}")
 
     targets = list(STRATEGIES)
     known_ids = {s["id"] for s in targets}

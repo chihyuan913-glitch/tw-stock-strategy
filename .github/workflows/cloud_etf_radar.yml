@@ -1,0 +1,72 @@
+name: 🌐 雲端策略12 ETF跨市場雙階段事件雷達
+
+on:
+  schedule:
+    # 1. 台灣時間週一至週五 08:20 (UTC 00:20)：盤前早鳥跨市場預警快篩
+    - cron: '20 0 * * 1-5'
+    # 2. 台灣時間週一至週五 09:02 (UTC 01:02)：開盤實盤價格行為確認與下單指令產出
+    - cron: '2 1 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: '執行階段'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - 'auto'        # 依當前時鐘自動判定 (08:20~08:59 執行早鳥，09:00~13:35 執行開盤確認)
+          - 'premarket'   # 強制執行 08:20 盤前早鳥快篩
+          - 'confirm'     # 強制執行 09:02 開盤確認與下單卡片產出
+
+jobs:
+  run-etf-radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 簽出專案代碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 環境 (3.11)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安裝相依套件
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 執行策略 12 雙階段事件雷達
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_CHANNEL_ACCESS_TOKEN_BACKUP: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN_BACKUP }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          LINE_TARGET_STRATEGY_12: ${{ secrets.LINE_TARGET_STRATEGY_12 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          STAGE="${{ github.event.inputs.stage }}"
+          UTC_HOUR=$(date -u +%H)
+          UTC_MIN=$(date -u +%M)
+          echo "[+] 當前 UTC 時間: ${UTC_HOUR}:${UTC_MIN} (台灣時間約 $(( (10#$UTC_HOUR + 8) % 24 )):${UTC_MIN})"
+
+          if [ "$STAGE" = "premarket" ] || ([ "$STAGE" = "auto" ] && [ "$UTC_HOUR" -eq 0 ]); then
+            echo "[+] 啟動 08:20 盤前早鳥跨市場預警快篩..."
+            python strategies/12_etf_event_radar/screener.py --line
+          else
+            echo "[+] 啟動 09:02 開盤實盤確認與下單指令產出..."
+            python strategies/12_etf_event_radar/intraday_scanner.py --confirm --line
+          fi
+
+      - name: 自動提交最新選股報表與快取 (result.csv / premarket_candidates.json)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add strategies/12_etf_event_radar/result.csv strategies/12_etf_event_radar/result.md strategies/12_etf_event_radar/premarket_candidates.json all_etf_universe.json || true
+          if git diff --staged --quiet; then
+            echo "無報表異動，跳過提交。"
+          else
+            git commit -m "chore(etf-radar): 自動同步策略 12 最新報表與快取 [skip ci]"
+            git push
+          fi

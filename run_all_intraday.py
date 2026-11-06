@@ -97,6 +97,12 @@ INTRADAY_STRATEGIES = [
         "script": ROOT_DIR / "strategies" / "11_revenue_volume_breakout" / "intraday_scanner.py",
         "cwd": ROOT_DIR / "strategies" / "11_revenue_volume_breakout"
     },
+    {
+        "id": "12_etf_event_radar",
+        "name": "策略 12：全台 ETF 跨市場折溢價與到價確認雷達",
+        "script": ROOT_DIR / "strategies" / "12_etf_event_radar" / "intraday_scanner.py",
+        "cwd": ROOT_DIR / "strategies" / "12_etf_event_radar"
+    },
 ]
 
 def run_intraday_single(strat, extra_args):
