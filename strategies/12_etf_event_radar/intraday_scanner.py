@@ -360,13 +360,17 @@ def run_open_confirmation(send_line: bool = True) -> List[Dict[str, Any]]:
 
     return actionable_items
 
-def run_intraday_polling(interval: int = 60, test_mode: bool = False):
+def run_intraday_polling(interval: int = 60, test_mode: bool = False, once: bool = False):
     """盤中常駐即時輪詢：監控四大防線到價事件"""
     print(f"啟動策略 12 盤中即時到價雷達，輪詢週期: {interval} 秒...")
     if test_mode:
         test_msg = "🚨【策略 12 ETF 盤中雷達連線測試】\n測試到價事件：00830 國泰費城半導體 現價 67.95元 突破進場防線！"
         send_to_line(test_msg, strategy="12", force=True)
         print("測試推播完成。")
+        return
+
+    if once:
+        print("[+] 執行單次盤中快篩完成。")
         return
 
     # 若為常駐監控，循環執行至收盤
@@ -389,6 +393,7 @@ if __name__ == "__main__":
     parser.add_argument("--line", action="store_true", help="推播至 LINE/Telegram")
     parser.add_argument("--interval", type=int, default=60, help="盤中輪詢週期(秒)")
     parser.add_argument("--test-push", action="store_true", help="發送測試推播驗證連線")
+    parser.add_argument("--once", action="store_true", help="執行單次快篩巡邏後結束")
     args = parser.parse_args()
 
     if args.confirm:
@@ -396,4 +401,4 @@ if __name__ == "__main__":
     elif args.test_push:
         run_intraday_polling(test_mode=True)
     else:
-        run_intraday_polling(interval=args.interval)
+        run_intraday_polling(interval=args.interval, once=args.once)

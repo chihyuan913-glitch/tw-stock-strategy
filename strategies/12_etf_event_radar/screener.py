@@ -267,7 +267,7 @@ def fetch_batch_quotes(etf_items: List[Dict[str, Any]], batch_size: int = 25) ->
             pass
     return quotes
 
-def run_screener(send_line: bool = False, is_replay: bool = False) -> List[Dict[str, Any]]:
+def run_screener(send_line: bool = False, is_replay: bool = False, export_path: str = None) -> List[Dict[str, Any]]:
     """執行 08:20 盤前早鳥跨市場預警快篩"""
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     print(f"[{now_str}] 啟動策略 12：08:20 盤前早鳥跨市場事件預警器...")
@@ -338,7 +338,10 @@ def run_screener(send_line: bool = False, is_replay: bool = False) -> List[Dict[
         json.dump(candidates, f, ensure_ascii=False, indent=2)
 
     # 匯出標準 result.csv (UTF-8-BOM)
-    with open(RESULT_CSV, "w", encoding="utf-8-sig", newline="") as f:
+    target_csv = export_path if export_path else RESULT_CSV
+    if not os.path.isabs(target_csv):
+        target_csv = os.path.join(CURRENT_DIR, target_csv)
+    with open(target_csv, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["股票代碼", "股票名稱", "市場", "事件類型", "昨日收盤", "動態公允開盤價", "預估漲跌幅(%)", "海外複合錨定", "實戰操盤指引"])
         for c in candidates:
@@ -387,6 +390,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="策略 12 盤前早鳥跨市場預警器")
     parser.add_argument("--line", action="store_true", help="發送 LINE/Telegram 戰報推播")
     parser.add_argument("--replay", action="store_true", help="回測模式鎖定前夜結算與晨間走勢")
+    parser.add_argument("--export", type=str, default="result.csv", help="匯出 CSV 檔名")
+    parser.add_argument("--force", action="store_true", help="強制執行，忽略休市或狀態檢查")
     args = parser.parse_args()
 
-    run_screener(send_line=args.line, is_replay=args.replay)
+    run_screener(send_line=args.line, is_replay=args.replay, export_path=args.export)
