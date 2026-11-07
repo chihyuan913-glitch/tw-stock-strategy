@@ -548,7 +548,7 @@
     "name": "遠傳"
   },
   "4958": {
-    "contract": "LU",
+    "contract": "VV",
     "name": "臻鼎-KY"
   },
   "5871": {
@@ -1006,5 +1006,13 @@
   "3718": {
     "contract": "VQ",
     "name": "中光電投控"
+  },
+  "6442": {
+    "contract": "VS",
+    "name": "光聖"
+  },
+  "7769": {
+    "contract": "VU",
+    "name": "鴻勁"
   }
 }

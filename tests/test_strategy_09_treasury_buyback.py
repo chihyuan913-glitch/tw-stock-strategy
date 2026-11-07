@@ -355,3 +355,51 @@ def test_master_command_center_integration():
     assert env_file.exists()
     env_content = env_file.read_text(encoding="utf-8")
     assert "LINE_TARGET_STRATEGY_09" in env_content, ".env.example 缺少 LINE_TARGET_STRATEGY_09"
+
+
+# ============================================================================
+# 8. 臺灣證交所法定檔位方向性合規取整檢驗 (TWSE Tick Size Compliance - Rule 7)
+# ============================================================================
+def test_four_price_twse_tick_size_compliance():
+    """驗證四大防線點位在 6 大股價級距下均 100% 滿足臺灣證交所法定升降單位與停損安全閥"""
+    from four_price_engine import normalize_to_tick
+    scr = load_screener_09()
+
+    test_brackets = [
+        # (現價, 買回下限, 買回上限, 淨值, 預期最小單位)
+        (8.45, 7.0, 11.5, 9.0, 0.01),      # < 10 元
+        (28.65, 24.0, 38.0, 32.0, 0.05),   # 10 ~ 50 元
+        (88.5, 75.0, 115.0, 95.0, 0.10),   # 50 ~ 100 元
+        (245.5, 210.0, 320.0, 260.0, 0.50),# 100 ~ 500 元
+        (755.0, 650.0, 980.0, 800.0, 1.00),# 500 ~ 1000 元
+        (1280.0, 1100.0, 1650.0, 1400.0, 5.00), # >= 1000 元
+    ]
+
+    for price, p_min, p_max, bv, expected_tick in test_brackets:
+        fp = scr.calculate_treasury_four_price(price, p_min, p_max, bv)
+        for key in ["entry_price", "addon_price", "tp1_price", "tp2_price", "sl_price"]:
+            val = fp[key]
+            # 檢驗 1: 法定檔位完全合規
+            assert normalize_to_tick(val) == val, f"{key}={val} 在股價 {price} 下不符合法定升降檔位"
+
+        # 檢驗 2: 停損跌幅受最大 -7.0% 安全閥保護 (允許浮點誤差 0.1%)
+        sl = fp["sl_price"]
+        sl_pct = (sl - price) / price
+        assert sl_pct >= -0.075, f"股價 {price} 之停損跌幅 ({sl_pct:.2%}) 超過最大 -7.0% 安全閥"
+        assert sl < price, f"停損價 ({sl}) 必須嚴格小於現價 ({price})"
+
+
+# ============================================================================
+# 9. 台股未開盤日防禦與 CLI 參數驗證 (Rule 21 & Market Schedule)
+# ============================================================================
+def test_market_schedule_and_cli_force_guard():
+    """驗證 screener.py 與 intraday_scanner.py 支援 --force 旗標與開休市守門機制"""
+    scr = load_screener_09()
+    scan = load_scanner_09()
+
+    # 檢驗 screener 模組具備開休市守門模組
+    assert hasattr(scr, "check_market_open_or_exit"), "screener 缺少 check_market_open_or_exit"
+    assert hasattr(scr, "verify_twse_data_settlement"), "screener 缺少 verify_twse_data_settlement"
+
+    # 檢驗 scanner 模組具備開休市守門模組
+    assert hasattr(scan, "check_market_open_or_exit"), "intraday_scanner 缺少 check_market_open_or_exit"

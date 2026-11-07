@@ -531,7 +531,7 @@ def generate_markdown_report(summary, df_trades, df_hedge):
     md.append("# 🎯 台股策略 03：弱勢破線做空與股票期貨避險策略 歷史量化回測分析全報告\n\n")
     md.append(f"> **回測週期**：民國 114 年 1 月 1 日 (2025-01-01) ～ 民國 115 年 9 月 30 日 (2026-09-30) (共 21 個月，422 個交易日)  \n")
     md.append(f"> **核心標的池**：臺灣期貨交易所 252 檔個股期貨標的 (TAIFEX)  \n")
-    md.append(f"> **選股核心架構**：外資/投信 3 日倒貨 $\ge 1,000$ 張 ＋ 法人賣超佔比 $\ge 10\%$ ＋ 跌破月線下彎 ＋ 負乖離起跌安全區 $[-8\%, 0\%]$ ＋ K棒無長下影線  \n")
+    md.append(r"> **選股核心架構**：外資/投信 3 日倒貨 $\ge 1,000$ 張 ＋ 法人賣超佔比 $\ge 10\%$ ＋ 跌破月線下彎 ＋ 負乖離起跌安全區 $[-8\%, 0\%]$ ＋ K棒無長下影線  \n")
     md.append(f"> **產出時間**：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
     md.append("## 一、執行摘要與核心對比總表 (Executive Summary)\n\n")

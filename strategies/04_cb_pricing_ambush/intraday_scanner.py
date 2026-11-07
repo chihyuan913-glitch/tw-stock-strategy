@@ -309,11 +309,13 @@ def scan_once(targets: Dict[str, Dict[str, Any]], notified_events: dict, force_t
             if not confirmed:
                 print(f"    [🛡️ 防毛刺攔截] {code} {target['name']}: {cmsg}")
                 continue
+            p_disp = f"{round(price, 2):g}"
+            z_min_disp = f"{round(min_entry_zone, 2):g}"
             events_for_code.add('ENTRY')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ENTRY',
                 'event_title': '🟢 伏擊進場買點觸發',
-                'event_desc': f'現價 {price} 元 處於甜蜜進場區間 ({round(min_entry_zone, 1)} ~ {target["entry_price"]} 元) 且穩守防守線，賣壓竭盡量縮，可直接以現價或限價立即進場建倉！'
+                'event_desc': f'現價 {p_disp} 元 處於甜蜜進場區間 ({z_min_disp} ~ {target["entry_price"]} 元) 且穩守防守線，賣壓竭盡量縮，可直接以現價或限價立即進場建倉！'
             })
             continue
 

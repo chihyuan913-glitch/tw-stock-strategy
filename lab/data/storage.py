@@ -5,6 +5,7 @@ MarketStorage: 台股量化實驗室嵌入式資料庫驅動 (SQLite WAL Mode)
 
 import os
 import sqlite3
+import time
 from contextlib import contextmanager
 from typing import List, Dict, Any, Optional, Union
 import pandas as pd
@@ -32,16 +33,40 @@ class MarketStorage:
 
     @contextmanager
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         try:
-            # 開啟 WAL 模式與效能調校
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA synchronous=NORMAL;")
-            conn.execute("PRAGMA cache_size=-64000;")  # 64MB Cache
+            # 效能調校 (若在雲端硬碟/網路虛擬磁碟環境不支援 WAL mmap，自動平滑退回相容模式)
+            try:
+                conn.execute("PRAGMA busy_timeout = 30000;")
+                conn.execute("PRAGMA journal_mode=WAL;")
+            except sqlite3.OperationalError:
+                try:
+                    conn.execute("PRAGMA journal_mode=DELETE;")
+                except sqlite3.OperationalError:
+                    pass
+            try:
+                conn.execute("PRAGMA synchronous=NORMAL;")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("PRAGMA cache_size=-64000;")  # 64MB Cache
+            except sqlite3.OperationalError:
+                pass
             yield conn
         finally:
             conn.close()
+
+    def _commit_with_retry(self, conn, max_retries: int = 5, delay: float = 0.2):
+        """防止雲端硬碟 (Google Drive Desktop) 或併發讀取造成之短暫檔案鎖衝突 (disk I/O error / database locked)"""
+        for attempt in range(max_retries):
+            try:
+                conn.commit()
+                return
+            except sqlite3.OperationalError as e:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(delay * (attempt + 1))
 
     def _init_database(self):
         """建立核心表格結構與索引"""
@@ -128,7 +153,7 @@ class MarketStorage:
                 PRIMARY KEY (symbol, date)
             );
             """)
-            conn.commit()
+            self._commit_with_retry(conn)
 
     def save_daily_bars(self, symbol: str, data: Union[pd.DataFrame, List[Dict[str, Any]]]):
         """
@@ -168,7 +193,7 @@ class MarketStorage:
 
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
-            conn.commit()
+            self._commit_with_retry(conn)
 
         # 失效該標的之快取
         keys_to_del = [k for k in self._cache if k.startswith(f"bars_{symbol}_")]
@@ -182,7 +207,7 @@ class MarketStorage:
             conn.execute("DELETE FROM daily_bars WHERE symbol = ?", (symbol,))
             conn.execute("DELETE FROM chips WHERE symbol = ?", (symbol,))
             conn.execute("DELETE FROM margin_balances WHERE symbol = ?", (symbol,))
-            conn.commit()
+            self._commit_with_retry(conn)
         keys_to_del = [k for k in self._cache if k.startswith(f"bars_{symbol}_")]
         for k in keys_to_del:
             self._cache.pop(k, None)
@@ -269,7 +294,7 @@ class MarketStorage:
 
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
-            conn.commit()
+            self._commit_with_retry(conn)
         return len(rows)
 
     def get_chips(
@@ -343,7 +368,7 @@ class MarketStorage:
 
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
-            conn.commit()
+            self._commit_with_retry(conn)
         return len(rows)
 
     def get_margin(
@@ -382,7 +407,7 @@ class MarketStorage:
                 """,
                 (symbol, name, category, market, shares_issued),
             )
-            conn.commit()
+            self._commit_with_retry(conn)
 
     def get_stock_meta(self, symbol: str) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
@@ -456,7 +481,7 @@ class MarketStorage:
 
         with self._get_connection() as conn:
             conn.executemany(insert_sql, rows)
-            conn.commit()
+            self._commit_with_retry(conn)
         return len(rows)
 
     def get_available_revenue_as_of(self, symbol: str, query_date: str) -> Optional[Dict[str, Any]]:
@@ -508,7 +533,7 @@ class MarketStorage:
                 "INSERT OR REPLACE INTO disposal_dates (symbol, date, reason) VALUES (?, ?, ?)",
                 rows,
             )
-            conn.commit()
+            self._commit_with_retry(conn)
 
     def get_disposal_dates(self, symbol: str) -> set:
         """取得該標的被列為處置股的所有日期集合"""

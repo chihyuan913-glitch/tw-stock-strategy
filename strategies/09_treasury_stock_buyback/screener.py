@@ -35,6 +35,13 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
+from four_price_engine import normalize_to_tick, get_twse_tick_size, get_limit_prices
+from market_schedule import (
+    check_market_open_or_exit,
+    verify_twse_data_settlement,
+    should_suppress_push
+)
 from futures_helper import (
     load_stock_futures_pool,
     fetch_taifex_futures_quotes,
@@ -193,27 +200,27 @@ def evaluate_treasury_execution_reliability(code: str, history_dict: dict) -> tu
 def calculate_treasury_four_price(price: float, price_min: float, price_max: float, book_value: float,
                                   high: float = None, low: float = None, adaptive_params: dict = None) -> dict:
     """
-    計算策略 09 實戰四大防線價位 (Four-Price Defense Model)
-    幾何錨定法：
-      🟢 進場買進上限 (entry_price)：min(現價 * 1.035, price_max * 0.85)，防跳空追高，回測紅棒中軸為伏擊點
-      🔵 動能加碼價 (addon_price)：突破宣告當日高點 或 現價 * 1.04
-      🔴 目標停利 TP1 (tp1_price)：預定買回區間上限 * 0.96 (逼近法定宣告天花板獲利了結)
-      🔴 目標停利 TP2 (tp2_price)：max(每股淨值, price_max * 1.05) (淨值回歸或超額波段滿足)
-      🛑 嚴格停損價 (sl_price)：min(宣告日低點, price_min * 0.98) (破宣告低點或破下限無條件停損)
-    嚴格檢驗多方單調性：sl_price < price <= entry_price < addon_price < tp1_price <= tp2_price
+    計算策略 09 實戰四大防線價位 (Four-Price Defense Model V4.0)
+    嚴格遵循臺灣證交所法定 6 階升降檔位 (Tick Size) 與方向性合規取整：
+      🟢 進場買進上限 (entry_price)：min(現價 * 1.035, price_max * 0.88)，方向性向上取整 (direction='up')
+      🔵 動能加碼價 (addon_price)：max(突破宣告當日高點, entry_price * 1.035)，方向性向上取整 (direction='up')
+      🔴 目標停利 TP1 (tp1_price)：max(預定買回區間上限 * 0.96, addon_price * 1.04)，方向性向下取整 (direction='down')
+      🔴 目標停利 TP2 (tp2_price)：max(每股淨值, price_max * 1.04, tp1_price * 1.05)，方向性向下取整 (direction='down')
+      🛑 嚴格停損價 (sl_price)：max(min(宣告低點, 支撐), floor_sl)，方向性向下取整 (direction='down')
+    嚴格單調性守護：sl_price < price <= entry_price < addon_price < tp1_price <= tp2_price
     """
     price = float(price)
     price_min = float(price_min) if price_min else price * 0.8
     price_max = float(price_max) if price_max else price * 1.3
     book_value = float(book_value) if book_value else price
 
-    # 1. 計算基準值
-    entry_price = round(min(price * 1.035, price_max * 0.88), 2)
-    if entry_price < price:
-        entry_price = round(price * 1.015, 2)
+    # 1. 浮點數原始價位計算
+    raw_entry = min(price * 1.035, price_max * 0.88)
+    if raw_entry < price:
+        raw_entry = price * 1.015
 
     ref_high = high if high and high > price else price * 1.03
-    addon_price = round(max(ref_high * 1.01, entry_price * 1.035), 2)
+    raw_addon = max(ref_high * 1.01, raw_entry * 1.035)
 
     if adaptive_params:
         tp1_pct = float(adaptive_params.get("tp1_pct", 6.0))
@@ -222,32 +229,57 @@ def calculate_treasury_four_price(price: float, price_min: float, price_max: flo
         market_tp1 = price * (1.0 + tp1_pct / 100.0)
         market_tp2 = price * (1.0 + tp2_pct / 100.0)
         market_sl = price * (1.0 - abs(sl_pct_raw) / 100.0)
-        tp1_price = round(max(min(price_max * 0.98, market_tp1), addon_price * 1.04), 2)
-        tp2_price = round(max(book_value, price_max * 1.04, market_tp2, tp1_price * 1.05), 2)
+        raw_tp1 = max(min(price_max * 0.98, market_tp1), raw_addon * 1.04)
+        raw_tp2 = max(book_value, price_max * 1.04, market_tp2, raw_tp1 * 1.05)
         ref_low = low if low and low < price else price * 0.96
-        # 嚴守總指揮中心量化風控鐵律：停損安全閥嚴格控制在 -4.0% ~ -7.0% 間，絕不容許放大至下限跌幅
+        # 嚴守量化風控鐵律：停損安全閥嚴格控制在 -4.0% ~ -7.0% 間，絕不容許放大至下限跌幅
         tech_sl = min(ref_low * 0.985, market_sl)
         floor_sl = price * 0.93  # 最大 -7.0% 安全底線
-        sl_price = round(max(tech_sl, floor_sl), 2)
+        raw_sl = max(tech_sl, floor_sl)
     else:
-        tp1_price = round(max(price_max * 0.96, addon_price * 1.06), 2)
-        tp2_price = round(max(book_value, price_max * 1.04, tp1_price * 1.05), 2)
+        raw_tp1 = max(price_max * 0.96, raw_addon * 1.06)
+        raw_tp2 = max(book_value, price_max * 1.04, raw_tp1 * 1.05)
         ref_low = low if low and low < price else price * 0.96
         tech_sl = min(ref_low * 0.985, price * 0.95)
         floor_sl = price * 0.93
-        sl_price = round(max(tech_sl, floor_sl), 2)
+        raw_sl = max(tech_sl, floor_sl)
 
-    # 2. 嚴格數學單調性強制修正
-    if sl_price >= price:
-        sl_price = round(price * 0.94, 2)
-    if entry_price < price:
-        entry_price = round(price * 1.01, 2)
+    # 2. 臺灣證交所法定檔位方向性合規取整 (TWSE Tick Size Rounding)
+    entry_price = normalize_to_tick(raw_entry, direction='up')
+    addon_price = normalize_to_tick(raw_addon, direction='up')
+    tp1_price = normalize_to_tick(raw_tp1, direction='down')
+    tp2_price = normalize_to_tick(raw_tp2, direction='down')
+    sl_price = normalize_to_tick(raw_sl, direction='down')
+
+    # 3. 嚴格數學單調性強制修正 (保證 sl < price <= entry < addon < tp1 <= tp2)
+    step = get_twse_tick_size(price)
+    norm_price = normalize_to_tick(price)
+
+    # 停損需嚴格小於現價
+    if sl_price >= norm_price:
+        sl_price = normalize_to_tick(norm_price - step, direction='down')
+    # 停損最大 -7.0% 底線
+    norm_floor_sl = normalize_to_tick(price * 0.93, direction='down')
+    if sl_price < norm_floor_sl:
+        sl_price = norm_floor_sl
+        if sl_price >= norm_price:
+            sl_price = normalize_to_tick(norm_price - step, direction='down')
+
+    # 進場買進上限需 >= 現價
+    if entry_price < norm_price:
+        entry_price = norm_price
+
+    # 加碼價需嚴格高於進場價
     if addon_price <= entry_price:
-        addon_price = round(entry_price * 1.035, 2)
+        addon_price = normalize_to_tick(entry_price + step, direction='up')
+
+    # TP1 需嚴格高於加碼價
     if tp1_price <= addon_price:
-        tp1_price = round(addon_price * 1.06, 2)
+        tp1_price = normalize_to_tick(addon_price + step, direction='up')
+
+    # TP2 需大於等於 TP1
     if tp2_price < tp1_price:
-        tp2_price = round(tp1_price * 1.05, 2)
+        tp2_price = normalize_to_tick(tp1_price + step, direction='up')
 
     return {
         "entry_price": entry_price,
@@ -341,7 +373,7 @@ def fetch_stock_market_data(code: str, target_date_str: str = None, market: str 
     }
 
 
-def apply_treasury_screening(pool: list, history: dict, insider_pool: list, target_date_str: str = None) -> tuple:
+def apply_treasury_screening(pool: list, history: dict, insider_pool: list, target_date_str: str = None, adaptive_params: dict = None) -> tuple:
     """
     執行三層動態降級庫藏股篩選邏輯：
       Tier-1: 近 5 個交易日內全新申報 + 4+1 維度 + 法人防對倒共振 + 歷史執行率誠信檢驗
@@ -405,7 +437,7 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
 
         # 四大防線定價
         four_prices = calculate_treasury_four_price(
-            close, price_min, price_max, book_val, market_data["high"], market_data["low"]
+            close, price_min, price_max, book_val, market_data["high"], market_data["low"], adaptive_params=adaptive_params
         )
 
         # 軟評分計算 (100分制)
@@ -555,7 +587,7 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
         name = str(ins.get("name"))
         c_price = float(ins.get("current_price", 50.0))
         b_val = float(ins.get("book_value", 40.0))
-        four_prices = calculate_treasury_four_price(c_price, c_price * 0.85, c_price * 1.3, b_val)
+        four_prices = calculate_treasury_four_price(c_price, c_price * 0.85, c_price * 1.3, b_val, adaptive_params=adaptive_params)
         tier3_candidates.append({
             "股票代碼": code,
             "股票名稱": name,
@@ -672,6 +704,13 @@ def run_screener(export_csv: bool = True, send_line: bool = False, pool_path: st
     print(f"🚀 [{STRATEGY_NAME}] 開始盤後量化掃描...")
     print("=" * 70)
 
+    date_str = target_date or datetime.date.today().strftime("%Y-%m-%d")
+    adaptive_cfg = load_adaptive_config()
+    adaptive_params = get_strategy_adaptive_params(STRATEGY_ID)
+    regime_info = adaptive_cfg.get("market_regime", {})
+    global_ctrl = adaptive_cfg.get("global_controls", {})
+    print(f"[✓] 自適應大盤位階：{regime_info.get('label', '標準箱型')} | 模式：{global_ctrl.get('mode', '標準')} | 建議現金：{global_ctrl.get('cash_target_pct', 45)}%")
+
     pool = load_treasury_pool(pool_path)
     hist = load_execution_history(hist_path)
     insider = load_insider_pool(insider_path)
@@ -681,7 +720,7 @@ def run_screener(export_csv: bool = True, send_line: bool = False, pool_path: st
     print(f"[*] 載入內部人增持備援池: {len(insider)} 檔")
 
     # 執行篩選
-    screened, tier_name = apply_treasury_screening(pool, hist, insider, target_date)
+    screened, tier_name = apply_treasury_screening(pool, hist, insider, target_date, adaptive_params=adaptive_params)
     print(f"[+] 篩選完成！啟動層級: {tier_name}，入選檔數: {len(screened)} 檔")
 
     # 股期資訊加值
@@ -725,6 +764,17 @@ if __name__ == "__main__":
     parser.add_argument("--line", action="store_true", help="執行後推播至 LINE 獨立視窗")
     parser.add_argument("--export", action="store_true", default=True, help="匯出至 result.csv")
     parser.add_argument("--date", type=str, default=None, help="指定回測或執行基準日期 (YYYY-MM-DD)")
+    parser.add_argument("--force", action="store_true", help="強制執行，跳過開休市與未開盤日檢核 (Rule 21)")
     args = parser.parse_args()
+
+    # 開休市檢核守門 (若非強制且非指定歷史日期)
+    if not args.force and not args.date:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤後選股"):
+            sys.exit(0)
+
+    # 夜間官方數據沉澱防呆檢驗 (若在夜間 20:00 後執行且非強制、非指定日)
+    now_hour = datetime.datetime.now().hour
+    if now_hour >= 20 and not args.date and not args.force:
+        verify_twse_data_settlement(max_retries=3, retry_delay_sec=10)
 
     run_screener(export_csv=args.export, send_line=args.line, target_date=args.date)

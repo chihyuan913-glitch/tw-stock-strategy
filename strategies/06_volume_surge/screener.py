@@ -44,6 +44,22 @@ if ROOT_DIR not in sys.path:
 
 from algo_guards import evaluate_overnight_broker_risk
 from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
+from four_price_engine import (
+    calculate_four_prices_long,
+    normalize_to_tick,
+    get_twse_tick_size,
+    get_limit_prices
+)
+from futures_helper import (
+    load_stock_futures_pool,
+    fetch_taifex_futures_quotes,
+    calculate_futures_pricing
+)
+from market_schedule import (
+    check_market_open_or_exit,
+    should_suppress_push,
+    verify_twse_data_settlement
+)
 from line_sender import (
     send_to_line,
     build_screener_carousel,
@@ -289,6 +305,14 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
         print("[X] 行情數據為空，結束篩選。")
         return []
 
+    try:
+        futures_map = load_stock_futures_pool()
+        taifex_quotes = fetch_taifex_futures_quotes()
+    except Exception as e:
+        print(f"[!] 載入股票期貨數據失敗: {e}")
+        futures_map = {}
+        taifex_quotes = {}
+
     # 第一階段初步粗篩：當日成交量 >= 1,000 張 且收紅K 且漲幅 >= 2.0%
     min_vol_shares = min_volume_lots * 1000
     preliminary_codes = []
@@ -389,7 +413,7 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
             )
 
             penalty = broker_guard.get('penalty_score', 0)
-            score, stars, quality_tag = calculate_score_and_stars(
+            score, stars, quality_info = calculate_score_and_stars(
                 rvol=rvol,
                 solid_ratio=candle_m['solid_ratio'],
                 foreign_lots=f_lots,
@@ -398,6 +422,8 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
                 curr_vol_lots=curr_vol_lots,
                 return_quality=True
             )
+            quality_tag = quality_info.get('quality_tag', '⚪ 內資散戶換手') if isinstance(quality_info, dict) else str(quality_info)
+            inst_absorption_ratio = quality_info.get('inst_absorption_ratio', 0.0) if isinstance(quality_info, dict) else 0.0
 
             # 四大實戰價位精算 (V4.0 臺灣證交所法定檔位合規引擎 + ATR 波動自適應)
             regime_pricing_params = {
@@ -454,6 +480,7 @@ def screen_volume_surge(date_str: str = None, min_volume_lots: int = 1000, min_r
                 '外資買超(張)': f_lots,
                 '投信買超(張)': t_lots,
                 '換手品質': quality_tag,
+                '法人吸收率%': inst_absorption_ratio,
                 '綜合評分': score,
                 '星級推薦': stars,
                 '隔日沖警示': broker_guard.get('tag', '安全・無顯著集中'),

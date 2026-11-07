@@ -247,9 +247,17 @@ def calculate_four_prices_long(
         tick_step = get_twse_tick_size(curr_price)
         sl_price = round(curr_price - tick_step, 2)
 
-    # 計算盈虧比 (Reward to Risk Ratio)
+    # 計算盈虧比 (Reward to Risk Ratio) 並實施健康下限動態守護 (Master Rule 7)
     potential_risk = entry_price - sl_price
     potential_reward = tp1_price - entry_price
+    min_required_reward = potential_risk * 1.0  # 確保至少 1:1 盈虧比空間
+    if potential_risk > 0 and potential_reward < min_required_reward:
+        proposed_tp1 = normalize_to_tick(entry_price + min_required_reward, direction='down')
+        if limit_up <= 0 or proposed_tp1 <= limit_up:
+            tp1_price = max(tp1_price, proposed_tp1)
+            if tp2_price < tp1_price:
+                tp2_price = tp1_price
+            potential_reward = tp1_price - entry_price
     rr_ratio = round(potential_reward / potential_risk, 2) if potential_risk > 0 else 2.0
 
     return {
@@ -376,6 +384,14 @@ def calculate_four_prices_short(
 
     potential_risk = sl_price - entry_price
     potential_reward = entry_price - tp1_price
+    min_required_reward = potential_risk * 1.0  # 確保至少 1:1 盈虧比空間
+    if potential_risk > 0 and potential_reward < min_required_reward:
+        proposed_tp1 = normalize_to_tick(entry_price - min_required_reward, direction='up')
+        if limit_down <= 0 or proposed_tp1 >= limit_down:
+            tp1_price = min(tp1_price, proposed_tp1)
+            if tp2_price > tp1_price:
+                tp2_price = tp1_price
+            potential_reward = entry_price - tp1_price
     rr_ratio = round(potential_reward / potential_risk, 2) if potential_risk > 0 else 2.0
 
     return {

@@ -42,6 +42,7 @@ from line_sender import (
     format_clean_price_alert_text
 )
 from algo_guards import GLOBAL_TICK_GUARD
+from market_schedule import check_market_open_or_exit, should_suppress_push
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -79,8 +80,8 @@ def load_monitored_targets(csv_path: str = None) -> list:
         df = pd.read_csv(target_csv, encoding='utf-8-sig')
         targets = []
         for _, row in df.iterrows():
-            code = str(row.get('股票代碼') or row.get('代號') or '').strip()
-            name = str(row.get('股票名稱') or row.get('名稱') or '').strip()
+            code = str(row.get('股票代碼') or row.get('證券代號') or row.get('代號') or '').strip()
+            name = str(row.get('股票名稱') or row.get('證券名稱') or row.get('名稱') or '').strip()
             if not code:
                 continue
 
@@ -328,7 +329,13 @@ def main():
     parser.add_argument("--test-push", action="store_true", help="發送測試到價推播卡片驗證 LINE 連線")
     parser.add_argument("--csv", type=str, default=None, help="自訂 result.csv 路徑")
     parser.add_argument("--no-tick-guard", action="store_true", help="關閉盤中防毛刺機制 (僅供測試)")
+    parser.add_argument("--force", action="store_true", help="強制模式（略過休市日檢核）")
     args = parser.parse_args()
+
+    # 開休市檢核守門 (若非強制且非測試)
+    if not args.force and not args.test_push and not args.once:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤中雷達"):
+            return
 
     targets = load_monitored_targets(args.csv)
     print(f"[*] 載入監控標的: {len(targets)} 檔")

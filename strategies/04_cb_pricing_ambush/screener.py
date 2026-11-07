@@ -408,9 +408,10 @@ def score_and_analyze_cb(cb_item: Dict[str, Any], market_data: Dict[str, Any], r
     target_130_pct = normalize_to_tick(conv_price * 1.30, direction='down')
     lockup_end = cb_item.get('lockup_end_date', '掛牌滿3個月當日')
 
-    # 操盤錦囊細緻化
+    # 操盤錦囊細緻化 (數值格式化防浮點雜訊)
+    p_disp = f"{round(price, 2):g}"
     guidance_updated = {
-        "entry_desc": f"建議買進上限 {entry_price} 元 (現價 {price} 元以內皆為甜蜜買點，超過嚴禁追價)",
+        "entry_desc": f"建議買進上限 {entry_price} 元 (現價 {p_disp} 元以內皆為甜蜜買點，超過嚴禁追價)",
         "addon_desc": f"突破 {addon_price} 元帶量確認續強，啟動第 2 階段順勢加碼",
         "tp1_desc": f"目標一 {tp1_price} 元分批拔檔 50% (觸碰轉換價或首波反壓)，啟動保本防守",
         "tp2_desc": f"目標二 {tp2_price} 元波段主升段等幅滿足全數落袋",

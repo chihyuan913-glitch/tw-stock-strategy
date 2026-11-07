@@ -727,6 +727,13 @@ def load_adaptive_config(config_path: Optional[Union[Path, Dict[str, Any], str]]
         try:
             with open(target_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            # 自動回填遺漏之新增策略專屬設定 (例如 09, 10, 11 等)
+            regime_key = data.get("market_regime", {}).get("key", REGIME_SIDEWAYS)
+            default_matrix = build_regime_matrix(regime_key, data.get("market_regime", {}))
+            if "strategy_specific" in data and "strategy_specific" in default_matrix:
+                for s_key, s_val in default_matrix["strategy_specific"].items():
+                    if s_key not in data["strategy_specific"]:
+                        data["strategy_specific"][s_key] = s_val
             return enforce_safety_guardrails(data)
         except Exception as e:
             print(f"[!] 載入 regime_config.json 異常 ({e})，使用安全保底預設設定。")

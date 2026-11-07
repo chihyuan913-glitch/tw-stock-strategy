@@ -764,7 +764,9 @@ class MarketPulseEngine:
             "timeframe": timeframe,
             "summary": summary,
             "distribution": bins,
-            "scatter_data": scatter_items
+            "scatter_data": scatter_items,
+            "total_sectors": len(group_nodes),
+            "total_stocks": len(all_stocks)
         }
 
 

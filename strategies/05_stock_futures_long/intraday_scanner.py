@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-台股策略 05：個股期貨法人強勢波段多方 - 盤中即時雷達與到價推播系統 (Intraday Futures Long Scanner)
+台股策略 05：個股期貨法人強勢波段多方 - 盤中即時雷達與到價推播系統 V3.0 旗艦版
+(Intraday Futures Long Scanner V3.0)
 適用時段：09:00 ~ 13:35 (台股盤中交易時段)
-核心功能：
+
+核心功能與全域規範升級：
 1. 自動載入最新多方選股名單 (result.csv)，鎖定四大操盤防線與股票期貨近月主力合約。
 2. 盤中即時連線證交所/櫃買行情，精準偵測四大防線到價事件：
-   - 🟢【黃金起漲建倉】：現價回測支撐或落入多單標準建倉區間。
-   - 🔵【突破加碼觸發】：現價突破加碼價位 (過今日高點 1 檔確認主升段續強)。
-   - 🔴【分批停利觸發】：現價攻抵 TP1 (+10%) 或 TP2 (+16%) 波段滿足點。
-   - 🛑【破線停損警戒】：現價跌破月線防線與停損價位，強制停損出場。
-3. 整合個股期貨保證金試算 (一口表彰2張現貨，保證金約現值 13.5%)。
-4. 防重複洗版：同一標的同事件類型，當日僅推播一次。
-5. 盤中防毛刺確認機制 (GLOBAL_TICK_GUARD)，過濾量化高頻單 1-tick 假突破。
-6. 支援獨立 LINE 視窗分流 (strategy="05")。
+   - 🟢【黃金起漲建倉 (ENTRY)】：現價回測支撐或落入買進上限以內黃金建倉區間。
+   - 🔵【突破加碼觸發 (ADDON)】：現價突破加碼價位 (過日高或突破頸線確認主升段續強)。
+   - 🔴【分批停利觸發 (TP1/TP2)】：現價攻抵 TP1 或 TP2 波段滿足點。
+   - 🛑【破線停損警戒 (STOP_LOSS)】：現價跌破月線防線與停損價位，強制停損出場。
+3. 核心首選分級警報 (Rule #24)：入選標的中評分最高/5星標的自動冠上「🔥【今日核心推薦首選】」高亮警示。
+4. 結算日前五日開立次月新倉提醒：結算倒數 <= 5 個交易日時，自動於推播標註「⚠️ 建議開立次月新倉」。
+5. 盤中防毛刺確認機制 (GLOBAL_TICK_GUARD)，過濾高頻量化 1-tick 假突破。
+6. 未開盤日與國定假日休市守門員 (market_schedule.py)，防誤報與資源浪費。
+7. 支援獨立 LINE 視窗分流 (strategy="05")。
 """
 
 import sys
@@ -41,6 +44,7 @@ from line_sender import (
     format_clean_aggregated_text
 )
 from algo_guards import GLOBAL_TICK_GUARD
+from market_schedule import check_market_open_or_exit, should_suppress_push
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -54,7 +58,10 @@ if hasattr(sys.stderr, 'reconfigure'):
     except Exception:
         pass
 
+STRATEGY_ID = "05"
+STRATEGY_NAME = "策略 05：個股期貨法人強勢波段多方"
 CSV_FILE = os.path.join(os.path.dirname(__file__), 'result.csv')
+
 
 def load_targets():
     """優先自 result.csv 載入最新波段多方選股名單與四大價位"""
@@ -67,8 +74,8 @@ def load_targets():
                 close_p = float(row['收盤價'])
                 entry_p = float(row.get('進場價位', row.get('多單進場', close_p)))
                 addon_p = float(row.get('加碼價位', row.get('突破加碼', round(close_p * 1.03, 2))))
-                tp1_p = float(row.get('停利TP1', round(close_p * 1.10, 2)))
-                tp2_p = float(row.get('停利TP2', round(close_p * 1.16, 2)))
+                tp1_p = float(row.get('停利TP1', round(close_p * 1.05, 2)))
+                tp2_p = float(row.get('停利TP2', round(close_p * 1.10, 2)))
                 sl_p = float(row.get('停損價位', row.get('停損防守', round(close_p * 0.965, 2))))
                 ma20 = float(row.get('月線(20MA)', round(close_p * 0.97, 2)))
                 pos_bias = float(row.get('月線正乖離%', round((close_p - ma20) / ma20 * 100, 2)))
@@ -78,6 +85,10 @@ def load_targets():
                 basis_desc = str(row.get('價差(Basis)', '')).strip()
                 margin = int(row.get('1口保證金(約)', int(round(fut_close * 2000 * 0.135, -1))))
                 stars = str(row.get('星級推薦', '★★★★★')).strip()
+                score = int(row.get('評分', 80))
+                rr_ratio = float(row.get('盈虧比(R:R)', row.get('盈虧比', 2.0)))
+                atr_val = float(row.get('ATR', round(close_p * 0.03, 2)))
+                regime = str(row.get('大盤位階', '多頭主攻')).strip()
 
                 fut_oi = int(row.get('期貨未平倉(OI)', row.get('futures_oi', 0)))
                 settlement_tag = str(row.get('結算倒數', '')).strip()
@@ -85,6 +96,9 @@ def load_targets():
                 next_entry = float(row.get('次月進場參考', row.get('next_entry', entry_p)))
                 next_oi = int(row.get('次月未平倉(OI)', 0))
                 settlement_reminder = str(row.get('結算操盤建議', '')).strip()
+
+                playbook_cash = str(row.get('空手者策略', '')).strip()
+                playbook_hold = str(row.get('持股者策略', '')).strip()
 
                 targets[code] = {
                     'code': code,
@@ -96,6 +110,10 @@ def load_targets():
                     'basis_desc': basis_desc,
                     'margin_1lot': margin,
                     'stars': stars,
+                    'score': score,
+                    'risk_reward_ratio': rr_ratio,
+                    'atr': atr_val,
+                    'regime': regime,
                     'futures_oi': fut_oi,
                     'settlement_tag': settlement_tag,
                     'next_month': next_month,
@@ -112,15 +130,16 @@ def load_targets():
                     'v5_avg': int(row.get('5日均量(張)', 1000)),
                     'inst_buy_ratio': float(row.get('法人買超佔比%', 12.0)),
                     'f_3d': int(row.get('外資3日買超(張)', 0)),
-                    't_3d': int(row.get('投信3日買超(張)', 0))
+                    't_3d': int(row.get('投信3日買超(張)', 0)),
+                    'playbook_cash': playbook_cash,
+                    'playbook_hold': playbook_hold
                 }
             if targets:
                 print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔個股期貨波段多方精選標的。")
-                if targets:
-                    sample_target = next(iter(targets.values()))
-                    st_tag = sample_target.get('settlement_tag')
-                    if st_tag:
-                        print(f"[*] 【期貨結算週期戰情】{st_tag}")
+                sample_target = next(iter(targets.values()))
+                st_tag = sample_target.get('settlement_tag')
+                if st_tag:
+                    print(f"[*] 【期貨結算週期戰情】{st_tag}")
                 return targets
         except Exception as e:
             print(f"[!] 讀取 result.csv 失敗: {e}，將建立備用母池...")
@@ -155,17 +174,29 @@ def load_targets():
                 'basis_desc': '平價差 +0.00 (擬合)',
                 'margin_1lot': margin_est,
                 'stars': '★★★★★',
+                'score': 85,
+                'risk_reward_ratio': 2.0,
+                'atr': round(c_val * 0.025, 2),
+                'regime': '標準多頭',
+                'futures_oi': 5000,
+                'settlement_tag': '',
+                'next_month': '',
+                'next_entry': c_val,
+                'next_oi': 0,
+                'settlement_reminder': '',
                 'entry_price': c_val,
-                'addon_price': round(c_val * 1.03, 2),
-                'tp1_price': round(ma20_val * 1.10, 2),
-                'tp2_price': round(ma20_val * 1.16, 2),
+                'addon_price': round(c_val * 1.025, 2),
+                'tp1_price': round(c_val * 1.06, 2),
+                'tp2_price': round(c_val * 1.12, 2),
                 'sl_price': round(min(ma20_val * 0.985, c_val * 0.965), 2),
                 'ma20': ma20_val,
                 'pos_bias': round((c_val - ma20_val) / ma20_val * 100, 2),
                 'v5_avg': 5000,
                 'inst_buy_ratio': 15.0,
                 'f_3d': 2500,
-                't_3d': 1200
+                't_3d': 1200,
+                'playbook_cash': f"於 {c_val} 掛單建倉，防追高",
+                'playbook_hold': f"以停損價為防守線"
             }
         print(f"[✓] 已建立備用監控母池共 {len(targets)} 檔代表性個股期標的。")
     except Exception as e:
@@ -244,8 +275,13 @@ def fetch_realtime_quotes(stock_codes):
     return results
 
 
-def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
+def send_intraday_price_alert(target, rt, event_type, event_title, event_desc, force=False):
     """發送盤中到價 LINE 推播卡片 (策略 05 專屬視窗分流)"""
+    suppress, sup_reason = should_suppress_push(force=force, task_type=f"{STRATEGY_NAME} 到價推播")
+    if suppress:
+        print(f"[🛡️ 守衛攔截] {sup_reason}")
+        return
+
     code = target['code']
     name = target['name']
     price = rt['price']
@@ -258,23 +294,28 @@ def send_intraday_price_alert(target, rt, event_type, event_title, event_desc):
     if next_m and ('⚠️' in str(settle_tag) or '開次月' in str(settle_tag)) and event_type in ['ENTRY', 'ADDON']:
         event_desc += f"\n💡【結算提醒】近月合約到期在即，新建部位強烈建議直接開立次月新倉 ({next_m}月，進場參考價約 {next_e:.2f})！"
 
-    card = build_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id="05")
-    success = send_to_line(card, strategy="05")
+    card = build_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id=STRATEGY_ID)
+    success = send_to_line(card, strategy=STRATEGY_ID, force=force)
     if not success:
-        clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id="05")
-        send_to_line(clean_text, strategy="05")
+        clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id=STRATEGY_ID)
+        send_to_line(clean_text, strategy=STRATEGY_ID, force=force)
 
 
-def send_aggregated_price_alerts(alerts):
+def send_aggregated_price_alerts(alerts, force=False):
     """將同週期多檔多方到價事件整合為單一戰訊卡發送"""
+    suppress, sup_reason = should_suppress_push(force=force, task_type=f"{STRATEGY_NAME} 到價推播")
+    if suppress:
+        print(f"[🛡️ 守衛攔截] {sup_reason}")
+        return
+
     now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
     print(f"\n[⚡] 發送波段多方多檔合併戰訊卡 (共 {len(alerts)} 檔標的)")
 
-    card = build_aggregated_alert_card(alerts, strategy_id="05", now_str=now_str)
-    success = send_to_line(card, strategy="05")
+    card = build_aggregated_alert_card(alerts, strategy_id=STRATEGY_ID, now_str=now_str)
+    success = send_to_line(card, strategy=STRATEGY_ID, force=force)
     if not success:
-        clean_text = format_clean_aggregated_text(alerts, strategy_id="05", now_str=now_str)
-        send_to_line(clean_text, strategy="05")
+        clean_text = format_clean_aggregated_text(alerts, strategy_id=STRATEGY_ID, now_str=now_str)
+        send_to_line(clean_text, strategy=STRATEGY_ID, force=force)
 
 
 def scan_once(targets, notified_events, force_test=False):
@@ -292,12 +333,15 @@ def scan_once(targets, notified_events, force_test=False):
             continue
         price = rt['price']
         oi_str = f", OI {target['futures_oi']:,}口" if target.get('futures_oi') else ""
-        print(f"  • {code} {target['name']}: 現價 {price:.2f} (進場 {target['entry_price']:.2f}, 加碼 {target['addon_price']:.2f}, TP1 {target['tp1_price']:.2f}, 停損 {target['sl_price']:.2f}{oi_str})")
-
+        print(f"  • {code} {target['name']}: 現價 {price:.2f} (買進上限 {target['entry_price']:.2f}, 加碼 {target['addon_price']:.2f}, TP1 {target['tp1_price']:.2f}, 停損 {target['sl_price']:.2f}{oi_str})")
 
         events_for_code = notified_events.setdefault(code, set())
 
-        # 1. 停損防守判定 (優先級最高: 現價 <= 停損價 / 跌破月線)
+        # 核心首選標註 (Rule #24)
+        is_priority = (target.get('stars') == '★★★★★' or target.get('score', 0) >= 80)
+        pfx = "🔥【今日核心推薦首選】" if is_priority else ""
+
+        # 1. 停損防守判定 (優先級最高: 現價 <= 停損價)
         if price <= target['sl_price'] and 'STOP_LOSS' not in events_for_code:
             confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'STOP_LOSS', price, target['sl_price'], force_pass=force_test)
             if not confirmed:
@@ -306,12 +350,12 @@ def scan_once(targets, notified_events, force_test=False):
             events_for_code.add('STOP_LOSS')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'STOP_LOSS',
-                'event_title': '🛑 跌破關鍵防守線 - 多單停損警戒！',
-                'event_desc': '股價已跌破月線防線與嚴格停損價！多頭慣性受損，請嚴守紀律立即市價平倉停損，絕不死抗！'
+                'event_title': f'{pfx}🛑 跌破關鍵防守線 - 多單停損警戒！',
+                'event_desc': f'股價已跌破月線防線與嚴格停損價 ({target["sl_price"]:.2f})！多頭慣性受損，請嚴守紀律立即市價平倉停損，絕不死抗！'
             })
             continue
 
-        # 2. 第二停利達標觸發 (TP2: 月線正乖離 +16%)
+        # 2. 第二停利達標觸發 (TP2: 波段主升滿足點)
         if price >= target['tp2_price'] and 'TP2' not in events_for_code:
             confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP2', price, target['tp2_price'], force_pass=force_test)
             if not confirmed:
@@ -320,12 +364,12 @@ def scan_once(targets, notified_events, force_test=False):
             events_for_code.add('TP2')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'TP2',
-                'event_title': '🔴 主升段波段停利滿足點 (TP2 +16%) 達成！',
+                'event_title': f'{pfx}🔴 主升段波段停利滿足點 (TP2 {target["tp2_price"]:.2f}) 達成！',
                 'event_desc': f'股價大漲突破 TP2 滿足點！波段利潤已大幅拉開，建議獲利全數落袋為安，鎖定大波段暴利！'
             })
             continue
 
-        # 3. 第一停利達標觸發 (TP1: 月線正乖離 +10%)
+        # 3. 第一停利達標觸發 (TP1: 首波短線滿足點)
         if price >= target['tp1_price'] and 'TP1' not in events_for_code:
             confirmed, cmsg = GLOBAL_TICK_GUARD.check_confirmation(code, 'TP1', price, target['tp1_price'], force_pass=force_test)
             if not confirmed:
@@ -334,8 +378,8 @@ def scan_once(targets, notified_events, force_test=False):
             events_for_code.add('TP1')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'TP1',
-                'event_title': '🔴 短波段停利目標 (TP1 +10%) 達成！',
-                'event_desc': f'股價衝過 TP1 滿足區！獲利已逾 10%，建議分批獲利了結 1/3~1/2，餘股續抱上看 TP2！'
+                'event_title': f'{pfx}🔴 短波段停利目標 (TP1 {target["tp1_price"]:.2f}) 達成！',
+                'event_desc': f'股價衝過 TP1 滿足區！建議分批獲利了結 1/3~1/2，餘股續抱上看 TP2 ({target["tp2_price"]:.2f})！'
             })
             continue
 
@@ -348,38 +392,47 @@ def scan_once(targets, notified_events, force_test=False):
             events_for_code.add('ADDON')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ADDON',
-                'event_title': '🔵 突破關鍵高點 - 右側動能加碼點！',
-                'event_desc': f'現價帶量摜破日高或突破整理防線！多方動能續強，符合右側加碼追擊條件！'
+                'event_title': f'{pfx}🔵 突破關鍵高點 - 右側動能加碼點！',
+                'event_desc': f'現價帶量突破加碼防線 ({target["addon_price"]:.2f})！多方動能續強，符合右側加碼追擊條件！'
             })
             continue
 
-        # 5. 建倉進場觸發 (回測在建倉區間附近)
-        if abs(price - target['entry_price']) / target['entry_price'] <= 0.008 and 'ENTRY' not in events_for_code:
+        # 5. 建倉進場觸發 (現價位於建議買進上限以內之甜蜜買進區間，且高於停損線)
+        is_in_buy_zone = (target['sl_price'] < price <= target['entry_price']) and (
+            (target['entry_price'] - price) / target['entry_price'] <= 0.025
+        )
+        if is_in_buy_zone and 'ENTRY' not in events_for_code:
             events_for_code.add('ENTRY')
             triggered_alerts.append({
                 'target': target, 'rt': rt, 'event_code': 'ENTRY',
-                'event_title': '🟢 進入黃金建倉區間 - 多單買點浮現',
-                'event_desc': f'現價回測月線或平台頸線支撐有守，盈虧比極佳，可依紀律分批佈局個股期多單！'
+                'event_title': f'{pfx}🟢 進入黃金建倉區間 - 個股期多單買點浮現',
+                'event_desc': f'現價 {price:.2f} 處於買進上限 ({target["entry_price"]:.2f}) 以內甜蜜區！盈虧比極佳，可依紀律分批佈局個股期多單！'
             })
 
     # 多檔到價合併發送
     if len(triggered_alerts) == 1:
         a = triggered_alerts[0]
-        send_intraday_price_alert(a['target'], a['rt'], a['event_code'], a['event_title'], a['event_desc'])
+        send_intraday_price_alert(a['target'], a['rt'], a['event_code'], a['event_title'], a['event_desc'], force=force_test)
     elif len(triggered_alerts) > 1:
-        send_aggregated_price_alerts(triggered_alerts)
+        send_aggregated_price_alerts(triggered_alerts, force=force_test)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="台股策略 05：個股期貨法人強勢波段多方 - 盤中即時雷達")
+    parser = argparse.ArgumentParser(description="台股策略 05：個股期貨法人強勢波段多方 - 盤中即時雷達 V3.0")
     parser.add_argument("--interval", type=int, default=60, help="輪詢掃描週期 (秒)，預設 60 秒")
     parser.add_argument("--once", action="store_true", help="僅執行單次快篩即退出")
     parser.add_argument("--test-push", action="store_true", help="發送一則模擬到價快訊至 LINE 以驗證連線與排版")
+    parser.add_argument("--force", action="store_true", help="強制執行 (忽略休市與未開盤守衛)")
     args = parser.parse_args()
 
     print("=" * 70)
-    print("🚀 啟動【策略05：個股期貨法人強勢波段多方 - 盤中即時雷達與到價推播系統】")
+    print("🚀 啟動【策略05：個股期貨法人強勢波段多方 - 盤中即時雷達與到價推播系統 V3.0】")
     print("=" * 70)
+
+    # 開休市檢核守門 (若非強制且非測試)
+    if not args.force and not args.test_push and not args.once:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤中雷達"):
+            return
 
     targets = load_targets()
     if not targets:
@@ -401,16 +454,17 @@ def main():
         send_intraday_price_alert(
             t, dummy_rt,
             event_type="ENTRY",
-            event_title="🟢 測試推播：個股期貨波段多方到價快訊",
-            event_desc="本訊息為系統測試推播。四大防線與期貨合約展示正常，請嚴守操作紀律！"
+            event_title="🟢 測試推播：個股期貨波段多方到價快訊 (四大防線V4.0)",
+            event_desc="本訊息為系統測試推播。四大防線合規性、期貨合約展示與次月新倉提醒已完全對齊全域標準！",
+            force=True
         )
-        print("\n[✓] 測試掃描完成！")
+        print("\n[✓] 測試推播完成！")
         return
 
     notified_events = {}
 
     if args.once:
-        scan_once(targets, notified_events)
+        scan_once(targets, notified_events, force_test=args.force)
         print("\n[✓] 單次快篩巡邏結束。")
         return
 
@@ -418,20 +472,20 @@ def main():
     try:
         while True:
             now_dt = datetime.datetime.now(TZ_TW)
-            # 檢查盤中交易時段 (09:00 ~ 13:35)
             market_open = now_dt.replace(hour=9, minute=0, second=0, microsecond=0)
             market_close = now_dt.replace(hour=13, minute=35, second=0, microsecond=0)
 
-            if now_dt < market_open:
-                wait_sec = (market_open - now_dt).total_seconds()
-                print(f"[*] 尚未開盤 (開盤時間 09:00)，等待開盤中... ({int(wait_sec)} 秒)")
-                time.sleep(min(wait_sec, 60))
-                continue
-            elif now_dt > market_close:
-                print(f"[*] 盤中交易時段已結束 ({now_dt.strftime('%H:%M:%S')} > 13:35)，雷達自動安全退出。")
-                break
+            if not args.force:
+                if now_dt < market_open:
+                    wait_sec = (market_open - now_dt).total_seconds()
+                    print(f"[*] 尚未開盤 (開盤時間 09:00)，等待開盤中... ({int(wait_sec)} 秒)")
+                    time.sleep(min(wait_sec, 60))
+                    continue
+                elif now_dt > market_close:
+                    print(f"[*] 盤中交易時段已結束 ({now_dt.strftime('%H:%M:%S')} > 13:35)，雷達自動安全退出。")
+                    break
 
-            scan_once(targets, notified_events)
+            scan_once(targets, notified_events, force_test=args.force)
             time.sleep(args.interval)
 
     except KeyboardInterrupt:

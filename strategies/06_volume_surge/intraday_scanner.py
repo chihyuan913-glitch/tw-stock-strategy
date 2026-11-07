@@ -51,6 +51,8 @@ from line_sender import (
     format_clean_aggregated_text
 )
 from algo_guards import GLOBAL_TICK_GUARD
+from four_price_engine import calculate_four_prices_long
+from market_schedule import check_market_open_or_exit
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -489,23 +491,43 @@ def evaluate_intraday_trailing_stop(
     return True, event_info
 
 
+
+def ensure_target_four_prices(target: dict, snap: dict):
+    """確保 target 具備 TWSE 法定檔位合規且符合嚴格單調性之四大防線價位"""
+    price = snap.get('price', 0.0)
+    if price <= 0:
+        return
+    need_entry = target.get('entry_price', 0) <= 0
+    need_sl = target.get('sl_price', 0) <= 0
+    if need_entry or need_sl:
+        try:
+            fp = calculate_four_prices_long(
+                curr_price=price,
+                high=snap.get('high', price),
+                low=snap.get('low', price),
+                ma20=price
+            )
+            target['entry_price'] = fp['entry_price']
+            target['addon_price'] = fp['addon_price']
+            target['tp1_price'] = fp['tp1_price']
+            target['tp2_price'] = fp['tp2_price']
+            target['sl_price'] = fp['sl_price']
+        except Exception:
+            target['entry_price'] = round(price * 1.01, 2)
+            target['addon_price'] = round(snap.get('high', price) * 1.005, 2)
+            target['tp1_price'] = round(price * 1.08, 2)
+            target['tp2_price'] = round(price * 1.15, 2)
+            target['sl_price'] = round(max(snap.get('low', price), price * 0.965), 2)
+
+
 def send_surge_alert(target: dict, snap: dict, event_info: dict):
     """建構旗艦大字體 Flex 卡片並推播至策略 06 專屬群組"""
     code = target['code']
     name = target['name']
     price = snap['price']
 
-    # 確保四大防線數據完備
-    if target.get('entry_price', 0) == 0:
-        target['entry_price'] = round(price * 1.01, 2)
-    if target.get('addon_price', 0) == 0:
-        target['addon_price'] = round(snap['high'] * 1.005, 2)
-    if target.get('tp1_price', 0) == 0:
-        target['tp1_price'] = round(price * 1.08, 2)
-    if target.get('tp2_price', 0) == 0:
-        target['tp2_price'] = round(price * 1.15, 2)
-    if target.get('sl_price', 0) == 0:
-        target['sl_price'] = round(max(snap['low'], price * 0.965), 2)
+    # 確保四大防線數據完備 (臺灣證交所法定檔位合規)
+    ensure_target_four_prices(target, snap)
 
     rt_data = {
         'price': price,
@@ -586,16 +608,8 @@ def scan_once(pool: dict, progress_ratio: float):
             TRIGGERED_LEVELS[code] = new_level
             t_copy = dict(target)
             price = snap['price']
-            if t_copy.get('entry_price', 0) == 0:
-                t_copy['entry_price'] = round(price * 1.01, 2)
-            if t_copy.get('addon_price', 0) == 0:
-                t_copy['addon_price'] = round(snap['high'] * 1.005, 2)
-            if t_copy.get('tp1_price', 0) == 0:
-                t_copy['tp1_price'] = round(price * 1.08, 2)
-            if t_copy.get('tp2_price', 0) == 0:
-                t_copy['tp2_price'] = round(price * 1.15, 2)
-            if t_copy.get('sl_price', 0) == 0:
-                t_copy['sl_price'] = round(max(snap['low'], price * 0.965), 2)
+            # 確保四大防線數據完備 (臺灣證交所法定檔位合規)
+            ensure_target_four_prices(t_copy, snap)
 
             rt_data = {
                 'price': price,
@@ -732,8 +746,9 @@ def main():
     parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤中即時雷達")
     parser.add_argument("--interval", type=int, default=60, help="輪詢間隔秒數 (預設 60 秒)")
     parser.add_argument("--once", action="store_true", help="執行單次快篩巡邏後結束")
-    parser.add_argument("--test-push", "--force-test", dest="test_push", action="store_true", help="一鍵發送模擬爆量戰訊卡至 LINE 測試連線")
+    parser.add_argument("--test-push", action="store_true", help="一鍵發送模擬爆量戰訊卡至 LINE 測試連線")
     parser.add_argument("--test-trailing", action="store_true", help="一鍵發送模擬動態移動停利戰訊卡至 LINE 測試連線")
+    parser.add_argument("--force", action="store_true", help="強制執行 (忽略休市與未開盤守衛)")
     args = parser.parse_args()
 
     if args.test_trailing:
@@ -743,6 +758,11 @@ def main():
     if args.test_push:
         test_push_alert(test_type="surge")
         return
+
+    # 休市與開盤日防護檢驗
+    if not args.force and not args.test_push and not args.test_trailing:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤中雷達"):
+            return
 
     now_tw = datetime.datetime.now(TZ_TW)
     print("=" * 70)

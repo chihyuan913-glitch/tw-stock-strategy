@@ -38,7 +38,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
-from four_price_engine import calculate_four_prices_long
+from four_price_engine import calculate_four_prices_long, normalize_to_tick, get_twse_tick_size
 from market_schedule import check_market_open_or_exit, should_suppress_push
 from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
 from rolling_retention_manager import save_rolling_result_csv
@@ -342,7 +342,7 @@ def calculate_score(inst_ratio, foreign_lots, trust_lots, candle_feat, upside_pc
 
 def screen_stocks(date_str=None, min_volume_lots=1000, 
                   lower_dist_max=1.0, lower_dist_min=-5.0, 
-                  min_inst_ratio=1.5, min_upside=0.0,
+                  min_inst_ratio=1.5, min_upside=3.5,
                   trust_max_sell_lots=500, require_reversal_candle=False,
                   regime_params=None):
     """
@@ -485,28 +485,42 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
 
             # 臺灣證交所法定檔位四大防線定價引擎 V4.0 (幾何單調性 SL < Close <= Entry < Addon < TP1 <= TP2)
             # TP1 採「反彈半中軌 (Close + (20MA - Close) * 0.5)」，大幅提升達標勝率至 60%+
-            raw_half_tp1 = curr_close + (ma20_val - curr_close) * 0.5
-            fp_calc = calculate_four_prices_long(
-                curr_price=close_val,
-                high=high_val,
-                low=low_val,
-                ma20=ma20_val,
-                lower_band=lb_val,
-                regime_params=regime_params,
-                custom_anchors={
-                    'tp1': raw_half_tp1,
-                    'tp2': ma20_val
-                }
-            )
+            # 超跌反轉專屬實戰定價 (窄幅前低停損 + 緊貼現價防追高 + 半中軌TP1分段拔檔)
+            tick_size = get_twse_tick_size(curr_close)
 
-            entry_p = fp_calc['entry_price']
-            addon_target = fp_calc['addon_price']
-            tp1_target = fp_calc['tp1_price']
-            tp2_target = fp_calc['tp2_price']
-            sl_p = fp_calc['sl_price']
-            rr_ratio = fp_calc.get('risk_reward_ratio', fp_calc.get('rr_ratio', 0.0))
-            if rr_ratio == 0.0 and (entry_p - sl_p) > 0:
-                rr_ratio = round((tp1_target - entry_p) / (entry_p - sl_p), 2)
+            # 1. 窄幅停損：破前低或下軌 1 檔即撤退，風險嚴格壓制在 1.2% ~ 3.5% (拒絕無效大停損)
+            raw_sl = min(low_val, lb_val) - tick_size
+            raw_sl = max(raw_sl, curr_close * 0.965)  # 最大停損不超過 -3.5%
+            raw_sl = min(raw_sl, curr_close - tick_size)
+            sl_p = normalize_to_tick(raw_sl, direction='down')
+
+            # 2. 進場上限：緊貼現價 (現價至現價 + 1 檔以內，嚴禁追高抬轎)
+            entry_p = normalize_to_tick(min(curr_close + tick_size, curr_close * 1.006), direction='up')
+
+            # 3. 目標停利：TP1 半中軌高勝率收割，TP2 月線 20MA 波段滿足
+            raw_half_tp1 = curr_close + (ma20_val - curr_close) * 0.5
+            tp1_target = normalize_to_tick(raw_half_tp1, direction='down')
+            if tp1_target <= entry_p:
+                tp1_target = normalize_to_tick(entry_p + tick_size, direction='up')
+            tp2_target = normalize_to_tick(ma20_val, direction='down')
+            if tp2_target < tp1_target:
+                tp2_target = tp1_target
+
+            # 4. 動能加碼：介於進場與 TP1 之中間突破點 (保證幾何單調性 Entry < Addon < TP1 <= TP2)
+            raw_addon = entry_p + (tp1_target - entry_p) * 0.5
+            addon_target = normalize_to_tick(raw_addon, direction='nearest')
+            if addon_target <= entry_p:
+                addon_target = normalize_to_tick(entry_p + tick_size, direction='up')
+            if tp1_target <= addon_target:
+                tp1_target = normalize_to_tick(addon_target + get_twse_tick_size(addon_target), direction='up')
+            if tp2_target < tp1_target:
+                tp2_target = tp1_target
+
+            # 5. 精算實戰綜合盈虧比 (50% TP1 獲利落袋 + 50% TP2 衝刺滿足)
+            potential_risk = entry_p - sl_p
+            reward_tp1 = tp1_target - entry_p
+            reward_tp2 = tp2_target - entry_p
+            rr_ratio = round((0.5 * reward_tp1 + 0.5 * reward_tp2) / potential_risk, 2) if potential_risk > 0 else 2.0
 
             # -------------------------------------------------------------
             # 【Tier-1：布林極致超跌轉折精選門檻】
@@ -518,9 +532,10 @@ def screen_stocks(date_str=None, min_volume_lots=1000,
             t1_pct_b_pass = (-0.05 <= pct_b <= 0.15)
             t1_bw_pass = (bandwidth <= 22.0)
             t1_slope_pass = (ma20_slope_5d >= -3.5)
+            t1_rr_pass = (rr_ratio >= 1.5)
 
             if (t1_vol_pass and t1_dist_pass and t1_inst_pass and 
-                t1_upside_pass and t1_pct_b_pass and t1_bw_pass and t1_slope_pass):
+                t1_upside_pass and t1_pct_b_pass and t1_bw_pass and t1_slope_pass and t1_rr_pass):
                 
                 score, stars, is_dual = calculate_score(
                     inst_ratio=meta['inst_ratio'],
@@ -649,7 +664,7 @@ def main():
     parser.add_argument("--max-dist", type=float, default=1.0, help="位於布林下軌上方容許百分比(%%)，預設 1.0%%")
     parser.add_argument("--min-dist", type=float, default=-5.0, help="跌破布林下軌容許百分比(%%)，預設 -5.0%%")
     parser.add_argument("--min-inst-ratio", type=float, default=1.5, help="法人買超佔成交量最低比重(%%)，預設 1.5%%")
-    parser.add_argument("--min-upside", type=float, default=0.0, help="距布林中軌最低反彈空間(%%)，預設 0.0%%")
+    parser.add_argument("--min-upside", type=float, default=3.5, help="距布林中軌最低反彈空間(%%)，預設 0.0%%")
     parser.add_argument("--trust-dump-limit", type=int, default=500, help="投信最大容許賣超張數，預設 500 張")
     parser.add_argument("--strict-candle", action="store_true", help="開啟嚴格 K 線止跌型態硬濾網")
     parser.add_argument("--export", type=str, default=None, help="匯出檔名 (如 result.csv 或 result.md)")

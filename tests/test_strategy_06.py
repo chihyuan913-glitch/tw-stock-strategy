@@ -601,3 +601,56 @@ class TestReportExportIntegrity:
         content_md = test_md.read_text(encoding='utf-8')
         assert "2330" in content_md
         assert "台積電" in content_md
+
+
+class TestBugFixesAndEdgeCases:
+    """十二、自動除錯與邊界防護驗證測試"""
+
+    def test_ensure_target_four_prices_twse_tick_size_compliance(self):
+        """測試 ensure_target_four_prices 是否符合 TWSE 法定檔位規範與單調性"""
+        ensure_target_four_prices = scanner_06.ensure_target_four_prices
+        
+        # 測試大型股 1050 元 (檔位 5.0 元)
+        target_high_price = {'code': '2330', 'name': '台積電', 'entry_price': 0.0, 'sl_price': 0.0}
+        snap_high = {'price': 1050.0, 'high': 1060.0, 'low': 1040.0}
+        ensure_target_four_prices(target_high_price, snap_high)
+        
+        assert target_high_price['entry_price'] > 0
+        assert target_high_price['sl_price'] > 0
+        assert target_high_price['sl_price'] < snap_high['price'] <= target_high_price['entry_price']
+        assert target_high_price['entry_price'] < target_high_price['addon_price'] < target_high_price['tp1_price'] <= target_high_price['tp2_price']
+        # 檢驗檔位是 5 的倍數
+        for k in ['entry_price', 'addon_price', 'tp1_price', 'tp2_price', 'sl_price']:
+            val = target_high_price[k]
+            assert val % 5.0 == 0.0, f"{k}: {val} 不是 5.0 元的合法升降檔位"
+
+        # 測試中價位 158.5 元 (檔位 0.5 元)
+        target_mid = {'code': '2881', 'name': '富邦金', 'entry_price': 0.0, 'sl_price': 0.0}
+        snap_mid = {'price': 158.5, 'high': 160.0, 'low': 156.0}
+        ensure_target_four_prices(target_mid, snap_mid)
+        for k in ['entry_price', 'addon_price', 'tp1_price', 'tp2_price', 'sl_price']:
+            val = target_mid[k]
+            assert round(val * 10) % 5 == 0, f"{k}: {val} 不是 0.5 元的合法升降檔位"
+
+    def test_screener_quality_info_string_label_and_absorption_ratio(self):
+        """測試 calculate_score_and_stars 回傳品質資訊且解包後換手品質為乾淨字串"""
+        score, stars, q_info = screener_06.calculate_score_and_stars(
+            rvol=3.5,
+            solid_ratio=0.88,
+            foreign_lots=2500,
+            trust_lots=1200,
+            curr_vol_lots=5000,
+            return_quality=True
+        )
+        assert isinstance(q_info, dict)
+        assert "quality_tag" in q_info
+        assert isinstance(q_info["quality_tag"], str)
+        assert "法人" in q_info["quality_tag"]
+        assert q_info["inst_absorption_ratio"] > 0
+
+    def test_intraday_scanner_has_force_and_market_schedule_check(self):
+        """測試 intraday_scanner.py 支援 --force 且具備 check_market_open_or_exit"""
+        import inspect
+        src = inspect.getsource(scanner_06.main)
+        assert "--force" in src
+        assert "check_market_open_or_exit" in src

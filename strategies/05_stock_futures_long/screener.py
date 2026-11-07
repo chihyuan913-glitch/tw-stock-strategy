@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-台股策略 05：個股期貨法人強勢波段多方選股器 V1.0 旗艦版
-(Stock Futures Institutional Momentum Long Screener)
+台股策略 05：個股期貨法人強勢波段多方選股器 V3.0 旗艦自適應版
+(Stock Futures Institutional Momentum Long Screener V3.0)
 
 【核心多方量化策略邏輯 (4+1 核心維度鐵律)】
 一、母池與流動性防守 (Liquidity & Pool)：
@@ -10,7 +10,7 @@
   - 近 5 日平均成交量 >= 1,000 張，排除流動性不足標的。
 
 二、趨勢位階線 (Trend Alignment)：
-  - 收盤價站上 20 日均線 (月線)，且月線斜率向上助漲 (MA20_curr > MA20_prev)。
+  - 收盤價站上 20 日均線 (月線)，且月線斜率向上助漲 (MA20_curr >= MA20_prev)。
   - 現價站穩 60 日均線 (季線) 之上，維持中長線多頭主升格局。
 
 三、籌碼動能面 (Institutional Buying Momentum)：
@@ -20,17 +20,18 @@
 
 四、型態防守面 (Candlestick Pattern Defense)：
   - 當日收紅或實體突破整理平台。
-  - 當日 K 棒無長上影線 (上影線長度 < 實體長度一半，排除爆量假突破誘多倒貨)。
+  - 當日 K 棒無長上影線 (上影線長度 < 實體長度一半，排除衝高倒貨出貨墓碑線)。
 
 五、空間防追高 (Sweet-Spot Entry Window)：
   - 月線正乖離率介於 +1.0% 到 +6.0% 之間 (+1.0% <= Bias <= +6.0%)。
   - 剛自均線帶量起漲或突破整理平台，拒絕 +8% 以上無肉追高！
 
-六、操盤實戰四大價位 (股票期貨價位優先報價)：
-  - 🟢 多單進場：期貨收盤價 (或回測突破頸線分批建倉)
-  - 🔵 突破加碼：突破當日高點 1 檔 (或期貨現價 +3% 確認主升段續強)
-  - 🔴 停利目標：TP1 月線正乖離 +10% (分批平倉 1/3~1/2) ｜ TP2 月線正乖離 +16% (主升段滿足全數了結)
-  - 🛑 停損防守：跌破 20MA -1.5% 或進場價 -3.5% 嚴格無條件停損出場！
+六、全台股首創【實戰四大防線定價引擎 V4.0 ＋ 股票期貨價位優先】：
+  - 臺灣證交所法定 6 階升降檔位方向性合規取整 (TWSE Tick Size Rounding)。
+  - ATR 波動自適應動態調校 (ATR Volatility Scaling)。
+  - 大盤市場位階深度連動 (Market Regime Adaptation)。
+  - 幾何單調性嚴格單向守護：LimitDown <= SL < Close <= Entry < Addon < TP1 <= TP2 <= LimitUp。
+  - 股票期貨價位優先換算 (Basis + OI 深度流動性加分 + 結算日前五日開次月新倉提醒)。
 """
 
 import sys
@@ -39,6 +40,7 @@ import argparse
 import datetime
 import json
 import urllib.request
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -49,8 +51,22 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
-from futures_helper import load_stock_futures_pool, fetch_taifex_futures_quotes, calculate_futures_pricing
-from line_sender import send_to_line, build_screener_carousel, format_clean_screener_text
+from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
+from four_price_engine import calculate_four_prices_long, normalize_to_tick
+from futures_helper import (
+    load_stock_futures_pool,
+    fetch_taifex_futures_quotes,
+    calculate_futures_pricing,
+    get_futures_settlement_info
+)
+from market_schedule import check_market_open_or_exit, verify_twse_data_settlement, should_suppress_push
+from rolling_retention_manager import save_rolling_result_csv
+from line_sender import (
+    send_to_line,
+    build_screener_carousel,
+    format_clean_screener_text,
+    format_screener_markdown_cards
+)
 
 # 設定標準輸出編碼為 UTF-8
 if hasattr(sys.stdout, 'reconfigure'):
@@ -58,6 +74,16 @@ if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+STRATEGY_ID = "05"
+STRATEGY_NAME = "策略 05：個股期貨法人強勢波段多方"
+CSV_FILE = os.path.join(os.path.dirname(__file__), 'result.csv')
+MD_FILE = os.path.join(os.path.dirname(__file__), 'result.md')
 
 
 def get_recent_trading_dates(n_days=5, max_lookback=20):
@@ -164,52 +190,43 @@ def fetch_daily_quotes(date_str):
     return quotes
 
 
-def check_market_regime():
-    """
-    檢查台股大盤 (0050.TW / 加權指數) 宏觀多頭環境
-    回傳: (is_bull_market: bool, status_text: str)
-    """
-    try:
-        df_m = yf.download('0050.TW', period='2mo', progress=False)
-        if df_m.empty:
-            return True, "⚠️ 無法取得大盤數據，預設維持多方監控"
-        close_s = df_m['Close']['0050.TW'] if isinstance(df_m.columns, pd.MultiIndex) else df_m['Close']
-        close_s = close_s.dropna()
-        if len(close_s) < 21:
-            return True, "⚠️ 大盤歷史K線不足20日，預設維持多方監控"
-        ma20 = close_s.rolling(20).mean().dropna()
-        curr_c = float(close_s.iloc[-1])
-        curr_ma = float(ma20.iloc[-1])
-        prev_ma = float(ma20.iloc[-2])
-        is_above = curr_c >= curr_ma
-        is_slope_up = curr_ma >= prev_ma
-        is_bull = is_above and is_slope_up
-
-        if is_bull:
-            return True, f"🟢【大盤多空燈：多頭主攻模式】0050現價 {curr_c:.2f} 站穩月線 {curr_ma:.2f} 且走揚，個股期波段多方勝率與動能處於黃金期！"
-        else:
-            return False, f"⚠️【大盤多空燈：震盪整理/逆風警示】0050現價 {curr_c:.2f} 跌破月線 {curr_ma:.2f} 或月線下彎。大盤偏弱，做多需嚴控部位並嚴守停損！"
-    except Exception as e:
-        return True, f"⚠️ 大盤偵測異常 ({e})，預設維持常規監控"
-
-
 def screen_stock_futures_long(date_str=None, min_vol_lots=1000, 
                               min_bias_pct=1.0, max_bias_pct=6.0, 
                               inst_buy_ratio_pct=12.0, inst_3d_threshold=1000, 
                               futures_only=True):
     """
-    執行個股期貨波段多方量化篩選 (Strategy 05 V1.0)
+    執行個股期貨波段多方量化篩選 (Strategy 05 V3.0 全域旗艦自適應版)
     """
-    is_bull, regime_msg = check_market_regime()
-    print(f"\n[*] {regime_msg}")
+    # 載入全域大盤自適應設定 (Regime Engine)
+    adaptive_cfg = load_adaptive_config()
+    regime_info = adaptive_cfg.get("market_regime", {})
+    global_ctrl = adaptive_cfg.get("global_controls", {})
+    adaptive_params = get_strategy_adaptive_params(STRATEGY_ID)
+
+    regime_label = regime_info.get("label", "🟢【多頭良性主升波段】")
+    regime_mode = global_ctrl.get("mode", "標準模式")
+    cash_target = global_ctrl.get("cash_target_pct", 30.0)
+
+    # 自適應參數微調 (若使用者未明確覆蓋命令列參數)
+    effective_max_bias = max_bias_pct if max_bias_pct is not None else float(adaptive_params.get("bias_max_pct", 6.0))
+    effective_tp1_pct = float(adaptive_params.get("tp1_pct", 5.0))
+    effective_tp2_pct = float(adaptive_params.get("tp2_pct", 10.0))
+    effective_sl_pct = float(adaptive_params.get("stop_loss_pct", -4.0))
+
+    print(f"\n[*] 大盤自適應狀態：{regime_label} ｜ 模式：{regime_mode} ｜ 建議現金水位：{cash_target}%")
+    print(f"[*] 量化動態參數：月線正乖離上限 {effective_max_bias:.1f}% ｜ TP1 +{effective_tp1_pct:.1f}% ｜ TP2 +{effective_tp2_pct:.1f}% ｜ 停損 {effective_sl_pct:.1f}%")
 
     futures_map = {}
     taifex_quotes = {}
     if futures_only:
         futures_map = load_stock_futures_pool(os.path.join(os.path.dirname(__file__), 'stock_futures_list.json'))
-        print(f"[*] 【個股期貨優先模式】已載入期交所 {len(futures_map)} 檔股票期貨標的！")
+        print(f"[*] 【個股期貨優先模式】已載入期交所 {len(futures_map)} 檔股票期貨標的清單！")
         taifex_quotes = fetch_taifex_futures_quotes()
-        print(f"[*] 【期交所即時/盤後行情】已同步 {len(taifex_quotes)} 檔近月主力合約報價！")
+        print(f"[*] 【期交所即時/盤後行情】已同步 {len(taifex_quotes)} 檔股票期貨近月/次月合約行情！")
+
+    settle_info = get_futures_settlement_info()
+    if settle_info.get('is_rollover_window'):
+        print(f"[*] ⚠️【結算週期警示】目前距結算日僅剩 {settle_info['trading_days_left']} 個交易日，建議開立次月新倉 ({settle_info['next_month']})！")
 
     if date_str:
         all_dates = get_recent_trading_dates(n_days=10)
@@ -245,13 +262,13 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
         return []
 
     print(f"[*] 今日取得 {len(quotes)} 檔行情，{len(chips_history)} 檔籌碼記錄。")
-    print("[*] 執行第一階段籌碼動能面與 K 棒形態快篩...")
+    print("[*] 執行第一階段 4+1 維度硬性條件快篩 (流動性、籌碼集中、無長上影線)...")
 
     preliminary_candidates = []
     preliminary_meta = {}
 
     for code, q in quotes.items():
-        # 【關鍵過濾】限定具備期交所股票期貨標的
+        # 【關鍵維度 1】限定具備期交所股票期貨標的
         if futures_only and code not in futures_map:
             continue
 
@@ -264,13 +281,13 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
         f_3d_shares = sum(chips_history[code][d]['foreign'] for d in dates_3d if d in chips_history[code])
         t_3d_shares = sum(chips_history[code][d]['trust'] for d in dates_3d if d in chips_history[code])
         
-        # 多方條件 1: 外資或投信近 3 個交易日累計買超 >= 1,000 張 (>= 1,000,000 股)
+        # 籌碼條件 1: 外資或投信近 3 個交易日累計買超 >= 1,000 張 (>= 1,000,000 股)
         threshold_buy_shares = inst_3d_threshold * 1000
         cond_inst_3d_buy = (f_3d_shares >= threshold_buy_shares) or (t_3d_shares >= threshold_buy_shares)
         if not cond_inst_3d_buy:
             continue
             
-        # 多方條件 2: 當日三大法人買超佔總成交量比例 >= 12%
+        # 籌碼條件 2: 當日三大法人買超佔總成交量比例 >= 12%
         inst_today_shares = c_today['total']
         if q['volume'] <= 0 or inst_today_shares <= 0:
             continue
@@ -279,14 +296,12 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
         if inst_buy_ratio < inst_buy_ratio_pct:
             continue
 
-        # 多方條件 3: 近 5 日法人累計呈現淨買超
+        # 籌碼條件 3: 近 5 日法人累計呈現淨買超
         total_5d_shares = sum(chips_history[code][d]['total'] for d in dates_5d if d in chips_history[code])
         if total_5d_shares <= 0:
             continue
 
-        # 多方形態濾網: 當日收紅或實體突破，且無長上影線（排除衝高倒貨出貨墓碑線）
-        # 實體 K 棒長度 = abs(Close - Open)
-        # 上影線長度 = High - max(Open, Close)
+        # 型態防守面: 當日收紅或實體突破，且無長上影線（排除衝高倒貨出貨墓碑線）
         body = abs(q['close'] - q['open'])
         upper_shadow = q['high'] - max(q['open'], q['close'])
         
@@ -315,8 +330,8 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
         print("[-] 今日無符合籌碼集中買超與型態門檻之標的。")
         return []
 
-    # 第二階段技術面濾網：站上 20MA、月線向上、現價>60MA、5日均量>1000張、正乖離在 +1.0%~+6.0% 起漲甜蜜區
-    print("[*] 執行第二階段多頭趨勢與正乖離率精算（下載日K計算月線走揚與乖離空間）...")
+    # 第二階段技術面濾網：站上 20MA、月線向上、現價>60MA、5日均量>1000張、正乖離在起漲甜蜜區
+    print("[*] 執行第二階段多頭趨勢與正乖離率精算（下載日K計算月線走揚、ATR與四大防線）...")
     tickers = [f"{c}.TW" for c in preliminary_candidates]
     try:
         hist_data = yf.download(tickers, period='4mo', progress=False, group_by='ticker')
@@ -373,26 +388,51 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
             if v5_avg_lots < min_vol_lots:
                 continue
 
-            # 空間防追高條件: 月線正乖離率介於 +1.0% 到 +6.0% (起漲甜蜜點，絕不追高)
+            # 空間防追高條件: 月線正乖離率介於 +1.0% 到 +6.0% (自適應起漲甜蜜點，絕不追高)
             bias_ma20_pct = ((curr_close - ma20_curr) / ma20_curr) * 100.0
-            if not (min_bias_pct <= bias_ma20_pct <= max_bias_pct):
+            if not (min_bias_pct <= bias_ma20_pct <= effective_max_bias):
                 continue
 
             # -------------------------------------------------------------
-            # 現貨四大操盤防線基準計算
+            # 計算 14 日 ATR (True Range) 波動度
             # -------------------------------------------------------------
-            # 1. 多單進場：現價或回測月線頸線
-            spot_entry = round(curr_close, 2)
-            # 2. 突破加碼：突破今日高點 1 檔或現價 +3% 確認主升段續強
-            spot_addon = round(max(q['high'] * 1.005, curr_close * 1.03), 2)
-            # 3. 停利目標 (波段滿足點)：
-            #    TP1: 月線正乖離 +10% 短波段滿足點 (分批平倉 1/3 ~ 1/2)
-            #    TP2: 月線正乖離 +16% 主升段波段滿足點 (全數獲利了結)
-            spot_tp1 = round(ma20_curr * 1.10, 2)
-            spot_tp2 = round(ma20_curr * 1.16, 2)
-            # 4. 停損防守：跌破 20MA -1.5% 或進場價 -3.5% 嚴格無條件停損出場！
-            low_ref = q['low'] if q['low'] > 0 else curr_close * 0.985
-            spot_sl = round(min(ma20_curr * 0.985, low_ref * 0.99, curr_close * 0.965), 2)
+            tr1 = df['High'] - df['Low']
+            tr2 = (df['High'] - df['Close'].shift(1)).abs()
+            tr3 = (df['Low'] - df['Close'].shift(1)).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr_14 = float(tr.rolling(14).mean().iloc[-1]) if len(tr) >= 14 else float(q['high'] - q['low'])
+            if np.isnan(atr_14) or atr_14 <= 0:
+                atr_14 = float(q['high'] - q['low']) if (q['high'] > q['low']) else curr_close * 0.03
+
+            # -------------------------------------------------------------
+            # 實戰四大防線定價引擎 V4.0 全域規範
+            # (臺灣證交所法定檔位方向性合規取整 + ATR 波動自適應 + 幾何單調性嚴格守護)
+            # -------------------------------------------------------------
+            prev_close_val = float(df['Close'].iloc[-2]) if len(df['Close']) >= 2 else curr_close
+            regime_pricing_params = {
+                "tp1_pct": effective_tp1_pct,
+                "tp2_pct": effective_tp2_pct,
+                "stop_loss_pct": effective_sl_pct,
+                "bias_max_pct": effective_max_bias
+            }
+
+            fp_calc = calculate_four_prices_long(
+                curr_price=curr_close,
+                prev_close=prev_close_val,
+                high=q.get('high'),
+                low=q.get('low'),
+                ma20=ma20_curr,
+                atr=atr_14,
+                regime_params=regime_pricing_params
+            )
+
+            spot_entry = fp_calc['entry_price']
+            spot_addon = fp_calc['addon_price']
+            spot_tp1 = fp_calc['tp1_price']
+            spot_tp2 = fp_calc['tp2_price']
+            spot_sl = fp_calc['sl_price']
+            rr_ratio = fp_calc.get('risk_reward_ratio', fp_calc.get('rr_ratio', 2.0))
+            guidance = fp_calc.get('guidance', {})
 
             # -------------------------------------------------------------
             # 股票期貨價位優先計算與四大防線換算 (Futures Pricing Priority)
@@ -401,7 +441,6 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
             contract_base = f_info.get('contract', '--')
             fut_q = taifex_quotes.get(contract_base)
 
-            # 調用共用期貨定價引擎，計算以期貨為優先的報價與四防線
             fut_pricing = calculate_futures_pricing(
                 spot_close=curr_close,
                 futures_quote=fut_q,
@@ -415,7 +454,7 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
             )
 
             # -------------------------------------------------------------
-            # 隔日沖券商風控評估
+            # 隔日沖券商風控評估 (程式交易反制)
             # -------------------------------------------------------------
             og_risk = evaluate_overnight_broker_risk(
                 code,
@@ -440,10 +479,9 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
             # 4. 正乖離甜蜜度 (+2%~+4.5% 最優，加 15 分)
             score_bias = 15 if (2.0 <= bias_ma20_pct <= 4.5) else 8
             # 5. 期貨未平倉量 (OI) 深度加分 (期貨流動性防守，上限 20 分)
-            #    未平倉量大代表法人長期重倉佈局、買賣價差緊密，不易被劇烈滑價！
             fut_oi = fut_pricing['futures_oi']
             if fut_oi >= 10000:
-                score_oi = 20  # 萬口以上超旗艦主流 (如聯電、鴻海、聯發科期)
+                score_oi = 20  # 萬口以上超旗艦主流
             elif fut_oi >= 5000:
                 score_oi = 16  # 5,000口以上主力強勢標的
             elif fut_oi >= 2000:
@@ -455,7 +493,6 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
             else:
                 score_oi = 0   # 偏冷門小合約
 
-            # 總分計算並扣除隔日沖倒貨風險扣分
             total_score = max(50, min(100, score_chips + score_vol + score_trend + score_bias + score_oi - og_risk.get('penalty_score', 0)))
 
             if total_score >= 85:
@@ -464,6 +501,10 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
                 stars = '★★★★☆'
             else:
                 stars = '★★★☆☆'
+
+            # 雙向操盤錦囊
+            playbook_cash = f"【空手者】於 {curr_close:.2f}~{fut_pricing['futures_entry']:.2f} 掛單建倉，超過 {fut_pricing['futures_entry']:.2f} 嚴禁追高。"
+            playbook_hold = f"【持股者】以 {fut_pricing['futures_sl']:.2f} 為嚴格防守底線，突破 {fut_pricing['futures_addon']:.2f} 順勢加碼，攻抵 {fut_pricing['futures_tp1']:.2f} 分批停利 50%。"
 
             results.append({
                 '證券代號': code,
@@ -484,6 +525,7 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
                 '次月未平倉(OI)': fut_pricing['next_oi'],
                 '評分': total_score,
                 '星級推薦': stars,
+                '大盤位階': regime_label,
                 '進場價位': fut_pricing['futures_entry'],
                 '多單進場': fut_pricing['futures_entry'],
                 '加碼價位': fut_pricing['futures_addon'],
@@ -497,6 +539,8 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
                 '現貨TP1': spot_tp1,
                 '現貨TP2': spot_tp2,
                 '現貨停損': spot_sl,
+                '盈虧比(R:R)': rr_ratio,
+                'ATR': round(atr_14, 2),
                 '隔日沖風控': og_risk['tag'],
                 '1口保證金(約)': fut_pricing['margin_1lot'],
                 '期貨成交量': fut_pricing['futures_vol'],
@@ -512,17 +556,79 @@ def screen_stock_futures_long(date_str=None, min_vol_lots=1000,
                 '當日法人買超(張)': meta['inst_today_lots'],
                 '5日法人累計(張)': meta['total_5d_lots'],
                 'K棒實體': meta['body'],
-                '上影線': meta['upper_shadow']
+                '上影線': meta['upper_shadow'],
+                '空手者策略': playbook_cash,
+                '持股者策略': playbook_hold
             })
             
-        except Exception as e:
+        except Exception:
             continue
 
     return results
 
 
+def export_reports(results, csv_path=None, md_path=None, target_date=None):
+    """匯出滾動 5 日 CSV 與視覺化 Markdown 戰報"""
+    today_str = target_date or datetime.date.today().strftime('%Y-%m-%d')
+    csv_file = csv_path or CSV_FILE
+    md_file = md_path or MD_FILE
+
+    if not results:
+        empty_cols = ['證券代號', '證券名稱', '期貨契約', '收盤價', '期貨收盤價', '進場價位', '加碼價位', '停利TP1', '停損價位', '期貨未平倉(OI)', '評分']
+        df_empty = pd.DataFrame(columns=empty_cols)
+        save_rolling_result_csv(csv_file, df_empty, today_date_str=today_str, max_days=5)
+        with open(md_file, 'w', encoding='utf-8') as f:
+            f.write(f"# 【{STRATEGY_NAME}】最新盤後選股戰訊報表\n\n")
+            f.write(f"產出日期：{today_str}\n\n")
+            f.write("> [!NOTE]\n> 今日無標的符合 4+1 維度法人強勢波段多方條件，建議保留高現金水位耐心觀望。\n")
+        print(f"[✓] 已更新空報表至: {csv_file}")
+        return
+
+    df_res = pd.DataFrame(results)
+    df_res = df_res.sort_values(by=["評分", "期貨未平倉(OI)", "法人買超佔比%"], ascending=[False, False, False]).reset_index(drop=True)
+
+    # 儲存滾動 CSV
+    df_res = save_rolling_result_csv(csv_file, df_res, today_date_str=today_str, max_days=5)
+    print(f"[✓] 已成功匯出 CSV 報表至: {csv_file}")
+
+    # 產出標準 Markdown 字卡戰報
+    settle_banner = results[0].get('結算操盤建議', '')
+    with open(md_file, 'w', encoding='utf-8') as f:
+        f.write(format_screener_markdown_cards(results, today_str, strategy_id=STRATEGY_ID, max_stocks=10))
+        if settle_banner:
+            f.write(f"\n> [!WARNING] **{settle_banner}**\n\n")
+        f.write("\n\n## 📋 完整量化數據指標總表\n\n")
+        f.write(df_res.to_markdown(index=False))
+        f.write("\n")
+    print(f"[✓] 已同步匯出視覺化字卡 Markdown 戰報至: {md_file}")
+
+
+def push_to_line(results, target_date=None, force=False):
+    """推播選股日報至 LINE (策略 05 專屬視窗分流)"""
+    suppress, sup_reason = should_suppress_push(force=force, task_type=f"{STRATEGY_NAME} 盤後戰報")
+    if suppress:
+        print(f"[🛡️ 守衛攔截] {sup_reason}")
+        return
+
+    if not results:
+        msg = f"📊【{STRATEGY_NAME}】今日盤後選股無符合條件標的。"
+        send_to_line(msg, strategy=STRATEGY_ID, force=force)
+        return
+
+    today_str = target_date or datetime.date.today().strftime('%Y/%m/%d')
+    try:
+        card = build_screener_carousel(results, today_str, strategy_id=STRATEGY_ID, max_stocks=6)
+        print(f"[*] 正在發送波段多方選股日報至 LINE (策略 {STRATEGY_ID} 專屬視窗)...")
+        success = send_to_line(card, strategy=STRATEGY_ID, force=force)
+        if not success:
+            clean_text = format_clean_screener_text(results, today_str, strategy_id=STRATEGY_ID, max_stocks=6)
+            send_to_line(clean_text, strategy=STRATEGY_ID, force=force)
+    except Exception as e:
+        print(f"[!] 發送 LINE 選股通知失敗: {e}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="台股個股期貨法人強勢波段多方選股策略 V2.0 旗艦版")
+    parser = argparse.ArgumentParser(description="台股個股期貨法人強勢波段多方選股策略 V3.0 旗艦自適應版")
     parser.add_argument("--date", type=str, default=None, help="指定日期 (格式: YYYYMMDD，預設為最新交易日)")
     parser.add_argument("--min-vol", type=int, default=1000, help="最低5日平均成交量(張)，預設 1000 張")
     parser.add_argument("--min-bias", type=float, default=1.0, help="20MA 正乖離率下限百分比(%%)，預設 +1.0%%")
@@ -530,10 +636,21 @@ def main():
     parser.add_argument("--buy-ratio", type=float, default=12.0, help="法人買超佔成交量低標(%%)，預設 12.0%% (集中重壓吃貨)")
     parser.add_argument("--buy-3d", type=int, default=1000, help="外資或投信近3日累計買超門檻(張)，預設 1000 張")
     parser.add_argument("--no-futures-filter", action="store_true", help="關閉個股期貨限制，允許篩選全市場普通股")
-    parser.add_argument("--export", type=str, default=None, help="匯出報表檔名 (.csv 或 .md)")
-    parser.add_argument("--line", action="store_true", help="發送選股日報至 LINE Notify/Bot (策略 05 專屬視窗)")
+    parser.add_argument("--export", nargs="?", const=CSV_FILE, default=CSV_FILE, help="匯出報表檔名 (.csv 或 .md)")
+    parser.add_argument("--line", action="store_true", help="發送選股日報至 LINE (策略 05 專屬視窗)")
+    parser.add_argument("--force", action="store_true", help="強制執行 (忽略非交易日與未開盤守衛)")
 
     args = parser.parse_args()
+
+    # 開休市檢核守門 (若非強制執行且未指定歷史日期)
+    if not args.force and not args.date:
+        if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤後選股"):
+            return
+
+    # 夜間官方數據沉澱守門 (若在夜間 20:00 後執行且無指定歷史日期)
+    now_hour = datetime.datetime.now().hour
+    if now_hour >= 20 and not args.date and not args.force:
+        verify_twse_data_settlement()
 
     results = screen_stock_futures_long(
         date_str=args.date,
@@ -547,10 +664,12 @@ def main():
 
     if not results:
         print("\n[!] 經檢核，所選條件下今日無符合多方 4+1 複合條件之個股期貨標的。")
+        export_reports([], csv_path=args.export, target_date=args.date)
+        if args.line:
+            push_to_line([], target_date=args.date, force=args.force)
         return
 
     df_res = pd.DataFrame(results)
-    # 依照「綜合評分」、「期貨未平倉(OI)」與「法人買超佔比%」降冪排序
     df_res = df_res.sort_values(by=["評分", "期貨未平倉(OI)", "法人買超佔比%"], ascending=[False, False, False]).reset_index(drop=True)
 
     settle_banner = results[0].get('結算操盤建議', '')
@@ -560,56 +679,16 @@ def main():
         print("#" * 115)
 
     print("\n" + "="*115)
-    print(f"🎯【台股個股期貨法人強勢波段多方】選股結果清單（共 {len(df_res)} 檔）- ⚡ 全面升級【未平倉量OI評分 ＋ 結算前五日開次月新倉提醒】！")
+    print(f"🎯【台股個股期貨法人強勢波段多方】選股結果清單（共 {len(df_res)} 檔）- ⚡ 全面升級【四大防線V4.0 ＋ OI深度評分 ＋ 結算提醒】！")
     print("條件符合：具備期交所股票期貨 | 外資/投信3日買超>1000張 | 法人買超佔比>=12% | 站穩20MA且月線走揚 | 站上60MA季線 | 正乖離[+1%~+6%]")
     print("="*115)
-    print(df_res.to_string(index=False))
+    print(df_res[['證券代號', '證券名稱', '期貨契約', '收盤價', '期貨收盤價', '進場價位', '加碼價位', '停利TP1', '停利TP2', '停損價位', '盈虧比(R:R)', '期貨未平倉(OI)', '評分', '星級推薦']].to_string(index=False))
     print("="*115)
 
-    if args.export:
-        export_path = args.export
-        if not os.path.isabs(export_path) and os.path.dirname(export_path) == "":
-            export_path = os.path.join(os.path.dirname(__file__), export_path)
-        if export_path.endswith('.csv'):
-            from rolling_retention_manager import save_rolling_result_csv
-            target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
-            df_res = save_rolling_result_csv(export_path, df_res, today_date_str=target_date, max_days=5)
-            print(f"[✓] 已成功匯出 CSV 報表至: {export_path}")
-            # 同步產出視覺化字卡 Markdown 戰報
-            md_path = export_path[:-4] + ".md"
-            from line_sender import format_screener_markdown_cards
-            with open(md_path, 'w', encoding='utf-8') as f:
-                target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
-                f.write(format_screener_markdown_cards(results, target_date, strategy_id="05", max_stocks=10))
-                if settle_banner:
-                    f.write(f"\n> [!WARNING] **{settle_banner}**\n\n")
-                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
-                f.write(df_res.to_markdown(index=False))
-                f.write("\n")
-            print(f"[✓] 已同步匯出視覺化字卡 Markdown 戰報至: {md_path}")
-        elif export_path.endswith('.md'):
-            from line_sender import format_screener_markdown_cards
-            with open(export_path, 'w', encoding='utf-8') as f:
-                target_date = args.date or (results[0].get('日期') if results else None) or datetime.date.today().strftime('%Y-%m-%d')
-                f.write(format_screener_markdown_cards(results, target_date, strategy_id="05", max_stocks=10))
-                if settle_banner:
-                    f.write(f"\n> [!WARNING] **{settle_banner}**\n\n")
-                f.write("\n\n## 📋 完整量化數據指標總表\n\n")
-                f.write(df_res.to_markdown(index=False))
-                f.write("\n")
-            print(f"[✓] 已成功匯出視覺化字卡 Markdown 報表至: {export_path}")
+    export_reports(results, csv_path=args.export, target_date=args.date)
 
     if args.line:
-        try:
-            target_date = args.date or (results[0]['證券代號'] and datetime.date.today().strftime('%Y/%m/%d')) or "今日"
-            card = build_screener_carousel(results, target_date, strategy_id="05", max_stocks=6)
-            print("[*] 正在發送波段多方選股日報至 LINE (策略 05 專屬視窗)...")
-            success = send_to_line(card, strategy="05")
-            if not success:
-                clean_text = format_clean_screener_text(results, target_date, strategy_id="05", max_stocks=6)
-                send_to_line(clean_text, strategy="05")
-        except Exception as e:
-            print(f"[!] 發送 LINE 選股通知失敗: {e}")
+        push_to_line(results, target_date=args.date, force=args.force)
 
 
 if __name__ == '__main__':
