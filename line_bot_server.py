@@ -400,7 +400,10 @@ async def startup_event():
                         # 盤前自動拉取雲端昨夜最新選股結果
                         try:
                             import subprocess
-                            subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=str(Path(__file__).resolve().parent), timeout=15)
+                            from cloud_sync import sync_cloud_reports
+                            _ok, _msg = sync_cloud_reports(Path(__file__).resolve().parent, timeout=30)
+                            if not _ok:
+                                raise RuntimeError(_msg)
                             log_debug("[✓] 盤前自動同步雲端最新盤後報表成功")
                         except Exception as e:
                             log_debug(f"[!] 盤前同步雲端失敗: {e}")
@@ -1563,7 +1566,10 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
     elif action_name == "sync_cloud":
         def _task():
             try:
-                subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=str(root_dir), timeout=25)
+                from cloud_sync import sync_cloud_reports
+                _ok, _msg = sync_cloud_reports(root_dir, timeout=30)
+                if not _ok:
+                    raise RuntimeError(_msg)
             except Exception as e:
                 log_debug(f"[!] 同步雲端失敗: {e}")
         background_tasks.add_task(_task)
