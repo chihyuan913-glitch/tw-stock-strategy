@@ -24,32 +24,17 @@ def read_json(path: Path) -> Optional[dict]:
         return None
 
 
-def load_tw_calendar(path: Path = DEFAULT_HOLIDAYS) -> dict:
+def load_tw_calendar(path: Optional[Path] = None) -> dict:
+    """儀表板只用證交所開休市快照。market_holidays.json 仍留給既有選股日程，這裡不讀。"""
     from dashboard_contract import unreliable_calendar
-    data = read_json(path)
-    holidays = data.get("holidays") if isinstance(data, dict) else None
-    if not isinstance(holidays, dict) or not holidays:
-        return unreliable_calendar("休市日曆不存在或是空的，不判定過期")
-    closed = set()
-    years = set()
-    for key, value in holidays.items():
-        parsed = parse_iso_date(key)
-        if parsed is None and isinstance(value, dict):
-            parsed = parse_iso_date(value.get("date"))
-        if parsed:
-            closed.add(parsed)
-            years.add(parsed.year)
-    if not years:
-        return unreliable_calendar("休市日曆沒有可解析日期，不判定過期")
-    # 檔內假期與 last_synced 不足以證明該年每個平日都已核對，不能宣稱全年完整。
-    return {
-        "reliable": False,
-        "trust": "partial_unproven",
-        "closed": closed,
-        "years": years,
-        "last_synced": data.get("last_synced") if isinstance(data, dict) else None,
-        "reason": "假期清單沒有可證明的完整來源與涵蓋截止，不依它判定開市或過期。",
-    }
+    from twse_calendar import PAYLOAD_PATH, SNAPSHOT_PATH, load_snapshot
+    if path is None:
+        return load_snapshot(SNAPSHOT_PATH, PAYLOAD_PATH)
+    if not path.exists():
+        return unreliable_calendar("指定日曆不存在，不判定過期")
+    if path.resolve() == SNAPSHOT_PATH.resolve():
+        return load_snapshot(SNAPSHOT_PATH, PAYLOAD_PATH)
+    return unreliable_calendar("這不是證交所開休市快照，不拿來判定過期")
 
 
 def fetch_twse_index() -> dict:
@@ -96,16 +81,13 @@ def fetch_yfinance_index() -> dict:
     change_pct = round((change / prev_p * 100), 2) if prev_p else 0.0
     ma20 = float(series.rolling(20).mean().iloc[-1])
     ma60 = float(series.rolling(60).mean().iloc[-1]) if len(series) >= 60 else ma20
+    session = market_session_date(series.index[-1])
     return {
         "close_raw": last_p,
         "prev_close": prev_p,
         "change": change,
         "change_pct": change_pct,
-        "date": (
-            market_session_date(series.index[-1]).isoformat()
-            if market_session_date(series.index[-1])
-            else None
-        ),
+        "date": session.isoformat() if session else None,
         "time": "13:30:00",
         "ma20": ma20,
         "ma60": ma60,
@@ -123,7 +105,7 @@ def build_market_snapshot(
 ) -> dict:
     """讀取快照。config_path 只以讀取模式開啟。"""
     config = read_json(config_path)
-    calendar = load_tw_calendar(holiday_path) if holidays is None else None
+    calendar = load_tw_calendar() if holidays is None else None
     if holidays is not None:
         from dashboard_contract import reliable_calendar
         years = {day.year for day in holidays}

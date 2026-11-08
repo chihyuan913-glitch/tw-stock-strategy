@@ -105,19 +105,38 @@ def reliable_calendar(closed: Iterable[dt.date], years: Iterable[int]) -> dict:
 
 
 def _in_coverage(day: dt.date, calendar: Mapping[str, Any]) -> bool:
-    return bool(calendar.get("reliable")) and day.year in set(calendar.get("years") or ())
+    if not calendar.get("reliable"):
+        return False
+    start = parse_iso_date(calendar.get("coverage_start"))
+    end = parse_iso_date(calendar.get("coverage_end"))
+    if start and end:
+        return start <= day <= end
+    return day.year in set(calendar.get("years") or ())
+
+
+def is_scheduled_session(day: dt.date, calendar: Mapping[str, Any]) -> Optional[bool]:
+    """True 交易、False 休市、None 超出已證明涵蓋。週末未列在開市標記中就不是交易日。"""
+    if not _in_coverage(day, calendar):
+        return None
+    if day in set(calendar.get("explicit_open") or ()):
+        return True
+    if day in set(calendar.get("closed") or ()):
+        return False
+    if day.weekday() >= 5:
+        return False
+    return True
 
 
 def previous_trading_day(day: dt.date, calendar: Mapping[str, Any]) -> Optional[dt.date]:
-    """往前找交易日。走出日曆覆蓋年份就停，不把未知年份硬當成開市。"""
+    """往前找交易日。走出已證明涵蓋就停，不把未公布年度硬當成開市。"""
     if not calendar.get("reliable"):
         return None
-    closed = set(calendar.get("closed") or ())
     cursor = day - dt.timedelta(days=1)
     for _ in range(366):
-        if not _in_coverage(cursor, calendar):
+        flag = is_scheduled_session(cursor, calendar)
+        if flag is None:
             return None
-        if cursor.weekday() < 5 and cursor not in closed:
+        if flag:
             return cursor
         cursor -= dt.timedelta(days=1)
     return None
@@ -143,11 +162,11 @@ def expected_session(
         base.update({"status": "unknown", "reason": reason})
         return base
     today = observed.date()
-    if not _in_coverage(today, calendar):
-        base.update({"status": "unknown", "reason": "觀察日不在休市日曆覆蓋年，不判定過期"})
+    today_flag = is_scheduled_session(today, calendar)
+    if today_flag is None:
+        base.update({"status": "unknown", "reason": "觀察日不在已證明的開休市涵蓋範圍，不判定過期"})
         return base
-    closed = set(calendar.get("closed") or ())
-    closed_today = today.weekday() >= 5 or today in closed
+    closed_today = not today_flag
     minutes = observed.hour * 60 + observed.minute
     if closed_today:
         phase = "weekend" if today.weekday() >= 5 else "holiday"

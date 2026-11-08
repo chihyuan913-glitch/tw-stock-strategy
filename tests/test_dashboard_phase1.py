@@ -483,13 +483,64 @@ def test_timezone_aware_session_date_and_real_calendar_is_not_a_full_year():
     assert str(stamped)[:10] == "2026-11-06"
     assert dc.market_session_date(stamped).isoformat() == "2026-11-07"
     calendar = ms.load_tw_calendar()
-    assert calendar["reliable"] is False
-    assert calendar["trust"] == "partial_unproven"
+    assert calendar["trust"] == "twse_annual_schedule_snapshot"
+    assert calendar["reliable"] is True
+    assert calendar["coverage_start"] == "2026-01-01"
+    assert calendar["coverage_end"] == "2026-12-31"
     assert "2026-01-01" in {day.isoformat() for day in calendar["closed"]}
-    assert calendar.get("last_synced")
-    judged = dc.classify_session_freshness("2026-10-24", now=SUNDAY, calendar=calendar)
-    assert judged["freshness"] == "unknown"
-    assert judged["stale"] is False
+    assert dt.date(2026, 1, 2) in set(calendar["explicit_open"])
+    assert dt.date(2026, 2, 11) in set(calendar["explicit_open"])
+    assert dt.date(2026, 2, 23) in set(calendar["explicit_open"])
+    assert dt.date(2026, 2, 12) in set(calendar["closed"])
+    assert calendar["payload_sha256"] == "7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117"
+    outside = dc.classify_session_freshness("2027-01-04", now=dt.datetime(2027, 1, 4, 9, tzinfo=dc.TAIPEI), calendar=calendar)
+    assert outside["freshness"] == "unknown"
+    assert outside["stale"] is False
+
+
+def test_official_snapshot_drives_batch_and_market_view():
+    import market_snapshot as ms
+    calendar = ms.load_tw_calendar()
+    sunday = dt.datetime(2026, 11, 8, 11, 0, tzinfo=dc.TAIPEI)
+    old = dc.build_batch_status(
+        [{"strategy": "06", "dates": ["2026-10-24"], "rolling_total": 2}],
+        now=sunday,
+        calendar=calendar,
+    )
+    assert dt.date(2026, 10, 24).weekday() == 5
+    assert old["unity"] == "single_date"
+    assert old["status"] == "stale"
+    assert old["freshness"] == "stale"
+    current = dc.build_batch_status(
+        [{"strategy": "01", "dates": ["2026-11-06"], "rolling_total": 4}],
+        now=sunday,
+        calendar=calendar,
+    )
+    assert current["status"] == "ok"
+    monday_before = dt.datetime(2026, 11, 2, 8, 30, tzinfo=dc.TAIPEI)
+    assert dc.expected_session(monday_before, calendar, rhythm="daily_close")["expected_session"] == "2026-10-30"
+    midday = dt.datetime(2026, 11, 6, 10, 0, tzinfo=dc.TAIPEI)
+    assert dc.classify_session_freshness("2026-11-05", now=midday, calendar=calendar, rhythm="daily_close")["freshness"] == "ok"
+    assert dc.classify_session_freshness("2026-11-06", now=midday, calendar=calendar, rhythm="intraday")["freshness"] == "ok"
+    after = dt.datetime(2026, 11, 6, 14, 0, tzinfo=dc.TAIPEI)
+    assert dc.classify_session_freshness("2026-11-06", now=after, calendar=calendar, rhythm="daily_close")["freshness"] == "ok"
+    new_year = dt.datetime(2026, 1, 1, 12, 0, tzinfo=dc.TAIPEI)
+    assert dc.expected_session(new_year, calendar)["status"] == "unknown"
+    reopen = dt.datetime(2026, 2, 23, 8, 30, tzinfo=dc.TAIPEI)
+    assert dc.expected_session(reopen, calendar, rhythm="daily_close")["expected_session"] == "2026-02-11"
+    from twse_calendar import calendar_from_payload
+    assert calendar_from_payload([{"Name": "只到六月", "Date": "1150601"}])["reliable"] is False
+    assert calendar_from_payload([])["reliable"] is False
+    assert ms.load_tw_calendar(Path("/tmp/does-not-exist-calendar.json"))["reliable"] is False
+    view = dc.assemble_market_view(
+        twse={"close_raw": 40000, "prev_close": 40100, "change": -100, "change_pct": -0.25, "date": "20261024"},
+        yfinance_bar={"date": "2026-10-24", "ma20": 41000, "ma60": 40000},
+        now=sunday,
+        calendar=calendar,
+    )
+    assert view["status"] == "stale"
+    assert view["verified"] is False
+    assert view["quote_inferred_regime"]["label_display"] == "未知"
 
 
 def test_hub_parse_flows_into_treemap_summary_without_network():
