@@ -660,7 +660,9 @@ def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict
                         'high': float(h_val) if (h_val and h_val != '-') else None,
                         'low': float(l_val) if (l_val and l_val != '-') else None,
                         'volume': int(v_val) if (v_val and v_val != '-') else None,
-                        'time': item.get('t', time_str)
+                        'time': item.get('t', time_str),
+                        'feed_time': item.get('t') or None,
+                        'feed_date': item.get('d') or None,
                     }
                     quotes[c] = quote_obj
                     _QUOTE_CACHE[c] = quote_obj

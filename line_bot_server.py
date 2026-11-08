@@ -630,6 +630,12 @@ def get_network_info_endpoint():
         "tunnel_url": tunnel_url
     }
 
+@app.get("/dashboard_guards.js")
+async def serve_dashboard_guards():
+    path = Path(__file__).resolve().parent / "web" / "dashboard_guards.js"
+    return FileResponse(path, media_type="application/javascript")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
     """提供深色科技風「台股量化選股策略最高總指揮中心」戰情儀表板"""
@@ -689,6 +695,16 @@ def _selection_batch_rows():
     return rows
 
 
+def _advisor_table_rows():
+    """只讀既有決策表。缺檔回 None，不建立、不改寫。"""
+    import csv
+    path = Path(__file__).resolve().parent / "lab" / "data" / "tomorrow_trading_advisor.csv"
+    if not path.exists():
+        return None
+    with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
 @app.get("/api/tomorrow_advisor")
 async def get_tomorrow_advisor():
     """提供明日 (T+1) 量化買賣建議決策卡與一鍵委託資訊"""
@@ -696,7 +712,15 @@ async def get_tomorrow_advisor():
     import pandas as pd
     advisor_csv = Path(__file__).resolve().parent / "lab" / "data" / "tomorrow_trading_advisor.csv"
     if not advisor_csv.exists():
-        return {"status": "empty", "items": [], "market_regime": {}}
+        from dashboard_contract import summarize_advisor_table
+        missing = summarize_advisor_table(None)
+        return {
+            "status": "missing",
+            "items": [],
+            "market_regime": {},
+            "effective_regime": {},
+            "count_contract": {"advisor_actual": missing, "note": missing.get("note"), "by_strategy": []},
+        }
     
     try:
         df = pd.read_csv(advisor_csv, encoding='utf-8-sig', dtype=str).fillna("")
@@ -749,9 +773,10 @@ async def get_tomorrow_advisor():
             except Exception:
                 pass
 
-        from dashboard_contract import build_batch_status, flatten_effective_regime
+        from dashboard_contract import build_batch_status, flatten_effective_regime, summarize_advisor_table
         effective = flatten_effective_regime(regime_info)
         batch_rows = _selection_batch_rows()
+        advisor_actual = summarize_advisor_table(items)
         return {
             "status": "success",
             "items": items,
@@ -763,8 +788,10 @@ async def get_tomorrow_advisor():
             "count_contract": {
                 "advisor_rows": len(items),
                 "advisor_cap_per_strategy": 2,
-                "note": "此表是每策略最多 2 檔的決策切片，不是五日滾動總數，也不是 Studio 前 5 檔。",
-                "by_strategy": batch_rows,
+                "advisor_actual": advisor_actual,
+                "note": advisor_actual.get("note"),
+                "by_strategy": advisor_actual.get("by_strategy"),
+                "pool_batches": batch_rows,
             },
         }
     except Exception as e:
@@ -895,8 +922,8 @@ async def get_overview():
     }
 
 @app.get("/api/strategy/{strat_id}")
-async def get_strategy_data(strat_id: str, quotes: bool = False):
-    """取得指定策略最新選股表格數據"""
+async def get_strategy_data(strat_id: str, quotes: bool = True):
+    """取得指定策略選股表。quotes 預設 true 以維持舊客戶；戰情頁傳 quotes=0 只讀快取。"""
     import pandas as pd
     strat_meta = {
         "01_bollinger_reversal": {
@@ -1059,7 +1086,9 @@ async def get_strategy_data(strat_id: str, quotes: bool = False):
         pending_count = len(pending_rows)
         tracking_count = len(rows) - today_count
 
-        from dashboard_contract import build_count_contract, legacy_provenance
+        from dashboard_contract import apply_advisor_actual, build_count_contract, legacy_provenance, summarize_advisor_table
+        sid = strat_id[:2] if strat_id[:2].isdigit() else None
+        count_contract = apply_advisor_actual(build_count_contract(rows), summarize_advisor_table(_advisor_table_rows()), sid)
         return {
             "name": meta["name"],
             "desc": meta["desc"],
@@ -1072,7 +1101,7 @@ async def get_strategy_data(strat_id: str, quotes: bool = False):
             "rows": rows,
             "quotes_included": bool(quotes),
             "detail_source": "result.csv",
-            "count_contract": build_count_contract(rows),
+            "count_contract": count_contract,
             "provenance": legacy_provenance(cols, rows),
         }
     except Exception as e:

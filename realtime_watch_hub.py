@@ -24,7 +24,8 @@ _MARKET_INDEX_CACHE: Dict[str, Any] = {
     "index_close": 23285.42,
     "change": -328.60,
     "change_pct": -1.39,
-    "time": "13:30:00"
+    "time": "13:30:00",
+    "observation": "builtin_placeholder",
 }
 
 def is_market_open() -> bool:
@@ -76,9 +77,15 @@ def _sync_fetch_all_watch_quotes(codes: List[str]):
         if q_idx.get("price"):
             _MARKET_INDEX_CACHE = {
                 "index_close": q_idx["price"],
-                "change": q_idx.get("change", 0.0),
-                "change_pct": q_idx.get("change_pct", 0.0),
-                "time": q_idx.get("time", "13:30:00")
+                "change": q_idx.get("change"),
+                "change_pct": q_idx.get("change_pct"),
+                "time": q_idx.get("time"),
+                "feed_time": q_idx.get("feed_time"),
+                "feed_date": q_idx.get("feed_date"),
+                "date": q_idx.get("feed_date"),
+                "as_of_date": q_idx.get("feed_date"),
+                "source": "twse_mis",
+                "observation": "quote",
             }
 
     # 覆蓋更新個股行情

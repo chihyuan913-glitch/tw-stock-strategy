@@ -35,6 +35,7 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="/dashboard_guards.js"></script>
   <style>
     body {
       font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -164,8 +165,8 @@
           <span>雲端雙軌自動化狀態</span>
         </div>
         <div class="flex items-center gap-2 mt-1">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-          <span class="text-sm font-bold text-white">GitHub 雲端排程託管中</span>
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+          <span class="text-sm font-bold text-slate-200">排程寫在倉庫，此頁未核對是否正在跑</span>
         </div>
         <div class="text-xs text-slate-400 mt-1 flex justify-between">
           <span>盤後 21:15 選股</span>
@@ -396,13 +397,13 @@
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 p-3.5 bg-slate-950/60 border-b border-slate-800 text-xs">
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
               <div class="text-[10px] text-slate-400">示範 CAGR（未驗證）</div>
-              <div id="metricCAGR" class="text-base font-black font-mono text-emerald-400 mt-0.5">+38.6%</div>
+              <div id="metricCAGR" class="text-base font-black font-mono text-slate-300 mt-0.5">+38.6%</div>
               <div class="text-[10px] text-slate-500 font-mono">大盤同期 +14.2%</div>
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
               <div class="text-[10px] text-slate-400">示範夏普（未驗證）</div>
-              <div id="metricSharpe" class="text-base font-black font-mono text-cyan-400 mt-0.5">1.85</div>
-              <div class="text-[10px] text-emerald-400 font-sans">極佳風險回報</div>
+              <div id="metricSharpe" class="text-base font-black font-mono text-slate-300 mt-0.5">1.85</div>
+              <div class="text-[10px] text-slate-400 font-sans">示範評語，不是驗證結論</div>
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
               <div class="text-[10px] text-slate-400">示範回撤（未驗證）</div>
@@ -411,7 +412,7 @@
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
               <div class="text-[10px] text-slate-400">示範勝率（未驗證）</div>
-              <div id="metricWinRate" class="text-base font-black font-mono text-amber-400 mt-0.5">71.4%</div>
+              <div id="metricWinRate" class="text-base font-black font-mono text-slate-300 mt-0.5">71.4%</div>
               <div class="text-[10px] text-slate-500 font-sans" id="metricProfitFactor">盈虧比 1:2.42</div>
             </div>
           </div>
@@ -3719,21 +3720,9 @@
         if (priceEl) priceEl.innerText = m.close || '—';
         const chEl = document.getElementById('twiiChange');
         if (chEl) {
-          const ch = Number(m.change);
-          const chPct = Number(m.change_pct);
-          if (!Number.isFinite(ch) || !Number.isFinite(chPct)) {
-            chEl.className = "text-xs font-mono font-bold text-slate-400";
-            chEl.innerText = '漲跌未知';
-          } else if (ch > 0) {
-            chEl.className = "text-xs font-mono font-bold text-rose-400";
-            chEl.innerText = `▲ +${ch.toFixed(2)} (+${chPct.toFixed(2)}%)`;
-          } else if (ch < 0) {
-            chEl.className = "text-xs font-mono font-bold text-emerald-400";
-            chEl.innerText = `▼ ${ch.toFixed(2)} (${chPct.toFixed(2)}%)`;
-          } else {
-            chEl.className = "text-xs font-mono font-bold text-slate-400";
-            chEl.innerText = `0.00 (0.00%)`;
-          }
+          const shown = displayChange(m.change, m.change_pct);
+          chEl.className = "text-xs font-mono font-bold text-slate-300";
+          chEl.innerText = shown.text;
         }
         const maEl = document.getElementById('twiiMa20');
         if (maEl) maEl.innerText = m.ma20 || '—';
@@ -3750,7 +3739,7 @@
         const inferred = m.quote_inferred_regime || {};
         const effective = m.effective_regime || d.effective_regime || {};
         const regimeEl = document.getElementById('marketRegime');
-        if (regimeEl) regimeEl.innerText = `報價推斷：${inferred.label || m.regime || '未知'}`;
+        if (regimeEl) regimeEl.innerText = quoteHeadline(inferred);
         const adviceEl = document.getElementById('marketAdvice');
         if (adviceEl) adviceEl.innerText = inferred.reason || m.risk_advice || '報價推斷沒有說明';
         const trendEl = document.getElementById('marketTrendTag');
@@ -4216,8 +4205,24 @@
       try {
         const resp = await fetch('/api/tomorrow_advisor');
         const res = await resp.json();
+        if (res.status === 'missing') {
+          container.textContent = '';
+          const missing = document.createElement('div');
+          missing.className = 'col-span-full py-12 text-center text-slate-300 text-sm';
+          missing.textContent = (res.count_contract && res.count_contract.note) || '決策表缺檔';
+          container.appendChild(missing);
+          ['advisorStrongBuyCount', 'advisorBuyDipCount', 'advisorFilteredCount', 'advisorTotalCount'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = '缺檔';
+          });
+          return;
+        }
         if (res.status === 'error' || !Array.isArray(res.items)) {
-          container.innerHTML = `<div class="col-span-full py-12 text-center text-rose-300 text-sm">決策表錯誤：${res.message || '回應無法讀取'}</div>`;
+          container.textContent = '';
+          const errBox = document.createElement('div');
+          errBox.className = 'col-span-full py-12 text-center text-rose-300 text-sm';
+          errBox.textContent = `決策表錯誤：${res.message || '回應無法讀取'}`;
+          container.appendChild(errBox);
           ['advisorStrongBuyCount', 'advisorBuyDipCount', 'advisorFilteredCount', 'advisorTotalCount'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerText = '錯誤';
@@ -4257,7 +4262,11 @@
         renderAdvisorCards();
       } catch (e) {
         console.error('載入明日決策失敗:', e);
-        container.innerHTML = `<div class="col-span-full py-12 text-center text-rose-400 text-sm">載入失敗: ${e.message}</div>`;
+        container.textContent = '';
+        const failBox = document.createElement('div');
+        failBox.className = 'col-span-full py-12 text-center text-rose-400 text-sm';
+        failBox.textContent = `載入失敗: ${e.message || e}`;
+        container.appendChild(failBox);
       }
     }
 

@@ -24,18 +24,26 @@ def read_json(path: Path) -> Optional[dict]:
         return None
 
 
-def holiday_dates(path: Path = DEFAULT_HOLIDAYS) -> set:
-    data = read_json(path) or {}
-    found = set()
+def load_tw_calendar(path: Path = DEFAULT_HOLIDAYS) -> dict:
+    from dashboard_contract import reliable_calendar, unreliable_calendar
+    data = read_json(path)
     holidays = data.get("holidays") if isinstance(data, dict) else None
-    if isinstance(holidays, dict):
-        for key, value in holidays.items():
-            parsed = parse_iso_date(key)
-            if parsed is None and isinstance(value, dict):
-                parsed = parse_iso_date(value.get("date"))
-            if parsed:
-                found.add(parsed)
-    return found
+    if not isinstance(holidays, dict) or not holidays:
+        return unreliable_calendar("休市日曆不存在或是空的，不判定過期")
+    closed = set()
+    years = set()
+    for key, value in holidays.items():
+        parsed = parse_iso_date(key)
+        if parsed is None and isinstance(value, dict):
+            parsed = parse_iso_date(value.get("date"))
+        if parsed:
+            closed.add(parsed)
+            years.add(parsed.year)
+    if not years:
+        return unreliable_calendar("休市日曆沒有可解析日期，不判定過期")
+    calendar = reliable_calendar(closed, years)
+    calendar["last_synced"] = data.get("last_synced")
+    return calendar
 
 
 def fetch_twse_index() -> dict:
@@ -105,7 +113,11 @@ def build_market_snapshot(
 ) -> dict:
     """讀取快照。config_path 只以讀取模式開啟。"""
     config = read_json(config_path)
-    closed = set(holidays) if holidays is not None else holiday_dates(holiday_path)
+    calendar = load_tw_calendar(holiday_path) if holidays is None else None
+    if holidays is not None:
+        from dashboard_contract import reliable_calendar
+        years = {day.year for day in holidays}
+        calendar = reliable_calendar(holidays, years) if years else load_tw_calendar(holiday_path)
     twse_fetcher = fetch_twse if fetch_twse is not None else fetch_twse_index
     yf_fetcher = fetch_yfinance if fetch_yfinance is not None else fetch_yfinance_index
 
@@ -137,5 +149,5 @@ def build_market_snapshot(
         twse_error=twse_error,
         yfinance_error=yf_error,
         now=now or dt.datetime.now(TAIPEI),
-        holidays=closed,
+        calendar=calendar,
     )

@@ -70,62 +70,124 @@ def parse_iso_date(value: Any) -> Optional[dt.date]:
         return None
 
 
-def last_trading_day(day: dt.date, holidays: Optional[Iterable[dt.date]] = None) -> dt.date:
-    """最近一個非週末、非已知休市日。只使用呼叫端給的休市日，不連線。"""
-    closed = set(holidays or ())
-    cursor = day
+OPEN_MINUTES = 9 * 60
+CLOSE_MINUTES = 13 * 60 + 30
+
+
+def unreliable_calendar(reason: str = "沒有可信的臺灣休市日曆，不判定過期") -> dict:
+    return {"reliable": False, "closed": set(), "years": set(), "reason": reason}
+
+
+def reliable_calendar(closed: Iterable[dt.date], years: Iterable[int]) -> dict:
+    year_set = {int(year) for year in years}
+    closed_set = set(closed)
+    if not year_set:
+        return unreliable_calendar("休市日曆沒有覆蓋年份")
+    return {"reliable": True, "closed": closed_set, "years": year_set, "reason": None}
+
+
+def _in_coverage(day: dt.date, calendar: Mapping[str, Any]) -> bool:
+    return bool(calendar.get("reliable")) and day.year in set(calendar.get("years") or ())
+
+
+def previous_trading_day(day: dt.date, calendar: Mapping[str, Any]) -> Optional[dt.date]:
+    """往前找交易日。走出日曆覆蓋年份就停，不把未知年份硬當成開市。"""
+    if not calendar.get("reliable"):
+        return None
+    closed = set(calendar.get("closed") or ())
+    cursor = day - dt.timedelta(days=1)
     for _ in range(366):
+        if not _in_coverage(cursor, calendar):
+            return None
         if cursor.weekday() < 5 and cursor not in closed:
             return cursor
         cursor -= dt.timedelta(days=1)
-    return day
+    return None
+
+
+def expected_session(
+    now: Optional[dt.datetime],
+    calendar: Optional[Mapping[str, Any]],
+    rhythm: str = "daily_close",
+) -> dict:
+    """依交易時段決定『這類資料現在應該對到哪一個交易日』。日曆不可信時不給日期。"""
+    observed = now_taipei(now)
+    base = {
+        "timezone": TIMEZONE_NAME,
+        "observed_at": isoformat_taipei(observed),
+        "rhythm": rhythm,
+        "phase": None,
+        "expected_session": None,
+        "calendar_reliable": bool(calendar and calendar.get("reliable")),
+    }
+    if not calendar or not calendar.get("reliable"):
+        reason = (calendar or {}).get("reason") or "沒有可信的臺灣休市日曆，不判定過期"
+        base.update({"status": "unknown", "reason": reason})
+        return base
+    today = observed.date()
+    if not _in_coverage(today, calendar):
+        base.update({"status": "unknown", "reason": "觀察日不在休市日曆覆蓋年，不判定過期"})
+        return base
+    closed = set(calendar.get("closed") or ())
+    closed_today = today.weekday() >= 5 or today in closed
+    minutes = observed.hour * 60 + observed.minute
+    if closed_today:
+        phase = "weekend" if today.weekday() >= 5 else "holiday"
+        expected = previous_trading_day(today, calendar)
+    elif minutes < OPEN_MINUTES:
+        phase = "before_open"
+        expected = previous_trading_day(today, calendar)
+    elif minutes < CLOSE_MINUTES:
+        phase = "session"
+        expected = today if rhythm == "intraday" else previous_trading_day(today, calendar)
+    else:
+        phase = "after_close"
+        expected = today
+    if expected is None:
+        base.update({"status": "unknown", "phase": phase, "reason": "最近交易日超出日曆覆蓋，不判定過期"})
+        return base
+    base.update({
+        "status": "ok",
+        "phase": phase,
+        "expected_session": expected.isoformat(),
+        "reason": "依交易時段與休市日曆",
+    })
+    return base
 
 
 def classify_session_freshness(
     as_of: Any,
     now: Optional[dt.datetime] = None,
-    holidays: Optional[Iterable[dt.date]] = None,
+    calendar: Optional[Mapping[str, Any]] = None,
+    rhythm: str = "daily_close",
 ) -> dict:
-    """週末或已知休市日沿用最近交易日，不把該日標成過期。沒有資料日則是未知，不是過期。"""
-    observed = now_taipei(now)
-    today = observed.date()
-    holiday_dates = set(holidays or ())
-    expected = last_trading_day(today, holiday_dates)
+    """沒有資料日、沒有可信日曆，或日期對不齊預期節奏時，不標成已驗證，也不硬判過期。"""
+    expectation = expected_session(now, calendar, rhythm=rhythm)
     parsed = parse_iso_date(as_of)
-    base = {
-        "timezone": TIMEZONE_NAME,
-        "observed_at": isoformat_taipei(observed),
-        "expected_session": expected.isoformat(),
+    result = {
+        **expectation,
         "as_of": parsed.isoformat() if parsed else None,
-        "calendar_today_is_session": today == expected,
-    }
-    if parsed is None:
-        base.update({
-            "freshness": "unknown",
-            "stale": False,
-            "reason": "沒有可驗證的資料日，不以日曆日差標成過期",
-        })
-        return base
-    if parsed == expected:
-        base.update({
-            "freshness": "ok",
-            "stale": False,
-            "reason": "對齊最近交易日（含週末與已知休市沿用）",
-        })
-        return base
-    if parsed < expected:
-        base.update({
-            "freshness": "stale",
-            "stale": True,
-            "reason": "早於最近交易日",
-        })
-        return base
-    base.update({
-        "freshness": "unknown",
         "stale": False,
-        "reason": "資料日晚於最近交易日，不改寫成已驗證",
-    })
-    return base
+        "freshness": "unknown",
+    }
+    if not expectation.get("calendar_reliable") or expectation.get("status") != "ok":
+        result["reason"] = expectation.get("reason") or "沒有可信的臺灣休市日曆，不判定過期"
+        return result
+    if parsed is None:
+        result["reason"] = "沒有可驗證的資料日，不以日曆日差標成過期"
+        return result
+    expected = parse_iso_date(expectation.get("expected_session"))
+    if expected is None:
+        result["reason"] = "沒有可比較的預期交易日"
+        return result
+    if parsed == expected:
+        result.update({"freshness": "ok", "stale": False, "reason": "對齊這個時段預期的交易日"})
+        return result
+    if parsed < expected:
+        result.update({"freshness": "stale", "stale": True, "reason": "早於這個時段預期的交易日"})
+        return result
+    result.update({"freshness": "unknown", "stale": False, "reason": "資料日晚於預期交易日，不改寫成已驗證"})
+    return result
 
 
 def module_status(
@@ -134,10 +196,11 @@ def module_status(
     count: Optional[int] = None,
     as_of: Any = None,
     now: Optional[dt.datetime] = None,
-    holidays: Optional[Iterable[dt.date]] = None,
+    calendar: Optional[Mapping[str, Any]] = None,
+    rhythm: str = "daily_close",
 ) -> dict:
-    """錯誤、零筆、過期分開，不互相覆蓋。"""
-    freshness = classify_session_freshness(as_of, now=now, holidays=holidays)
+    """錯誤、零筆、過期分開。沒有日曆時過期旗標維持未知，不硬判。"""
+    freshness = classify_session_freshness(as_of, now=now, calendar=calendar, rhythm=rhythm)
     if error:
         return {
             **freshness,
@@ -148,7 +211,12 @@ def module_status(
             "freshness": "unknown",
         }
     empty = count == 0
-    status = "empty" if empty else freshness["freshness"]
+    if freshness.get("freshness") == "unknown" and not empty:
+        status = "unknown"
+    elif empty:
+        status = "empty"
+    else:
+        status = freshness["freshness"]
     return {
         **freshness,
         "status": status,
@@ -281,6 +349,35 @@ def _fmt_price(value: float) -> str:
     return f"{float(value):,.2f}"
 
 
+def _component(source: Optional[str], as_of: Optional[dt.date], verified: bool) -> dict:
+    return {
+        "source": source,
+        "as_of": as_of.isoformat() if as_of else None,
+        "verified": verified,
+    }
+
+
+def _sync_quote_components(price_part: Mapping[str, Any], ma_part: Mapping[str, Any]) -> dict:
+    """來源名稱不同不是衝突。兩邊都有交易日且不一致才是衝突；對不齊就未知。"""
+    if price_part.get("verified") and ma_part.get("verified"):
+        if price_part.get("as_of") and price_part.get("as_of") == ma_part.get("as_of"):
+            return {
+                "status": "ok",
+                "verified": True,
+                "reason": "價格與均線同一交易日。這是報價推斷，不是設定檔生效位階。",
+            }
+        return {
+            "status": "conflict",
+            "verified": False,
+            "reason": "價格與均線的交易日不同，不把推斷當成已驗證。",
+        }
+    return {
+        "status": "unknown",
+        "verified": False,
+        "reason": "價格或均線缺少可驗證的交易日，不把推斷當成已驗證。",
+    }
+
+
 def assemble_market_view(
     *,
     twse: Optional[Mapping[str, Any]] = None,
@@ -289,9 +386,9 @@ def assemble_market_view(
     twse_error: Optional[str] = None,
     yfinance_error: Optional[str] = None,
     now: Optional[dt.datetime] = None,
-    holidays: Optional[Iterable[dt.date]] = None,
+    calendar: Optional[Mapping[str, Any]] = None,
 ) -> dict:
-    """組出報價信封。不讀寫磁碟。價格來源與均線來源不同時標成衝突，不當成生效位階。"""
+    """組出報價信封。不讀寫磁碟。設定檔更新時間不是行情日，缺漲跌保持未知。"""
     observed = now_taipei(now)
     price = None
     prev = None
@@ -300,45 +397,62 @@ def assemble_market_view(
     as_of = None
     quote_time = None
     price_source = None
+    price_verified = False
     ma20 = None
     ma60 = None
     ma_source = None
+    ma_as_of = None
+    ma_verified = False
+    price_rhythm = "intraday"
     errors = [err for err in (twse_error, yfinance_error) if err]
 
     if twse and twse.get("close_raw"):
         price = float(twse["close_raw"])
-        prev = float(twse.get("prev_close") or price)
-        change = float(twse.get("change") if twse.get("change") is not None else round(price - prev, 2))
-        change_pct = float(twse.get("change_pct") if twse.get("change_pct") is not None else (round(change / prev * 100, 2) if prev else 0.0))
+        prev = float(twse["prev_close"]) if twse.get("prev_close") not in (None, "") else None
+        change = twse.get("change")
+        change_pct = twse.get("change_pct")
+        change = float(change) if change is not None else None
+        change_pct = float(change_pct) if change_pct is not None else None
         as_of = parse_iso_date(twse.get("date"))
         quote_time = twse.get("time") or None
         price_source = "twse_mis"
+        price_verified = as_of is not None
+        price_rhythm = "intraday"
     elif yfinance_bar and yfinance_bar.get("close_raw"):
         price = float(yfinance_bar["close_raw"])
-        prev = float(yfinance_bar.get("prev_close") or price)
-        change = float(yfinance_bar.get("change") if yfinance_bar.get("change") is not None else round(price - prev, 2))
-        change_pct = float(yfinance_bar.get("change_pct") if yfinance_bar.get("change_pct") is not None else (round(change / prev * 100, 2) if prev else 0.0))
+        prev = float(yfinance_bar["prev_close"]) if yfinance_bar.get("prev_close") not in (None, "") else None
+        change = yfinance_bar.get("change")
+        change_pct = yfinance_bar.get("change_pct")
+        change = float(change) if change is not None else None
+        change_pct = float(change_pct) if change_pct is not None else None
         as_of = parse_iso_date(yfinance_bar.get("date"))
         quote_time = yfinance_bar.get("time") or None
         price_source = "yfinance"
+        price_verified = as_of is not None
+        price_rhythm = "daily_close"
 
     if yfinance_bar and yfinance_bar.get("ma20"):
         ma20 = float(yfinance_bar["ma20"])
         ma60 = float(yfinance_bar.get("ma60") or ma20)
         ma_source = "yfinance"
+        ma_as_of = parse_iso_date(yfinance_bar.get("date"))
+        ma_verified = ma_as_of is not None
 
     market = config.get("market_regime") if isinstance(config, Mapping) and isinstance(config.get("market_regime"), Mapping) else {}
-    if price is None and market.get("close"):
+    if price is None and market.get("close") not in (None, ""):
         price = float(market["close"])
-        prev = price
-        change = 0.0
-        change_pct = 0.0
-        as_of = parse_iso_date(config.get("updated_at") if isinstance(config, Mapping) else None)
+        prev = None
+        change = None
+        change_pct = None
+        as_of = None
         price_source = "regime_config_snapshot"
-    if ma20 is None and market.get("ma20"):
+        price_verified = False
+    if ma20 is None and market.get("ma20") not in (None, ""):
         ma20 = float(market["ma20"])
         ma60 = float(market.get("ma60") or ma20)
         ma_source = "regime_config_snapshot"
+        ma_as_of = None
+        ma_verified = False
 
     used_hardcoded = False
     if price is None:
@@ -355,39 +469,64 @@ def assemble_market_view(
         ma_source = "hardcoded_fallback"
         used_hardcoded = True
 
-    mixed = price_source != ma_source
+    if price_source == "hardcoded_fallback":
+        price_verified = False
+        as_of = None
+    if ma_source == "hardcoded_fallback":
+        ma_verified = False
+        ma_as_of = None
+    price_part = _component(price_source, as_of, price_verified and price_source not in {"hardcoded_fallback", "regime_config_snapshot"})
+    ma_part = _component(ma_source, ma_as_of, ma_verified and ma_source not in {"hardcoded_fallback", "regime_config_snapshot"})
+    sync = _sync_quote_components(price_part, ma_part)
     inferred = infer_quote_regime(price, ma20, ma60)
-    if mixed:
-        inferred["status"] = "conflict"
-        inferred["reason"] = "價格與均線不是同一來源，此推斷不視為生效位階"
-    elif price_source == "hardcoded_fallback":
-        inferred["status"] = "fallback"
-        inferred["reason"] = "寫死占位數字，不是已驗證行情"
-    elif price_source == "regime_config_snapshot":
-        inferred["status"] = "config_snapshot"
-        inferred["reason"] = "沿用設定檔裡的收盤與均線，不是這次交易所回報"
-    else:
-        inferred["status"] = "ok"
-        inferred["reason"] = "僅為報價推斷"
+    inferred["status"] = sync["status"]
+    inferred["verified"] = sync["verified"]
+    inferred["reason"] = sync["reason"]
+    inferred["label_display"] = inferred["label"] if sync["verified"] else "未知"
     inferred["price_source"] = price_source
     inferred["ma_source"] = ma_source
+    inferred["price_as_of"] = price_part["as_of"]
+    inferred["ma_as_of"] = ma_part["as_of"]
+    if price_source == "hardcoded_fallback":
+        inferred["status"] = "fallback"
+        inferred["verified"] = False
+        inferred["label_display"] = "未知"
+        inferred["reason"] = "寫死占位數字，不是已驗證行情"
+    elif price_source == "regime_config_snapshot" and not sync["verified"]:
+        inferred["status"] = "config_snapshot" if sync["status"] == "unknown" else sync["status"]
+        inferred["verified"] = False
+        inferred["label_display"] = "未知"
+        inferred["reason"] = "沿用設定檔收盤，沒有行情交易日，漲跌未知。這不是設定檔生效位階。"
 
-    freshness = classify_session_freshness(as_of.isoformat() if as_of else None, now=observed, holidays=holidays)
+    freshness = classify_session_freshness(
+        as_of.isoformat() if as_of else None,
+        now=observed,
+        calendar=calendar,
+        rhythm=price_rhythm,
+    )
+    if inferred.get("status") == "ok" and freshness.get("freshness") == "unknown":
+        inferred["status"] = "unknown"
+        inferred["verified"] = False
+        inferred["label_display"] = "未知"
+        inferred["reason"] = freshness.get("reason") or "無法用休市日曆確認這筆行情是否對到預期交易日"
     if price_source == "hardcoded_fallback":
         status = "fallback"
-        verified = False
-    elif mixed:
-        status = "conflict"
         verified = False
     elif price_source == "regime_config_snapshot":
         status = "config_snapshot"
         verified = False
+    elif not sync["verified"]:
+        status = sync["status"]
+        verified = False
     elif freshness["stale"]:
         status = "stale"
         verified = True
+    elif freshness["freshness"] == "unknown":
+        status = "unknown"
+        verified = False
     else:
-        status = "ok" if as_of else "unknown"
-        verified = bool(as_of)
+        status = "ok"
+        verified = True
 
     effective = flatten_effective_regime(config if isinstance(config, Mapping) else None)
     return {
@@ -451,7 +590,6 @@ def build_count_contract(rows: Sequence[Mapping[str, Any]]) -> dict:
         code = row_code(row)
         if code.isdigit():
             studio_displayed += 1
-    advisor_count = min(ADVISOR_PER_STRATEGY_CAP, available)
     if not material:
         pool_status = "empty"
     elif latest is None:
@@ -465,7 +603,7 @@ def build_count_contract(rows: Sequence[Mapping[str, Any]]) -> dict:
         "studio_limit": STUDIO_PREVIEW_LIMIT,
         "studio_displayed": studio_displayed,
         "advisor_cap": ADVISOR_PER_STRATEGY_CAP,
-        "advisor_count": advisor_count,
+        "advisor_count": None,
         "available_codes": available,
         "pool_status": pool_status,
         "labels": {
@@ -474,8 +612,168 @@ def build_count_contract(rows: Sequence[Mapping[str, Any]]) -> dict:
                 f"最新交易日 {latest.isoformat()} {latest_count} 檔" if latest else "最新交易日未知"
             ),
             "studio": f"Studio 顯示 {studio_displayed}／上限 {STUDIO_PREVIEW_LIMIT}",
-            "advisor": f"T+1 每策略 {advisor_count}／上限 {ADVISOR_PER_STRATEGY_CAP}",
+            "advisor": "T+1 實際筆數不由選股池推算",
         },
+    }
+
+
+def _strategy_id_from_source(text: Any) -> Optional[str]:
+    import re
+    matched = re.search(r"策略\s*(\d{1,2})", str(text or ""))
+    if not matched:
+        return None
+    return matched.group(1).zfill(2)
+
+
+def summarize_advisor_table(rows: Optional[Sequence[Mapping[str, Any]]]) -> dict:
+    """實際筆數只來自決策表。缺檔、空表、重複列分開，上限不拿來填數。"""
+    cap_note = f"上限 {ADVISOR_PER_STRATEGY_CAP} 不是實際列數"
+    if rows is None:
+        return {
+            "status": "missing",
+            "row_count": 0,
+            "unique_symbols": 0,
+            "duplicate_rows": 0,
+            "by_strategy": [],
+            "advisor_cap": ADVISOR_PER_STRATEGY_CAP,
+            "note": f"決策表缺檔。{cap_note}",
+        }
+    material = list(rows)
+    if not material:
+        return {
+            "status": "empty",
+            "row_count": 0,
+            "unique_symbols": 0,
+            "duplicate_rows": 0,
+            "by_strategy": [],
+            "advisor_cap": ADVISOR_PER_STRATEGY_CAP,
+            "note": f"決策表是空的。{cap_note}",
+        }
+    grouped: dict = {}
+    order = []
+    for row in material:
+        sid = _strategy_id_from_source(row.get("source_strategy")) or "unknown"
+        symbol = str(row.get("symbol") or row.get("證券代號") or "").strip() or "unknown"
+        if sid not in grouped:
+            grouped[sid] = {"strategy_id": sid, "source_label": str(row.get("source_strategy") or ""), "rows": []}
+            order.append(sid)
+        grouped[sid]["rows"].append(symbol)
+    by_strategy = []
+    duplicate_rows = 0
+    unique_all = set()
+    for sid in order:
+        symbols = grouped[sid]["rows"]
+        counts: dict = {}
+        for symbol in symbols:
+            counts[symbol] = counts.get(symbol, 0) + 1
+            unique_all.add((sid, symbol))
+        dup = sum(count - 1 for count in counts.values() if count > 1)
+        duplicate_rows += dup
+        by_strategy.append({
+            "strategy_id": sid,
+            "source_label": grouped[sid]["source_label"],
+            "row_count": len(symbols),
+            "unique_symbols": len(counts),
+            "duplicate_rows": dup,
+        })
+    return {
+        "status": "ok",
+        "row_count": len(material),
+        "unique_symbols": len(unique_all),
+        "duplicate_rows": duplicate_rows,
+        "by_strategy": by_strategy,
+        "advisor_cap": ADVISOR_PER_STRATEGY_CAP,
+        "note": cap_note,
+    }
+
+
+def advisor_label_for_strategy(summary: Mapping[str, Any], strategy_id: Optional[str]) -> str:
+    cap = summary.get("advisor_cap", ADVISOR_PER_STRATEGY_CAP)
+    if summary.get("status") == "missing":
+        return f"T+1 決策表缺檔（上限 {cap}，不是實際列數）"
+    if summary.get("status") == "empty":
+        return f"T+1 決策表空表，實際 0 列（上限 {cap}）"
+    sid = strategy_id.zfill(2) if strategy_id and str(strategy_id).isdigit() else strategy_id
+    found = None
+    for item in summary.get("by_strategy") or []:
+        if sid is None or item.get("strategy_id") == sid:
+            found = item
+            if sid is not None:
+                break
+    if sid is not None and found is None:
+        return f"T+1 策略{sid} 實際 0 列（上限 {cap}）"
+    if found is None:
+        return f"T+1 實際 {summary.get('row_count', 0)} 列（上限 {cap}，上限不是實際數）"
+    dup = f"，其中重複 {found['duplicate_rows']} 列" if found.get("duplicate_rows") else ""
+    return f"T+1 策略{found['strategy_id']} 實際 {found['row_count']} 列{dup}（上限 {cap}，上限不是實際數）"
+
+
+def apply_advisor_actual(contract: Mapping[str, Any], summary: Mapping[str, Any], strategy_id: Optional[str]) -> dict:
+    merged = dict(contract)
+    labels = dict(merged.get("labels") or {})
+    labels["advisor"] = advisor_label_for_strategy(summary, strategy_id)
+    merged["labels"] = labels
+    merged["advisor_actual"] = summary
+    merged["advisor_count"] = None
+    return merged
+
+
+def interpret_market_index_cache(cache: Optional[Mapping[str, Any]]) -> dict:
+    """看盤指數快取。沒有 source/as_of 標未知，不改叫寫死後備。占位與可驗證報價分開。"""
+    if not isinstance(cache, Mapping):
+        return {
+            "status": "unknown",
+            "source": "unknown",
+            "verified": False,
+            "index_close": None,
+            "index_change_pct": None,
+            "as_of_date": None,
+            "as_of_display": "資料日未知",
+            "quote_time": None,
+            "is_realtime": False,
+            "note": "沒有指數快取",
+        }
+    observation = cache.get("observation")
+    as_of = parse_iso_date(cache.get("as_of_date") or cache.get("date") or cache.get("feed_date"))
+    source = cache.get("source") or None
+    if observation == "builtin_placeholder":
+        return {
+            "status": "placeholder",
+            "source": "builtin_placeholder",
+            "verified": False,
+            "index_close": None,
+            "index_change_pct": None,
+            "as_of_date": None,
+            "as_of_display": "內建占位，不是行情",
+            "quote_time": None,
+            "is_realtime": False,
+            "note": "這組數字是程式內建占位，不拿來顯示成收盤",
+        }
+    if source in (None, "") and as_of is None:
+        return {
+            "status": "unknown",
+            "source": "unknown",
+            "verified": False,
+            "index_close": cache.get("index_close"),
+            "index_change_pct": cache.get("change_pct"),
+            "as_of_date": None,
+            "as_of_display": "資料日未知",
+            "quote_time": cache.get("time"),
+            "is_realtime": False,
+            "note": "快取沒有 source 與交易日，不視為寫死後備，也不視為已驗證",
+        }
+    verified = source == "twse_mis" and as_of is not None
+    return {
+        "status": "ok" if verified else "unverified_quote",
+        "source": source or "unknown",
+        "verified": verified,
+        "index_close": cache.get("index_close"),
+        "index_change_pct": cache.get("change_pct"),
+        "as_of_date": as_of.isoformat() if as_of else None,
+        "as_of_display": as_of.isoformat() if verified else "資料日未知",
+        "quote_time": cache.get("feed_time") or cache.get("time"),
+        "is_realtime": verified,
+        "note": "可驗證行情" if verified else "有報價但交易日不足，不標成已驗證",
     }
 
 

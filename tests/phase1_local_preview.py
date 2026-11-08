@@ -19,8 +19,8 @@ def body_for(path: str):
             "radar_count": 0,
             "market": {
                 "close": "40,087.56",
-                "change": -100,
-                "change_pct": -0.25,
+                "change": None,
+                "change_pct": None,
                 "ma20": "41,000.00",
                 "bias_ma20": -2.2,
                 "source": "twse_mis",
@@ -30,7 +30,13 @@ def body_for(path: str):
                 "fetched_at": "2026-11-08T11:00:00+08:00",
                 "timezone": "Asia/Taipei",
                 "error": None,
-                "quote_inferred_regime": {"label": "🟡【高檔震盪整理・箱型洗盤】", "status": "ok", "reason": "僅為報價推斷"},
+                "quote_inferred_regime": {
+                    "label": "🟡【高檔震盪整理・箱型洗盤】",
+                    "label_display": "🟡【高檔震盪整理・箱型洗盤】",
+                    "status": "ok",
+                    "verified": True,
+                    "reason": "價格與均線同一交易日",
+                },
                 "effective_regime": {
                     "label_display": "🟡【高檔震盪整理・箱型洗盤】",
                     "cash_display": "45%",
@@ -82,7 +88,7 @@ def body_for(path: str):
                     "rolling_total": "五日滾動 8 檔",
                     "latest_day": "最新交易日 2026-11-06 4 檔",
                     "studio": "Studio 顯示 5／上限 5",
-                    "advisor": "T+1 每策略 2／上限 2",
+                    "advisor": "T+1 策略11 實際 1 列（上限 2，上限不是實際數）",
                 }
             },
             "provenance": {"status": "unknown"},
@@ -161,6 +167,9 @@ class Handler(BaseHTTPRequestHandler):
         print(f"{time.time() - STARTED:.3f} GET {path}", flush=True)
         if path in ("/", "/index.html"):
             self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
+            return
+        if path == "/dashboard_guards.js":
+            self._send(200, (ROOT / "web" / "dashboard_guards.js").read_bytes(), "application/javascript; charset=utf-8")
             return
         self._send(200, body_for(path))
 
