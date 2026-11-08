@@ -306,7 +306,7 @@ class MarketPulseEngine:
         - score: 4.0 / 10
         - bullish_count: 4, bearish_count: 6
         - consecutive_bearish_days: 2
-        - as_of_date: "台股 · 10/29"
+        - as_of_date: null（靜態範例沒有可驗證的交易日，不填假日期）
         - summary: "10 項訊號中 4 項偏多，偏空已持續 2 個交易日。"
         - signals: 10 項子訊號
         - history: 3 年歷史分數與加權指數序列 (供 Chart.js 繪製)
@@ -431,17 +431,27 @@ class MarketPulseEngine:
 
         result = {
             "timestamp": time.time(),
-            "as_of_date": "台股 · 10/29",
+            "as_of_date": None,
+            "as_of_display": "資料日未知",
+            "source": "static_fixture",
+            "status": "illustrative_unverified",
+            "verified": False,
+            "stale": False,
+            "timezone": "Asia/Taipei",
+            "fetched_at": None,
+            "error": None,
             "score": score,
             "max_score": 10,
             "bullish_count": bullish_count,
             "bearish_count": bearish_count,
             "consecutive_days": 2,
             "regime_text": "中性偏空震盪",
-            "summary": f"10 項訊號中 {bullish_count} 項偏多，偏空已持續 2 個交易日。",
-            "cash_target_pct": 50,
-            "stock_target_pct": 50,
-            "playbook_advice": "【部位指引】維持 5 成現金，停止 A 軌追高，改採 B 軌拉回量縮低接與低估值庫藏股配置。",
+            "summary": f"示範：10 項靜態訊號中 {bullish_count} 項偏多。這不是已驗證的收盤計分。",
+            "cash_target_pct": None,
+            "cash_display": "未知",
+            "stock_target_pct": None,
+            "playbook_advice": "此區塊是靜態示範，不是生效現金配置。",
+            "metrics_status": "illustrative_unverified",
             "signals": signals,
             "history": history_points
         }
@@ -495,9 +505,6 @@ class MarketPulseEngine:
                     if (idx > 5 and float(ma20.iloc[idx]) > float(ma20.iloc[idx-5])): sc += 1.0
 
                     sc = max(1.0, min(9.5, sc))
-                    
-                    if idx == len(close.index) - 1:
-                        sc = 4.0
 
                     points.append({
                         "date": dt.strftime("%Y-%m-%d"),
@@ -522,8 +529,6 @@ class MarketPulseEngine:
             t = i / 730.0
             sc = 5.0 + 2.5 * math.sin(t * 8.0) + 1.2 * math.cos(t * 15.0)
             sc = max(1.0, min(9.0, sc))
-            if i >= 728:
-                sc = 4.0
             twii = 16000 + i * 40 + 800 * math.sin(t * 6.0)
             points.append({
                 "date": d.strftime("%Y-%m-%d"),
@@ -740,19 +745,36 @@ class MarketPulseEngine:
         for b in bins:
             b["pct"] = round((b["count"] / total_cnt) * 100.0, 1)
 
-        # 3. 全市場統計摘要 (Summary)
+        # 3. 全市場統計摘要。沒有交易日時不宣稱官方收盤，也不套用寫死的 10/29。
+        idx_source = market_idx.get("source") or "hardcoded_fallback"
+        as_of = market_idx.get("as_of_date") or None
+        verified = idx_source == "twse_mis" and bool(as_of)
+        top_sector = None
+        bottom_sector = None
+        if group_nodes:
+            ranked = sorted(group_nodes, key=lambda g: g.get("median_change") or 0)
+            bottom = ranked[0]
+            top = ranked[-1]
+            top_sector = f"{top['name']} ({top['median_change']:+.2f}%)"
+            bottom_sector = f"{bottom['name']} ({bottom['median_change']:+.2f}%)"
         summary = {
-            "index_change_pct": market_idx.get("change_pct", -1.39),
-            "index_close": market_idx.get("index_close", 23285.42),
-            "as_of_date": f"{market_idx.get('time', '13:30:00')} 官方報價",
-            "is_realtime": True,
+            "index_change_pct": market_idx.get("change_pct") if idx_source != "hardcoded_fallback" else None,
+            "index_close": market_idx.get("index_close") if idx_source != "hardcoded_fallback" else None,
+            "as_of_date": as_of,
+            "as_of_display": as_of if verified else "資料日未知",
+            "quote_time": market_idx.get("time") if idx_source == "twse_mis" else None,
+            "source": idx_source,
+            "status": "ok" if verified else "unverified",
+            "verified": verified,
+            "is_realtime": verified,
             "up_count": up_count,
             "down_count": down_count,
             "flat_count": flat_count,
-            "top_sector": "金融保險業 (+1.05%)",
-            "bottom_sector": "光電業 (-4.63%)",
-            "limit_up_count": 22,
-            "limit_down_count": 4,
+            "top_sector": top_sector,
+            "bottom_sector": bottom_sector,
+            "sector_rank_source": idx_source,
+            "limit_up_count": None,
+            "limit_down_count": None,
             "total_stocks_analyzed": len(all_stocks)
         }
 

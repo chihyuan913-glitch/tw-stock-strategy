@@ -923,7 +923,7 @@
       const mr = data.market_regime || {};
 
       let html = `<div style="margin-bottom:10px; padding:10px 14px; background:rgba(56,189,248,0.12); border-left:4px solid var(--accent); border-radius:6px; font-size:0.84rem;">
-        🧭 <strong>自適應大盤位階連動</strong>：${mr.label || '震盪偏多'} ｜ 建議現金保留水位：<strong>${mr.cash_target_pct || 30}%</strong> ｜ 建議可動用資金上限：<strong>$${(data.effective_capital || initial_cash).toLocaleString()}</strong><br/>
+        🧭 <strong>自適應大盤位階連動</strong>：${mr.label || '震盪偏多'} ｜ 建議現金保留水位：<strong>${(mr.cash_target_pct === null || mr.cash_target_pct === undefined || mr.cash_target_pct === '') ? '未知' : mr.cash_target_pct}%</strong> ｜ 建議可動用資金上限：<strong>$${(data.effective_capital || initial_cash).toLocaleString()}</strong><br/>
         <span style="color:var(--text-muted);">💡 戰術指引：${mr.tactical_guidance || ''}</span>
       </div>`;
 

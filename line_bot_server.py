@@ -649,163 +649,45 @@ _TWII_CACHE = {}
 _TWII_CACHE_EXPIRE = 0.0
 
 def fetch_twii_market_data(force_refresh: bool = False) -> dict:
+    """記憶體快取 60 秒。不寫入 regime_config.json。"""
     global _TWII_CACHE, _TWII_CACHE_EXPIRE
-    import time
     now_t = time.time()
-    
     if not force_refresh and _TWII_CACHE and (now_t < _TWII_CACHE_EXPIRE):
         return _TWII_CACHE
-
-    market_res = None
-    try:
-        url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0'
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            msg_list = data.get('msgArray', [])
-            if msg_list:
-                msg = msg_list[0]
-                z_str = msg.get('z', '')
-                y_str = msg.get('y', '')
-                curr_p = float(z_str) if z_str and z_str != '-' else (float(y_str) if y_str else 0.0)
-                prev_p = float(y_str) if y_str and y_str != '-' else curr_p
-                if curr_p > 0:
-                    ch = round(curr_p - prev_p, 2)
-                    ch_pct = round((ch / prev_p * 100), 2) if prev_p > 0 else 0.0
-                    market_res = {
-                        'close_raw': curr_p,
-                        'close': f'{curr_p:,.2f}',
-                        'prev_close': prev_p,
-                        'change': ch,
-                        'change_pct': ch_pct,
-                        'date': msg.get('d', ''),
-                        'time': msg.get('t', '')
-                    }
-    except Exception as e:
-        print(f'[!] 證交所大盤 API 抓取失敗: {e}')
-
-    ma20_val = 0.0
-    ma60_val = 0.0
-    try:
-        import yfinance as yf
-        import pandas as pd
-        df = yf.download('^TWII', period='4mo', interval='1d', progress=False)
-        if not df.empty and len(df) >= 20:
-            c_series = df['Close']
-            if isinstance(c_series, pd.DataFrame):
-                c_series = c_series.iloc[:, 0]
-            c_series = c_series.dropna()
-            
-            if not market_res or market_res.get('close_raw', 0) <= 0:
-                last_p = float(c_series.iloc[-1])
-                prev_p = float(c_series.iloc[-2]) if len(c_series) >= 2 else last_p
-                ch = round(last_p - prev_p, 2)
-                ch_pct = round((ch / prev_p * 100), 2) if prev_p > 0 else 0.0
-                market_res = {
-                    'close_raw': last_p,
-                    'close': f'{last_p:,.2f}',
-                    'prev_close': prev_p,
-                    'change': ch,
-                    'change_pct': ch_pct,
-                    'date': str(c_series.index[-1])[:10],
-                    'time': '13:30:00'
-                }
-
-            ma20_val = float(c_series.rolling(20).mean().iloc[-1])
-            if len(c_series) >= 60:
-                ma60_val = float(c_series.rolling(60).mean().iloc[-1])
-            else:
-                ma60_val = ma20_val
-    except Exception as e:
-        print(f'[!] yfinance 大盤歷史計算失敗: {e}')
-
-    if not market_res or market_res.get('close_raw', 0) <= 0:
-        cfg_file = ROOT_DIR / 'regime_config.json'
-        if cfg_file.exists():
-            try:
-                with open(cfg_file, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                    mr = cfg.get('market_regime', {})
-                    p = float(mr.get('close', 46292.93))
-                    market_res = {
-                        'close_raw': p,
-                        'close': f'{p:,.2f}',
-                        'prev_close': p,
-                        'change': 0.0,
-                        'change_pct': 0.0,
-                        'date': '',
-                        'time': ''
-                    }
-                    ma20_val = float(mr.get('ma20', 48170.13))
-                    ma60_val = float(mr.get('ma60', 46113.09))
-            except Exception:
-                pass
-
-    if not market_res:
-        market_res = {
-            'close_raw': 46292.93,
-            'close': '46,292.93',
-            'prev_close': 46822.08,
-            'change': -529.15,
-            'change_pct': -1.13,
-            'date': '',
-            'time': ''
-        }
-        ma20_val = 48170.13
-        ma60_val = 46113.09
-
-    if ma20_val <= 0:
-        ma20_val = 48170.13
-    if ma60_val <= 0:
-        ma60_val = 46113.09
-
-    curr_p = market_res['close_raw']
-    bias_ma20 = round((curr_p - ma20_val) / ma20_val * 100, 2)
-    market_res['ma20'] = f'{ma20_val:,.2f}'
-    market_res['ma60'] = f'{ma60_val:,.2f}'
-    market_res['ma20_raw'] = ma20_val
-    market_res['ma60_raw'] = ma60_val
-    market_res['bias_ma20'] = bias_ma20
-
-    if bias_ma20 > 5.0:
-        market_res['regime'] = '🔴【多頭強攻・短線過熱警戒】'
-        market_res['trend'] = '強勢過熱'
-        market_res['risk_advice'] = '月線正乖離過大，嚴防短線主力獲利調節，嚴禁盤中追高，聚焦回測守穩標的。'
-    elif bias_ma20 < -5.0 or curr_p < ma60_val:
-        market_res['regime'] = '🟣【空頭回檔修正・防禦避險】'
-        market_res['trend'] = '空頭防禦'
-        market_res['risk_advice'] = '指數摜破均線防守，提高現金水位至 50% 以上，嚴格執行停損，策略 03 避險放空優先。'
-    elif bias_ma20 >= 0.0 and curr_p >= ma20_val:
-        market_res['regime'] = '🟢【多頭良性主升波段】'
-        market_res['trend'] = '多頭排列'
-        market_res['risk_advice'] = '均線呈多頭排列，可積極佈局策略 02 法人起漲股、策略 04 可轉債與策略 05 股期波段。'
-    else:
-        market_res['regime'] = '🟡【高檔震盪整理・箱型洗盤】'
-        market_res['trend'] = '箱型震盪'
-        market_res['risk_advice'] = '指數跌破月線但守穩季線，類股快速輪動。採高出低進策略，重視布林下軌超跌反彈（策略 01）與低基期標的。'
-
-    try:
-        cfg_file = ROOT_DIR / 'regime_config.json'
-        if cfg_file.exists():
-            with open(cfg_file, 'r', encoding='utf-8') as f:
-                cfg = json.load(f)
-            if 'market_regime' in cfg:
-                cfg['market_regime']['close'] = market_res['close_raw']
-                cfg['market_regime']['bias_ma20'] = market_res['bias_ma20']
-                cfg['market_regime']['ma20'] = market_res['ma20_raw']
-                cfg['market_regime']['ma60'] = market_res['ma60_raw']
-                cfg['market_regime']['label'] = market_res['regime']
-                cfg['market_regime']['trend'] = market_res['trend']
-                cfg['market_regime']['risk_advice'] = market_res['risk_advice']
-                cfg['updated_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                with open(cfg_file, 'w', encoding='utf-8') as f:
-                    json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
+    from market_snapshot import build_market_snapshot
+    market_res = build_market_snapshot()
     _TWII_CACHE = market_res
     _TWII_CACHE_EXPIRE = now_t + 60.0
     return market_res
+
+def _selection_batch_rows():
+    """只讀各策略 result.csv 的日期與列數，不重跑選股。"""
+    import csv
+    from dashboard_contract import build_count_contract, parse_iso_date
+    rows = []
+    root = Path(__file__).resolve().parent / "strategies"
+    for strat in STRATEGIES:
+        path = root / strat / "result.csv"
+        dates = []
+        total = None
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+                    material = list(csv.DictReader(handle))
+                contract = build_count_contract(material)
+                seen = []
+                for item in material:
+                    parsed = parse_iso_date(item.get("選股日期") or item.get("日期"))
+                    if parsed:
+                        seen.append(parsed.isoformat())
+                dates = sorted(set(seen), reverse=True)
+                total = contract["rolling_total"]
+            except Exception:
+                dates = []
+                total = None
+        rows.append({"strategy": strat, "dates": dates, "rolling_total": total})
+    return rows
+
 
 @app.get("/api/tomorrow_advisor")
 async def get_tomorrow_advisor():
@@ -866,12 +748,24 @@ async def get_tomorrow_advisor():
                     regime_info = json.load(f)
             except Exception:
                 pass
-        
+
+        from dashboard_contract import build_batch_status, flatten_effective_regime
+        effective = flatten_effective_regime(regime_info)
+        batch_rows = _selection_batch_rows()
         return {
             "status": "success",
             "items": items,
             "total": len(items),
-            "market_regime": regime_info
+            "market_regime": regime_info,
+            "effective_regime": effective,
+            "quote_inferred_regime": None,
+            "selection_batches": build_batch_status(batch_rows),
+            "count_contract": {
+                "advisor_rows": len(items),
+                "advisor_cap_per_strategy": 2,
+                "note": "此表是每策略最多 2 檔的決策切片，不是五日滾動總數，也不是 Studio 前 5 檔。",
+                "by_strategy": batch_rows,
+            },
         }
     except Exception as e:
         return {"status": "error", "message": str(e), "items": []}
@@ -926,12 +820,29 @@ async def refresh_market_pulse():
 
 @app.get("/api/strategy/tiers")
 async def get_strategy_tiers_api():
-    """提供台股量化策略四級優化分級 (S/A/B/HEDGE) 與動態資金配置矩陣"""
+    """策略分級沿用設定檔 key。沒有 key 時回未知，不改套箱型預設。"""
     try:
-        from adaptive_regime_manager import get_strategy_tier_grading, load_adaptive_config
-        cfg = load_adaptive_config()
-        regime_key = cfg.get("market_regime", {}).get("key", "SIDEWAYS_CONSOLIDATION")
-        return get_strategy_tier_grading(regime_key=regime_key)
+        from adaptive_regime_manager import get_strategy_tier_grading
+        from dashboard_contract import flatten_effective_regime
+        from market_snapshot import DEFAULT_CONFIG, read_json
+        cfg = read_json(DEFAULT_CONFIG) or {}
+        effective = flatten_effective_regime(cfg)
+        regime_key = effective.get("key")
+        if not regime_key:
+            return {
+                "status": "unknown",
+                "regime_key": None,
+                "regime_label": None,
+                "effective_regime": effective,
+                "role": "effective_regime",
+                "message": "設定檔沒有生效位階 key，不改顯示成箱型預設。",
+            }
+        payload = get_strategy_tier_grading(regime_key=regime_key)
+        payload["status"] = "ok"
+        payload["effective_regime"] = effective
+        payload["role"] = "effective_regime"
+        payload["best_regime_note"] = "各策略 best_regime 是設計適用市況，與此分級的生效位階不同。"
+        return payload
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -970,16 +881,21 @@ async def get_overview():
     watchlist = load_watchlist()
     radar_count = len(watchlist)
 
+    from dashboard_contract import build_batch_status
     return {
         "status": "online",
         "market": market_data,
+        "effective_regime": market_data.get("effective_regime"),
+        "quote_inferred_regime": market_data.get("quote_inferred_regime"),
+        "selection_batches": build_batch_status(_selection_batch_rows()),
         "total_candidates": total_candidates,
         "radar_count": radar_count,
-        "strategies": strat_dirs
+        "strategies": strat_dirs,
+        "deployment_note": "此程序回應不等於公開站已經部署同一提交。",
     }
 
 @app.get("/api/strategy/{strat_id}")
-async def get_strategy_data(strat_id: str):
+async def get_strategy_data(strat_id: str, quotes: bool = False):
     """取得指定策略最新選股表格數據"""
     import pandas as pd
     strat_meta = {
@@ -1045,17 +961,19 @@ async def get_strategy_data(strat_id: str):
         cols = list(df.columns)
         rows = df.to_dict(orient='records')
 
-        # 批次查詢即時行情並計算與進場價之差異
-        from radar_manager import fetch_batch_realtime_quotes
+        # 預設只回選股快取。即時報價要明確 ?quotes=1，避免明細被行情連線擋住。
         codes = []
         for r in rows:
             c = str(r.get('證券代號') or r.get('股票代碼') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
             if c:
                 codes.append(c)
-        quotes = fetch_batch_realtime_quotes(codes) if codes else {}
+        quote_map = {}
+        if quotes:
+            from radar_manager import fetch_batch_realtime_quotes
+            quote_map = fetch_batch_realtime_quotes(codes) if codes else {}
         for r in rows:
             c = str(r.get('證券代號') or r.get('股票代碼') or r.get('代號') or r.get('代碼') or r.get('code') or '').strip()
-            q = quotes.get(c, {})
+            q = quote_map.get(c, {})
             curr_p = q.get('price')
             if curr_p is not None:
                 r['realtime_price'] = curr_p
@@ -1133,9 +1051,7 @@ async def get_strategy_data(strat_id: str):
                 except Exception:
                     pass
         if not date_str:
-            import datetime
-            mtime = datetime.datetime.fromtimestamp(csv_file.stat().st_mtime)
-            date_str = mtime.strftime('%Y-%m-%d')
+            date_str = ""
 
         today_rows = [r for r in rows if str(r.get('選股日期', '')).strip() == date_str or 'T+0' in str(r.get('入選天數', '')) or '今日' in str(r.get('狀態標註', ''))]
         pending_rows = [r for r in rows if str(r.get('lifecycle')) == 'PENDING_REMOVAL' or '待剔除' in str(r.get('狀態標註', ''))]
@@ -1143,6 +1059,7 @@ async def get_strategy_data(strat_id: str):
         pending_count = len(pending_rows)
         tracking_count = len(rows) - today_count
 
+        from dashboard_contract import build_count_contract, legacy_provenance
         return {
             "name": meta["name"],
             "desc": meta["desc"],
@@ -1152,7 +1069,11 @@ async def get_strategy_data(strat_id: str):
             "tracking_count": tracking_count,
             "pending_removal_count": pending_count,
             "columns": cols,
-            "rows": rows
+            "rows": rows,
+            "quotes_included": bool(quotes),
+            "detail_source": "result.csv",
+            "count_contract": build_count_contract(rows),
+            "provenance": legacy_provenance(cols, rows),
         }
     except Exception as e:
         return {
@@ -1211,15 +1132,35 @@ async def get_trade_history_api(strategy: Optional[str] = None):
 
 @app.get("/api/weekly_report")
 async def get_weekly_report():
-    """取得每週總體戰略週報內容"""
+    """取得每週總體戰略週報內容。只讀檔，不觸發優化。"""
     report_file = Path(__file__).resolve().parent / "weekly_report.md"
-    if report_file.exists():
-        try:
-            with open(report_file, "r", encoding="utf-8") as f:
-                return {"content": f.read()}
-        except Exception as e:
-            return {"content": f"讀取報告失敗: {e}"}
-    return {"content": "目前尚無每週戰報，請執行週日優化作業。"}
+    base = {"source": "weekly_report.md", "timezone": "Asia/Taipei"}
+    if not report_file.exists():
+        return {**base, "status": "empty", "content": "", "error": None, "generated_at": None, "generated_at_status": "unknown", "file_mtime": None}
+    try:
+        text = report_file.read_text(encoding="utf-8")
+    except Exception as exc:
+        return {**base, "status": "error", "content": "", "error": str(exc), "generated_at": None, "generated_at_status": "unknown", "file_mtime": None}
+    generated = None
+    for line in text.splitlines():
+        if "升級校準時間" in line:
+            matched = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2})", line)
+            if matched:
+                generated = matched.group(1)
+            break
+    mtime = datetime.datetime.fromtimestamp(
+        report_file.stat().st_mtime,
+        datetime.timezone(datetime.timedelta(hours=8)),
+    ).isoformat(timespec="seconds")
+    return {
+        **base,
+        "status": "ok",
+        "content": text,
+        "error": None,
+        "generated_at": generated,
+        "generated_at_status": "parsed_from_file" if generated else "unknown",
+        "file_mtime": mtime,
+    }
 
 @app.post("/api/analyze")
 async def analyze_endpoint(request: Request):
@@ -1612,10 +1553,14 @@ async def studio_chat_endpoint(request: Request):
 async def health():
     """專供 Render 防休眠檢測之輕量端點"""
     import datetime
+    from dashboard_contract import deployment_identity
+    identity = deployment_identity()
     return {
         "status": "ok",
         "service": "tw-stock-line-bot",
-        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timezone": "Asia/Taipei",
+        **identity,
     }
 
 @app.get("/logs")

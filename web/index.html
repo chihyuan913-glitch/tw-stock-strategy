@@ -116,16 +116,17 @@
       <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow relative overflow-hidden">
         <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
           <span class="flex items-center gap-1.5"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> 加權指數 (^TWII)</span>
-          <span id="marketTrendTag" class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">箱型震盪</span>
+          <span id="marketTrendTag" class="px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-300 font-medium">來源待確認</span>
         </div>
         <div class="flex items-baseline gap-2 flex-wrap">
-          <div class="text-2xl font-black font-mono text-white" id="twiiPrice">46,292.93</div>
-          <div class="text-xs font-mono font-bold text-emerald-400" id="twiiChange">▼ -529.15 (-1.13%)</div>
+          <div class="text-2xl font-black font-mono text-white" id="twiiPrice">—</div>
+          <div class="text-xs font-mono font-bold text-slate-400" id="twiiChange">等待報價</div>
         </div>
         <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
-          <span>20MA: <strong id="twiiMa20" class="text-slate-300">48,170.13</strong></span>
-          <span class="text-emerald-400 font-semibold" id="twiiBias">月線乖離 -3.90%</span>
+          <span>20MA: <strong id="twiiMa20" class="text-slate-300">—</strong></span>
+          <span class="text-slate-300 font-semibold" id="twiiBias">乖離未知</span>
         </div>
+        <div id="marketDataStatus" class="text-[11px] text-slate-500 mt-1">行情狀態：讀取中。寫死占位不會當成收盤。</div>
       </div>
 
       <!-- 市場位階判定 -->
@@ -134,10 +135,10 @@
           <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
           <span>市場位階情境 (Market Regime)</span>
         </div>
-        <div class="text-base font-bold text-emerald-400 mt-1" id="marketRegime">🟢【多頭良性主升波段】</div>
-        <div class="text-xs text-slate-400 mt-1 truncate" id="marketAdvice">
-          均線呈多頭排列，可積極佈局策略 02 起漲股與策略 04 可轉債。
-        </div>
+        <div class="text-base font-bold text-slate-200 mt-1" id="marketRegime">位階待確認</div>
+        <div class="text-[11px] text-cyan-300 mt-1" id="effectiveRegimeHome">設定檔生效位階：讀取中</div>
+        <div class="text-xs text-slate-400 mt-1" id="marketAdvice">報價推斷與設定檔生效位階會分開顯示，不一致時不合併。</div>
+        <div id="homeBatchStatus" class="text-[11px] text-slate-500 mt-1">選股批次：讀取中</div>
       </div>
 
       <!-- 監控標的統計 -->
@@ -147,7 +148,7 @@
           <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">即時盯盤</span>
         </div>
         <div class="flex items-baseline space-x-2">
-          <span class="text-2xl font-black font-mono text-emerald-400" id="radarCountBanner">38</span>
+          <span class="text-2xl font-black font-mono text-emerald-400" id="radarCountBanner">—</span>
           <span class="text-xs text-slate-400">檔監控中 (🔥 今日觸發: <span id="topCardTodayTriggeredText" class="font-mono text-amber-400 font-bold">0</span> 檔 / 策略: <span id="totalCandidatesCount" class="font-mono text-slate-400">17</span> 檔)</span>
         </div>
         <div class="text-xs text-slate-400 mt-1 flex items-center justify-between">
@@ -167,7 +168,7 @@
           <span class="text-sm font-bold text-white">GitHub 雲端排程託管中</span>
         </div>
         <div class="text-xs text-slate-400 mt-1 flex justify-between">
-          <span>盤後 17:35 選股</span>
+          <span>盤後 21:15 選股</span>
           <span>盤中 08:58 雷達</span>
           <span>週日 20:00 優化</span>
         </div>
@@ -192,11 +193,11 @@
         </button>
         <button onclick="switchTab('pulse')" id="btn-tab-pulse" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
           <span>🗺️ 大盤指標與產業板塊</span>
-          <span id="tabPulseScoreBadge" class="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[10px] font-mono text-emerald-400 border border-emerald-500/30">4.0分</span>
+          <span id="tabPulseScoreBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-slate-300 border border-slate-700">未驗證</span>
         </button>
         <button onclick="switchTab('radar')" id="btn-tab-radar" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
           🎯 個股診斷與盤中雷達
-          <span id="tabRadarBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-emerald-400 border border-slate-700">38</span>
+          <span id="tabRadarBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-emerald-400 border border-slate-700">—</span>
         </button>
         <button onclick="switchTab('analyzer')" id="btn-tab-analyzer" class="px-4 py-2 rounded-lg text-sm font-semibold transition text-slate-400 hover:text-white hover:bg-slate-800">
           🔍 個股即時量化診斷
@@ -380,7 +381,7 @@
               <button onclick="setStudioReportTab('holdings')" id="btnTabHoldings" class="px-3 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition flex items-center gap-1">
                 <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
                 <span>推薦標的</span>
-                <span id="studioHoldingsCountBadge" class="px-1 py-0.2 rounded bg-slate-800 text-[10px] font-mono text-cyan-400">2</span>
+                <span id="studioHoldingsCountBadge" class="px-1 py-0.2 rounded bg-slate-800 text-[10px] font-mono text-cyan-400">—</span>
               </button>
               <button onclick="setStudioReportTab('code')" id="btnTabCode" class="px-3 py-1.5 rounded-md font-semibold text-slate-400 hover:text-white transition flex items-center gap-1">
                 <i data-lucide="code" class="w-3.5 h-3.5"></i>
@@ -389,25 +390,27 @@
             </div>
           </div>
 
-          <!-- 8 大量化回測關鍵指標 4x2 矩陣 -->
+          <div id="studioMetricsDisclaimer" class="px-3.5 py-2 text-[11px] text-amber-200 bg-amber-500/10 border-b border-amber-500/30">示範常數與合成曲線，未經回測或實盤驗證，不可當作績效。</div>
+          <div id="studioBestRegime" class="px-3.5 py-1.5 text-[11px] text-slate-400 bg-slate-950/40 border-b border-slate-800">策略設計適用市況：讀取中。這不是目前生效位階，也不是報價推斷。</div>
+          <!-- 示範指標。數字來自目錄常數，不是驗證績效。 -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 p-3.5 bg-slate-950/60 border-b border-slate-800 text-xs">
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div class="text-[10px] text-slate-400">年化報酬率 (CAGR)</div>
+              <div class="text-[10px] text-slate-400">示範 CAGR（未驗證）</div>
               <div id="metricCAGR" class="text-base font-black font-mono text-emerald-400 mt-0.5">+38.6%</div>
               <div class="text-[10px] text-slate-500 font-mono">大盤同期 +14.2%</div>
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div class="text-[10px] text-slate-400">夏普比率 (Sharpe)</div>
+              <div class="text-[10px] text-slate-400">示範夏普（未驗證）</div>
               <div id="metricSharpe" class="text-base font-black font-mono text-cyan-400 mt-0.5">1.85</div>
               <div class="text-[10px] text-emerald-400 font-sans">極佳風險回報</div>
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div class="text-[10px] text-slate-400">最大歷史回撤 (MDD)</div>
+              <div class="text-[10px] text-slate-400">示範回撤（未驗證）</div>
               <div id="metricMDD" class="text-base font-black font-mono text-rose-400 mt-0.5">-11.4%</div>
               <div class="text-[10px] text-slate-500 font-mono">大盤同期 -22.8%</div>
             </div>
             <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div class="text-[10px] text-slate-400">整體交易勝率</div>
+              <div class="text-[10px] text-slate-400">示範勝率（未驗證）</div>
               <div id="metricWinRate" class="text-base font-black font-mono text-amber-400 mt-0.5">71.4%</div>
               <div class="text-[10px] text-slate-500 font-sans" id="metricProfitFactor">盈虧比 1:2.42</div>
             </div>
@@ -421,12 +424,12 @@
               <div class="flex items-center justify-between text-xs text-slate-400">
                 <span class="flex items-center gap-1.5 font-bold text-slate-200">
                   <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-                  策略累積淨值 (3 年滾動回測) vs
+                  示範累積淨值（合成，非回測）vs
                   <span class="w-2.5 h-2.5 rounded-full bg-slate-500 ml-1"></span>
                   加權報酬指數 (^TWII)
                 </span>
                 <span class="text-[11px] font-mono text-cyan-400">
-                  Alpha 超額報酬估算：+24.4%
+                  超額報酬：未驗證
                 </span>
               </div>
 
@@ -551,17 +554,17 @@
           <div>
             <div class="flex items-center gap-2">
               <h2 class="text-lg font-black text-white tracking-wide">明日 (T+1) 實盤下單決策指南卡</h2>
-              <span id="advisorMarketRegimeBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                多頭主升期
+              <span id="advisorMarketRegimeBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-200 border border-slate-600">
+                生效位階讀取中
               </span>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">全台股 10 大策略經 100 天滾動回測體檢，提煉勝率最大化之核心實盤操盤標的與四大防線</p>
+            <p class="text-xs text-slate-400 mt-0.5">讀取既有決策表。現金與位階來自設定檔巢狀欄位；表內勝率數字未在本頁驗證。</p>
           </div>
         </div>
         <div class="flex items-center gap-3">
           <div class="px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs">
             <span class="text-slate-400">大盤建議現金水位：</span>
-            <span id="advisorCashTarget" class="font-bold text-amber-400 font-mono text-sm">30%</span>
+            <span id="advisorCashTarget" class="font-bold text-amber-400 font-mono text-sm">未知</span>
           </div>
           <button onclick="loadTomorrowAdvisorData()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 shadow">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
@@ -569,6 +572,7 @@
           </button>
         </div>
       </div>
+      <div id="advisorBatchStatus" class="text-xs text-slate-400">選股批次：讀取中。不同策略日期不會被合併成同一天。</div>
 
       <!-- 統計摘要列 (KPI Cards) -->
       <div id="advisorSummaryBar" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -620,10 +624,10 @@
             <span>看盤</span>
             <span id="marketRealtimeBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shadow">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              <span>TWSE 官方行情連線中</span>
+              <span>行情狀態待確認</span>
             </span>
             <span id="marketQuoteTime" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-cyan-300">
-              撮合時間: 13:30:00
+              撮合時間：未知
             </span>
           </h2>
 
@@ -712,13 +716,13 @@
             <div class="lg:col-span-4 flex items-center gap-3.5">
               <div class="text-left">
                 <div class="flex items-baseline gap-2">
-                  <span id="summaryIndexChange" class="text-3xl font-black font-mono text-emerald-400 tracking-tight">
-                    -1.39%
+                  <span id="summaryIndexChange" class="text-3xl font-black font-mono text-slate-300 tracking-tight">
+                    —
                   </span>
-                  <span class="text-xs text-slate-400 font-medium">全市場 · 1日漲跌 · 10/29 收盤</span>
+                  <span id="summaryAsOf" class="text-xs text-slate-400 font-medium">資料日未知</span>
                 </div>
                 <p id="summaryMarketBreadth" class="text-[11px] text-slate-400 mt-1 leading-snug">
-                  <span class="text-rose-400 font-bold">431 家上漲</span>、<span class="text-emerald-400 font-bold">1342 家下跌</span>，金融保險業領漲 <span class="text-rose-400 font-bold">+1.05%</span>，光電業領跌 <span class="text-emerald-400 font-bold">-4.63%</span>。
+                  漲跌家數等待看盤模組。未驗證前不顯示固定收盤日。
                 </p>
               </div>
             </div>
@@ -726,9 +730,9 @@
             <!-- 中央：全市場報酬率分佈橫向長條圖 (5 列) -->
             <div class="lg:col-span-5 px-2">
               <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
-                <span>-3% 跌停 4</span>
+                <span id="summaryLimitDown">跌停：未驗證</span>
                 <span>全市場漲跌家數分佈 (Return Distribution)</span>
-                <span>+3% 漲停 22</span>
+                <span id="summaryLimitUp">漲停：未驗證</span>
               </div>
               <div id="watchDistributionContainer" class="flex items-end gap-1 h-12 w-full pt-1">
                 <!-- 動態注入分佈柱狀圖 -->
@@ -846,20 +850,20 @@
               </div>
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
-                  <span id="marketPulseRegimeBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    中性防守 (震盪整理)
+                  <span id="marketPulseRegimeBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700/40 text-slate-200 border border-slate-600">
+                    示範／未驗證
                   </span>
-                  <span class="text-xs text-slate-400 font-mono">台股 · <span id="marketPulseAsOf">10/29</span></span>
+                  <span class="text-xs text-slate-400 font-mono">台股 · <span id="marketPulseAsOf">資料日未知</span></span>
                 </div>
                 <p id="marketPulseScoreDesc" class="text-xs text-slate-300 font-medium">
-                  10 項訊號中 4 項偏多，偏空已持續 2 個交易日。
+                  靜態示範分數，不是已驗證收盤計分。
                 </p>
               </div>
             </div>
             <div class="flex items-center gap-2">
               <div class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
                 <span class="text-slate-400">總持股水位指引：</span>
-                <span id="marketPulseCashAdvice" class="font-bold text-amber-400 font-mono">40% ~ 60%</span>
+                <span id="marketPulseCashAdvice" class="font-bold text-amber-400 font-mono">未知</span>
               </div>
             </div>
           </div>
@@ -912,8 +916,8 @@
           </div>
           <div class="flex items-center gap-2 text-xs">
             <span class="text-slate-400">目前位階適配：</span>
-            <span id="tierRegimeBadge" class="px-3 py-1 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
-              箱型高出低進 · 動態調校生效中
+            <span id="tierRegimeBadge" class="px-3 py-1 rounded-full font-bold bg-slate-700/40 text-slate-200 border border-slate-600 font-mono">
+              生效位階讀取中
             </span>
           </div>
         </div>
@@ -1346,6 +1350,7 @@
           <span class="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">每週日定期升級</span>
         </div>
         
+        <div id="weeklyStatus" class="text-xs text-slate-400 mb-3">週報狀態：讀取中</div>
         <div id="weeklyContent" class="prose prose-invert max-w-none text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
           正在讀取 weekly_report.md...
         </div>
@@ -3006,7 +3011,7 @@
       currentStrategyView = mode;
       const btnCards = document.getElementById('stratBtnViewCards');
       const btnTable = document.getElementById('stratBtnViewTable');
-      const grid = document.getElementById('strategyCardGrid');
+      const grid = document.getElementById('strategyCardsContainer');
       const table = document.getElementById('strategyTableContainer');
       if (!btnCards || !btnTable || !grid || !table) return;
       if (mode === 'cards') {
@@ -3036,7 +3041,7 @@
       });
 
       try {
-        const resp = await fetch(`/api/strategy/${stratId}`);
+        const resp = await fetch(`/api/strategy/${stratId}?quotes=0`);
         const data = await resp.json();
         currentStrategyRawData = data;
         const tierBadges = {
@@ -3047,7 +3052,7 @@
           '08': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・集團作帳催化 (資金 10% · 季底作帳旺季加成)</span>',
           '02': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・法人籌碼起漲 (資金 10% · 單筆風險 1.5%)</span>',
           '04': '<span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/40">⚔️ A級・可轉債定價伏擊 (資金 8% · 百元保底高勝率)</span>',
-          '01': '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">🛡️ B級・布林超跌反轉 (資金 8% · 箱型震盪自動升級)</span>',
+          '01': '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">🛡️ B級・布林超跌反轉（設計情境：箱型洗盤，不是目前生效位階）</span>',
           '09': '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">🛡️ B級・庫藏股價值護盤 (資金 6% · PB<=1.25 安全邊際)</span>',
           '07': '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/40">⚡ HEDGE・斷頭伏擊 (資金 3% · 空頭期躍升S級獵殺)</span>',
           '03': '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/40">⚡ HEDGE・弱勢破線做空 (資金 3% · 股期零借券費避險)</span>'
@@ -3061,7 +3066,10 @@
         const todayCnt = data.today_count !== undefined ? data.today_count : (data.rows ? data.rows.filter(r => String(r['狀態標註']||'').includes('今日') || String(r['入選天數']||'').includes('T+0')).length : 0);
         const trackCnt = total - todayCnt;
 
-        document.getElementById('currentStrategyCount').innerText = `${total} 檔追蹤中（今日新選 ${todayCnt} 檔 ｜ 5日累計） ${dateTag}`;
+        const cc = data.count_contract || {};
+        const prov = data.provenance || {};
+        document.getElementById('currentStrategyCount').innerText =
+          `${cc.labels ? cc.labels.rolling_total : ('五日滾動 ' + total)}｜${cc.labels ? cc.labels.latest_day : ('最新交易日 ' + (data.date || '未知'))}｜${cc.labels ? cc.labels.studio : 'Studio 上限 5'}｜${cc.labels ? cc.labels.advisor : 'T+1 上限 2'}｜追溯 ${prov.status || 'unknown'}${dateTag}`;
         const pendingCnt = data.pending_removal_count !== undefined ? data.pending_removal_count : (data.rows ? data.rows.filter(r => String(r['生命週期狀態']||r['lifecycle']||'').includes('PENDING') || String(r['狀態標註']||'').includes('待剔除')).length : 0);
         if (document.getElementById('rfCountAll')) document.getElementById('rfCountAll').innerText = total;
         if (document.getElementById('rfCountToday')) document.getElementById('rfCountToday').innerText = todayCnt;
@@ -3071,12 +3079,14 @@
         applyRollingFilterAndRender();
       } catch (e) {
         console.error("載入策略失敗:", e);
+        const countEl = document.getElementById('currentStrategyCount');
+        if (countEl) countEl.innerText = `選股明細錯誤：${e.message || e}`;
       }
     }
 
     // 渲染策略個股字卡矩陣 (預設模式)
     function renderStrategyCards(data) {
-      const container = document.getElementById('strategyCardGrid');
+      const container = document.getElementById('strategyCardsContainer');
       if (!container) return;
       container.innerHTML = '';
 
@@ -3557,12 +3567,9 @@
     }
 
     function renderStrategyTable(data) {
-      document.getElementById('currentStrategyTitle').innerText = data.name;
-      document.getElementById('currentStrategyDesc').innerText = data.desc;
-      document.getElementById('currentStrategyCount').innerText = `${data.rows.length} 檔入選`;
-
       const headRow = document.getElementById('tableHeadRow');
       const body = document.getElementById('tableBody');
+      if (!headRow || !body || !data) return;
       headRow.innerHTML = '';
       body.innerHTML = '';
 
@@ -3696,68 +3703,143 @@
       }
     }
 
-    // 刷新全域資料
-    async function refreshData() {
-      const icon = document.getElementById('refreshIcon');
-      icon.classList.add('animate-spin');
+    function showCash(el, displayText) {
+      if (!el) return;
+      el.innerText = (displayText === null || displayText === undefined || displayText === '') ? '未知' : String(displayText);
+    }
+
+    async function loadOverviewModule() {
+      const statusEl = document.getElementById('marketDataStatus');
       try {
-        // 載入 overview
         const resp = await fetch('/api/overview');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const d = await resp.json();
-        if (d.market) {
-          const m = d.market;
-          document.getElementById('twiiPrice').innerText = m.close;
-          const chEl = document.getElementById('twiiChange');
-          if (chEl) {
-            const ch = Number(m.change || 0);
-            const chPct = Number(m.change_pct || 0);
-            if (ch > 0) {
-              chEl.className = "text-xs font-mono font-bold text-rose-400";
-              chEl.innerText = `▲ +${ch.toFixed(2)} (+${chPct.toFixed(2)}%)`;
-            } else if (ch < 0) {
-              chEl.className = "text-xs font-mono font-bold text-emerald-400";
-              chEl.innerText = `▼ ${ch.toFixed(2)} (${chPct.toFixed(2)}%)`;
-            } else {
-              chEl.className = "text-xs font-mono font-bold text-slate-400";
-              chEl.innerText = `0.00 (0.00%)`;
-            }
+        const m = d.market || {};
+        const priceEl = document.getElementById('twiiPrice');
+        if (priceEl) priceEl.innerText = m.close || '—';
+        const chEl = document.getElementById('twiiChange');
+        if (chEl) {
+          const ch = Number(m.change);
+          const chPct = Number(m.change_pct);
+          if (!Number.isFinite(ch) || !Number.isFinite(chPct)) {
+            chEl.className = "text-xs font-mono font-bold text-slate-400";
+            chEl.innerText = '漲跌未知';
+          } else if (ch > 0) {
+            chEl.className = "text-xs font-mono font-bold text-rose-400";
+            chEl.innerText = `▲ +${ch.toFixed(2)} (+${chPct.toFixed(2)}%)`;
+          } else if (ch < 0) {
+            chEl.className = "text-xs font-mono font-bold text-emerald-400";
+            chEl.innerText = `▼ ${ch.toFixed(2)} (${chPct.toFixed(2)}%)`;
+          } else {
+            chEl.className = "text-xs font-mono font-bold text-slate-400";
+            chEl.innerText = `0.00 (0.00%)`;
           }
-          document.getElementById('twiiMa20').innerText = m.ma20;
-          const biasVal = Number(m.bias_ma20 || 0);
-          const biasEl = document.getElementById('twiiBias');
-          if (biasEl) {
+        }
+        const maEl = document.getElementById('twiiMa20');
+        if (maEl) maEl.innerText = m.ma20 || '—';
+        const biasVal = Number(m.bias_ma20);
+        const biasEl = document.getElementById('twiiBias');
+        if (biasEl) {
+          if (!Number.isFinite(biasVal)) {
+            biasEl.innerText = '乖離未知';
+          } else {
             biasEl.innerText = `月線乖離 ${biasVal > 0 ? '+' : ''}${biasVal.toFixed(2)}%`;
             biasEl.className = biasVal >= 0 ? "text-rose-400 font-semibold" : "text-emerald-400 font-semibold";
           }
-          document.getElementById('marketRegime').innerText = m.regime;
-          document.getElementById('marketAdvice').innerText = m.risk_advice;
-          document.getElementById('marketTrendTag').innerText = m.trend;
         }
-        document.getElementById('totalCandidatesCount').innerText = d.total_candidates;
-        
+        const inferred = m.quote_inferred_regime || {};
+        const effective = m.effective_regime || d.effective_regime || {};
+        const regimeEl = document.getElementById('marketRegime');
+        if (regimeEl) regimeEl.innerText = `報價推斷：${inferred.label || m.regime || '未知'}`;
+        const adviceEl = document.getElementById('marketAdvice');
+        if (adviceEl) adviceEl.innerText = inferred.reason || m.risk_advice || '報價推斷沒有說明';
+        const trendEl = document.getElementById('marketTrendTag');
+        if (trendEl) trendEl.innerText = inferred.status || m.status || '未知';
+        const effectiveEl = document.getElementById('effectiveRegimeHome');
+        if (effectiveEl) {
+          effectiveEl.innerText = `設定檔生效位階：${effective.label_display || '未知'}｜現金 ${effective.cash_display ?? '未知'}`;
+        }
+        if (statusEl) {
+          const asOf = m.as_of || '資料日未知';
+          const verified = m.verified ? '已驗證' : '未驗證';
+          const stale = m.stale ? '過期' : '未標過期';
+          statusEl.innerText = `來源 ${m.source || '未知'}｜${verified}｜${stale}｜資料日 ${asOf}｜取得 ${m.fetched_at || '未知'}（${m.timezone || 'Asia/Taipei'}）${m.error ? '｜錯誤 ' + m.error : ''}`;
+        }
+        const totalEl = document.getElementById('totalCandidatesCount');
+        if (totalEl) totalEl.innerText = d.total_candidates;
+        const batchEl = document.getElementById('homeBatchStatus');
+        const batches = d.selection_batches || {};
+        if (batchEl) {
+          const dates = (batches.dates || []).join('、') || '無';
+          batchEl.innerText = `選股批次 ${batches.unity || 'unknown'}：${dates}。${batches.note || ''}`;
+        }
         if (d.radar_count !== undefined) {
           const bannerCount = document.getElementById('radarCountBanner');
           const tabBadge = document.getElementById('tabRadarBadge');
           if (bannerCount) bannerCount.innerText = d.radar_count;
           if (tabBadge) tabBadge.innerText = d.radar_count;
         }
-
-        // 載入當前策略與明日買賣決策卡
-        await loadStrategyData(currentStrategy);
-        await loadTomorrowAdvisorData();
-
-        // 載入週報
-        const rep = await fetch('/api/weekly_report');
-        const repData = await rep.json();
-        document.getElementById('weeklyContent').innerText = repData.content || "尚無週報內容";
-
-        // 同步載入雷達清單
-        await loadRadarWatchlist();
       } catch (e) {
-        console.error("刷新失敗:", e);
-      } finally {
-        setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        if (statusEl) statusEl.innerText = `行情模組錯誤：${e.message || e}`;
+        console.error('overview 失敗:', e);
       }
+    }
+
+    async function loadWeeklyReport() {
+      const box = document.getElementById('weeklyContent');
+      const statusEl = document.getElementById('weeklyStatus');
+      try {
+        const rep = await fetch('/api/weekly_report');
+        if (!rep.ok) throw new Error(`HTTP ${rep.status}`);
+        const repData = await rep.json();
+        if (statusEl) {
+          statusEl.innerText = `狀態 ${repData.status || 'unknown'}｜產生時間 ${repData.generated_at || '未知'}｜檔案時間 ${repData.file_mtime || '未知'}｜${repData.timezone || 'Asia/Taipei'}`;
+        }
+        if (box) {
+          if (repData.status === 'error') box.innerText = `週報讀取錯誤：${repData.error || '未知'}`;
+          else if (repData.status === 'empty') box.innerText = '尚無週報檔案。';
+          else box.innerText = repData.content || '週報內容是空的';
+        }
+      } catch (e) {
+        if (statusEl) statusEl.innerText = `週報模組錯誤：${e.message || e}`;
+        if (box) box.innerText = '週報這次沒有載入。其他卡片不受這次失敗影響。';
+      }
+    }
+
+    async function loadStrategyTiers() {
+      const el = document.getElementById('tierRegimeBadge');
+      try {
+        const resp = await fetch('/api/strategy/tiers');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!el) return;
+        if (data.status === 'error') {
+          el.innerText = '分級讀取失敗';
+          return;
+        }
+        if (data.status === 'unknown' || !data.regime_label) {
+          el.innerText = '生效位階未知';
+          return;
+        }
+        el.innerText = `設定檔 ${data.regime_label}`;
+      } catch (e) {
+        if (el) el.innerText = '分級讀取失敗';
+      }
+    }
+
+    // 各模組各自失敗，慢的 overview 不等待週報或 T+1。
+    async function refreshData() {
+      const icon = document.getElementById('refreshIcon');
+      if (icon) icon.classList.add('animate-spin');
+      await Promise.allSettled([
+        loadOverviewModule(),
+        loadStrategyData(currentStrategy),
+        loadTomorrowAdvisorData(),
+        loadWeeklyReport(),
+        loadRadarWatchlist(),
+        loadStrategyTiers(),
+      ]);
+      if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
     }
 
     // ==============================================================================
@@ -3817,8 +3899,13 @@
 
     // 初始化加載
     window.addEventListener('DOMContentLoaded', () => {
-      refreshData();
-      initBrowserLifecycleWatcher();
+      const requestedTab = new URLSearchParams(window.location.search).get('tab');
+      if (requestedTab) {
+        try { switchTab(requestedTab); } catch (err) { console.error(err); }
+      }
+      try { refreshData(); } catch (err) { console.error(err); }
+      try { initStudio(); } catch (err) { console.error(err); }
+      try { initBrowserLifecycleWatcher(); } catch (err) { console.error(err); }
     });
   </script>
 
@@ -4129,8 +4216,12 @@
       try {
         const resp = await fetch('/api/tomorrow_advisor');
         const res = await resp.json();
-        if (res.status !== 'success' || !res.items) {
-          container.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500 text-sm">目前尚無明日買賣建議表，請先執行盤後選股 run_all.py。</div>';
+        if (res.status === 'error' || !Array.isArray(res.items)) {
+          container.innerHTML = `<div class="col-span-full py-12 text-center text-rose-300 text-sm">決策表錯誤：${res.message || '回應無法讀取'}</div>`;
+          ['advisorStrongBuyCount', 'advisorBuyDipCount', 'advisorFilteredCount', 'advisorTotalCount'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = '錯誤';
+          });
           return;
         }
 
@@ -4152,11 +4243,15 @@
         const badge = document.getElementById('tabAdvisorBadge');
         if (badge) badge.innerText = `${strongBuy + buyDip} 檔`;
 
-        if (res.market_regime && res.market_regime.label) {
-          const mb = document.getElementById('advisorMarketRegimeBadge');
-          if (mb) mb.innerText = res.market_regime.label;
-          const ct = document.getElementById('advisorCashTarget');
-          if (ct) ct.innerText = `${res.market_regime.cash_target_pct || 30}%`;
+        const effective = res.effective_regime || {};
+        const mb = document.getElementById('advisorMarketRegimeBadge');
+        if (mb) mb.innerText = effective.label_display || '生效位階未知';
+        showCash(document.getElementById('advisorCashTarget'), effective.cash_display);
+        const batchEl = document.getElementById('advisorBatchStatus');
+        const batches = res.selection_batches || {};
+        if (batchEl) {
+          const dates = (batches.dates || []).join('、') || '無';
+          batchEl.innerText = `選股批次 ${batches.unity || 'unknown'}：${dates}。${batches.note || ''} ${(res.count_contract && res.count_contract.note) || ''}`;
         }
 
         renderAdvisorCards();
@@ -4337,12 +4432,12 @@
         const data = await res.json();
 
         // 更新頂部卡片
-        const scoreEl = document.getElementById('pulseScoreNumber');
-        const summaryEl = document.getElementById('pulseScoreSummary');
-        const dateBadgeEl = document.getElementById('pulseDateBadge');
+        const scoreEl = document.getElementById('marketPulseScoreNum');
+        const summaryEl = document.getElementById('marketPulseScoreDesc');
+        const dateBadgeEl = document.getElementById('marketPulseAsOf');
         const tabBadgeEl = document.getElementById('tabPulseScoreBadge');
         const ratioEl = document.getElementById('signalsBullBearRatio');
-        const cashTargetEl = document.getElementById('pulseTargetCash');
+        const cashTargetEl = document.getElementById('marketPulseCashAdvice');
 
         const score = data.score !== undefined ? data.score : 4.0;
         if (scoreEl) {
@@ -4357,11 +4452,11 @@
           }
         }
 
-        if (summaryEl) summaryEl.innerText = data.summary || `${data.signals?.length || 10} 項訊號中 ${data.bullish_count || 4} 項偏多，偏空已持續 ${data.consecutive_days || 2} 個交易日。`;
-        if (dateBadgeEl && data.as_of_date) dateBadgeEl.innerText = data.as_of_date;
-        if (tabBadgeEl) tabBadgeEl.innerText = `${score.toFixed(1)}分`;
-        if (ratioEl) ratioEl.innerText = `偏多 ${data.bullish_count || 4} · 偏空 ${data.bearish_count || 6}`;
-        if (cashTargetEl) cashTargetEl.innerText = `${data.cash_target_pct || 50}% 現金`;
+        if (summaryEl) summaryEl.innerText = data.summary || '大盤指標沒有摘要';
+        if (dateBadgeEl) dateBadgeEl.innerText = data.as_of_display || data.as_of_date || '資料日未知';
+        if (tabBadgeEl) tabBadgeEl.innerText = data.verified ? `${score.toFixed(1)}分` : '未驗證';
+        if (ratioEl) ratioEl.innerText = `偏多 ${data.bullish_count ?? '—'} · 偏空 ${data.bearish_count ?? '—'}`;
+        if (cashTargetEl) cashTargetEl.innerText = data.metrics_status === 'illustrative_unverified' ? '示範，非生效配置' : (data.cash_display ?? '未知');
 
         // 渲染 10 項訊號卡片
         renderSignalsList(data.signals || []);
@@ -4377,7 +4472,7 @@
 
     // 2. 渲染 10 項訊號卡片清單 (對齊 Image 2)
     function renderSignalsList(signals) {
-      const container = document.getElementById('signalsListContainer');
+      const container = document.getElementById('marketPulseSignalsList');
       if (!container) return;
       container.innerHTML = '';
 
@@ -4441,7 +4536,7 @@
 
     // 3. 渲染 3 年走勢圖 (Chart.js)
     function renderPulseChart(historyPoints, timeframe = '3years') {
-      const canvas = document.getElementById('marketPulseChart');
+      const canvas = document.getElementById('marketPulseHistoryCanvas');
       if (!canvas) return;
 
       // 依 timeframe 過濾數據
@@ -4693,24 +4788,40 @@
         // 更新左下全市場統計
         const summary = data.summary || {};
         const timeBadge = document.getElementById('marketQuoteTime');
-        if (timeBadge && summary.as_of_date) {
-          timeBadge.innerText = `最新撮合: ${summary.as_of_date}`;
+        if (timeBadge) {
+          timeBadge.innerText = summary.verified ? `最新撮合: ${summary.as_of_date}` : `資料日：${summary.as_of_display || '未知'}`;
         }
+        const asOfEl = document.getElementById('summaryAsOf');
+        if (asOfEl) asOfEl.innerText = summary.as_of_display || '資料日未知';
         const sumIndex = document.getElementById('summaryIndexChange');
         const sumBreadth = document.getElementById('summaryMarketBreadth');
         if (sumIndex) {
-          const val = summary.index_change_pct !== undefined ? summary.index_change_pct : -1.39;
-          sumIndex.innerText = `${val >= 0 ? '+' : ''}${val}%`;
-          sumIndex.className = `text-3xl font-black font-mono tracking-tight ${val >= 0 ? (currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400') : (currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400')}`;
+          if (summary.index_change_pct === null || summary.index_change_pct === undefined) {
+            sumIndex.innerText = '—';
+            sumIndex.className = 'text-3xl font-black font-mono tracking-tight text-slate-300';
+          } else {
+            const val = summary.index_change_pct;
+            sumIndex.innerText = `${val >= 0 ? '+' : ''}${val}%`;
+            sumIndex.className = `text-3xl font-black font-mono tracking-tight ${val >= 0 ? (currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400') : (currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400')}`;
+          }
         }
         if (sumBreadth) {
+          const up = summary.up_count ?? '未知';
+          const down = summary.down_count ?? '未知';
+          const top = summary.top_sector || '領漲未知';
+          const bottom = summary.bottom_sector || '領跌未知';
+          const trust = summary.verified ? '' : '（族群漲跌未標成官方收盤）';
           sumBreadth.innerHTML = `
-            <span class="${currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400'} font-bold">${summary.up_count || 431} 家上漲</span>、
-            <span class="${currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${summary.down_count || 1342} 家下跌</span>，
-            領漲 <strong class="text-white">${summary.top_sector || '金融保險業'}</strong>，
-            領跌 <strong class="text-white">${summary.bottom_sector || '光電業'}</strong>。
+            <span class="${currentWatchColorMode === 'tw' ? 'text-rose-400' : 'text-emerald-400'} font-bold">${up} 家上漲</span>、
+            <span class="${currentWatchColorMode === 'tw' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${down} 家下跌</span>，
+            領漲 <strong class="text-white">${top}</strong>，
+            領跌 <strong class="text-white">${bottom}</strong>${trust}。
           `;
         }
+        const limitUp = document.getElementById('summaryLimitUp');
+        const limitDown = document.getElementById('summaryLimitDown');
+        if (limitUp) limitUp.innerText = summary.limit_up_count == null ? '漲停：未驗證' : `漲停 ${summary.limit_up_count}`;
+        if (limitDown) limitDown.innerText = summary.limit_down_count == null ? '跌停：未驗證' : `跌停 ${summary.limit_down_count}`;
 
         // 更新橫向長條分佈圖
         renderWatchDistribution(data.distribution || []);
@@ -5474,8 +5585,7 @@
           </div>
           <div class="space-y-2 max-w-[90%]">
             <div class="p-3.5 rounded-2xl rounded-tl-none bg-slate-900 border border-slate-800 text-xs text-slate-200 leading-relaxed shadow-lg">
-              ${(data.reply || '已完成回測分析').replace(/
-/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>')}
+              ${(data.reply || '已完成回測分析').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>')}
             </div>
           </div>
         `;
@@ -5534,7 +5644,19 @@
           : 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30';
       }
       if (philEl) philEl.innerText = rep.philosophy || '';
-      if (holdingsCountBadge) holdingsCountBadge.innerText = (rep.holdings || []).length;
+      if (holdingsCountBadge) {
+        const shown = (rep.holdings || []).length;
+        const limit = (rep.count_contract && rep.count_contract.studio_limit) || 5;
+        holdingsCountBadge.innerText = `${shown}/${limit}`;
+      }
+      const bestEl = document.getElementById('studioBestRegime');
+      if (bestEl) {
+        bestEl.innerText = `策略設計適用市況：${rep.best_regime || '未知'}。這不是目前生效位階，也不是報價推斷。`;
+      }
+      const disclaimerEl = document.getElementById('studioMetricsDisclaimer');
+      if (disclaimerEl) {
+        disclaimerEl.innerText = rep.metrics_disclaimer || '示範常數與合成曲線，未經回測或實盤驗證，不可當作績效。';
+      }
 
       // 8 大指標
       const m = rep.metrics || {};

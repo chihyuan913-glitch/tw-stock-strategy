@@ -3,6 +3,8 @@ inject_market_pulse_ui.py: 將 Market Pulse 與 Treemap 視圖注入 web/index.h
 """
 import re
 
+raise SystemExit("phase1: 此腳本會把過期的 10/29 與錯誤 DOM id 寫回 index.html，已停用。")
+
 INDEX_PATH = "web/index.html"
 
 with open(INDEX_PATH, "r", encoding="utf-8") as f:
