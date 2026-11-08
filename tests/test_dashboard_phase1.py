@@ -356,10 +356,12 @@ const unknown = g.displayChange(null, null);
 if (unknown.text !== '漲跌未知') process.exit(2);
 const zero = g.displayChange(0, 0);
 if (zero.text !== '0.00 (0.00%)') process.exit(3);
-const headline = g.quoteHeadline({status:'ok', verified:true, label:'箱型'});
+const headline = g.quoteHeadline({status:'ok', verified:true, current:true, label:'箱型'});
 if (headline !== '報價推斷：箱型') process.exit(4);
-const hidden = g.quoteHeadline({status:'unknown', verified:false, label:'空頭'});
+const hidden = g.quoteHeadline({status:'stale', verified:false, current:false, label:'空頭'});
 if (hidden !== '報價推斷：未知') process.exit(5);
+const staleLine = g.formatMarketStatus({source_aligned:true, current:false, stale:true});
+if (!staleLine.includes('過期') || staleLine.includes('已驗證')) process.exit(6);
 """
     completed = subprocess.run(["node", "-e", script], cwd=Path(".").resolve(), capture_output=True, text=True)
     assert completed.returncode == 0, completed.stderr
@@ -393,6 +395,139 @@ def test_mocked_page_executes_guards(tmp_path):
         assert "實際 1 列" in page
         assert "T+1 每策略 2／上限 2" not in page
         assert "極佳風險回報" not in page
+        driver.get(f"http://127.0.0.1:{port}/?tab=pulse")
+        time.sleep(2)
+        pulse = driver.find_element(By.TAG_NAME, "body").text
+        assert "2026-11-06" in pulse
+        assert "有交易所日期，不代表此頁正在監測" in pulse
+        assert "10/29" not in pulse
     finally:
         driver.quit()
         server.shutdown()
+
+
+def test_old_single_batch_is_not_ok_and_counts_stay():
+    calendar = _cal_2026()
+    old = dc.build_batch_status(
+        [{"strategy": "11_revenue_volume_breakout", "dates": ["2026-10-24"], "rolling_total": 8}],
+        now=SUNDAY,
+        calendar=calendar,
+    )
+    assert old["unity"] == "single_date"
+    assert old["status"] == "stale"
+    assert old["freshness"] == "stale"
+    assert old["status"] != "ok"
+    current = dc.build_batch_status(
+        [{"strategy": "11_revenue_volume_breakout", "dates": ["2026-11-06"], "rolling_total": 8}],
+        now=SUNDAY,
+        calendar=calendar,
+    )
+    assert current["unity"] == "single_date"
+    assert current["status"] == "ok"
+    assert current["freshness"] == "ok"
+    monday = dt.datetime(2026, 11, 9, 8, 30, tzinfo=dc.TAIPEI)
+    before_open = dc.build_batch_status(
+        [{"strategy": "01", "dates": ["2026-11-06"], "rolling_total": 1}],
+        now=monday,
+        calendar=calendar,
+    )
+    assert before_open["status"] == "ok"
+    mixed = dc.build_batch_status(
+        [
+            {"strategy": "01", "dates": ["2026-11-06"], "rolling_total": 1},
+            {"strategy": "11", "dates": ["2026-10-24"], "rolling_total": 2},
+        ],
+        now=SUNDAY,
+        calendar=calendar,
+    )
+    assert mixed["unity"] == "conflict"
+    assert mixed["status"] == "conflict"
+    assert mixed["status"] != "ok"
+    missing_dates = dc.build_batch_status([{"strategy": "01", "dates": [], "rolling_total": 0}], now=SUNDAY, calendar=calendar)
+    assert missing_dates["status"] == "unknown"
+    unproven = dc.build_batch_status(
+        [{"strategy": "11", "dates": ["2026-11-06"], "rolling_total": 8}],
+        now=SUNDAY,
+        calendar=dc.unreliable_calendar(),
+    )
+    assert unproven["unity"] == "single_date"
+    assert unproven["status"] == "unknown"
+    pool = dc.build_count_contract(_rows(8))
+    assert pool["rolling_total"] == 8
+    assert pool["studio_displayed"] == 5
+    assert pool["advisor_count"] is None
+    assert dc.summarize_advisor_table(None)["status"] == "missing"
+    assert dc.summarize_advisor_table([])["status"] == "empty"
+
+
+def test_stale_aligned_quote_is_not_a_current_regime():
+    view = dc.assemble_market_view(
+        twse={"close_raw": 40087.56, "prev_close": 41000, "change": -1, "change_pct": -0.01, "date": "20261106"},
+        yfinance_bar={"date": "2026-11-06", "ma20": 41000, "ma60": 40000},
+        now=dt.datetime(2026, 11, 9, 14, 0, tzinfo=dc.TAIPEI),
+        calendar=_cal_2026(),
+    )
+    assert view["source_aligned"] is True
+    assert view["status"] == "stale"
+    assert view["verified"] is False
+    assert view["current"] is False
+    assert view["quote_inferred_regime"]["status"] == "stale"
+    assert view["quote_inferred_regime"]["verified"] is False
+    assert view["quote_inferred_regime"]["label_display"] == "未知"
+
+
+def test_timezone_aware_session_date_and_real_calendar_is_not_a_full_year():
+    import market_snapshot as ms
+    utc = dt.timezone.utc
+    stamped = dt.datetime(2026, 11, 6, 16, 30, tzinfo=utc)
+    assert str(stamped)[:10] == "2026-11-06"
+    assert dc.market_session_date(stamped).isoformat() == "2026-11-07"
+    calendar = ms.load_tw_calendar()
+    assert calendar["reliable"] is False
+    assert calendar["trust"] == "partial_unproven"
+    assert "2026-01-01" in {day.isoformat() for day in calendar["closed"]}
+    assert calendar.get("last_synced")
+    judged = dc.classify_session_freshness("2026-10-24", now=SUNDAY, calendar=calendar)
+    assert judged["freshness"] == "unknown"
+    assert judged["stale"] is False
+
+
+def test_hub_parse_flows_into_treemap_summary_without_network():
+    from mis_quote import parse_mis_quote_item
+    from realtime_watch_hub import index_cache_from_quotes
+    dated = parse_mis_quote_item(
+        {"c": "t00", "n": "發行量加權股價指數", "z": "40087.56", "y": "41000", "d": "20261106", "t": "13:24:01"},
+        {"t00"},
+        fallback_clock="99:99:99",
+    )
+    assert dated["feed_date"] == "20261106"
+    assert dated["feed_time"] == "13:24:01"
+    cache = index_cache_from_quotes({"t00": dated})
+    summary = dc.build_treemap_index_summary(
+        cache,
+        [{"name": "半導體業", "median_change": -1.25}],
+        up_count=2,
+        down_count=3,
+        flat_count=0,
+        total_stocks=5,
+    )
+    assert summary["source"] == "twse_mis"
+    assert summary["verified"] is True
+    assert summary["as_of_date"] == "2026-11-06"
+    assert summary["index_close"] == 40087.56
+    assert summary["top_sector"].startswith("半導體業")
+    slash = parse_mis_quote_item({"c": "t00", "z": "100", "y": "100", "d": "2026/11/06"}, {"t00"})
+    assert dc.build_treemap_index_summary(index_cache_from_quotes({"t00": slash}))["as_of_date"] == "2026-11-06"
+    undated = parse_mis_quote_item({"c": "t00", "z": "100", "y": "101"}, {"t00"}, fallback_clock="99:99:99")
+    undated_summary = dc.build_treemap_index_summary(index_cache_from_quotes({"t00": undated}))
+    assert undated_summary["source"] == "twse_mis"
+    assert undated_summary["verified"] is False
+    assert undated_summary["index_close"] == 100
+    assert undated["feed_date"] is None
+    assert undated["time"] == "99:99:99"
+    assert parse_mis_quote_item({"c": "2330", "z": "1", "y": "1", "d": "20261106"}, {"t00"}) is None
+    assert index_cache_from_quotes({"2330": {"price": 1}}) is None
+    assert parse_mis_quote_item({"c": "t00", "y": "-", "z": "-"}, {"t00"})["price"] is None
+    broken = dc.build_treemap_index_summary(index_cache_from_quotes({}))
+    assert broken["source"] == "unknown"
+    assert broken["index_change_pct"] is None

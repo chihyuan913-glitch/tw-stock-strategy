@@ -695,6 +695,16 @@ def _selection_batch_rows():
     return rows
 
 
+def _selection_batch_status(rows):
+    from dashboard_contract import TAIPEI, build_batch_status
+    from market_snapshot import load_tw_calendar
+    return build_batch_status(
+        rows,
+        now=datetime.datetime.now(TAIPEI),
+        calendar=load_tw_calendar(),
+    )
+
+
 def _advisor_table_rows():
     """只讀既有決策表。缺檔回 None，不建立、不改寫。"""
     import csv
@@ -773,7 +783,7 @@ async def get_tomorrow_advisor():
             except Exception:
                 pass
 
-        from dashboard_contract import build_batch_status, flatten_effective_regime, summarize_advisor_table
+        from dashboard_contract import flatten_effective_regime, summarize_advisor_table
         effective = flatten_effective_regime(regime_info)
         batch_rows = _selection_batch_rows()
         advisor_actual = summarize_advisor_table(items)
@@ -784,7 +794,7 @@ async def get_tomorrow_advisor():
             "market_regime": regime_info,
             "effective_regime": effective,
             "quote_inferred_regime": None,
-            "selection_batches": build_batch_status(batch_rows),
+            "selection_batches": _selection_batch_status(batch_rows),
             "count_contract": {
                 "advisor_rows": len(items),
                 "advisor_cap_per_strategy": 2,
@@ -908,13 +918,12 @@ async def get_overview():
     watchlist = load_watchlist()
     radar_count = len(watchlist)
 
-    from dashboard_contract import build_batch_status
     return {
         "status": "online",
         "market": market_data,
         "effective_regime": market_data.get("effective_regime"),
         "quote_inferred_regime": market_data.get("quote_inferred_regime"),
-        "selection_batches": build_batch_status(_selection_batch_rows()),
+        "selection_batches": _selection_batch_status(_selection_batch_rows()),
         "total_candidates": total_candidates,
         "radar_count": radar_count,
         "strategies": strat_dirs,

@@ -8,7 +8,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from dashboard_contract import TAIPEI, assemble_market_view, parse_iso_date
+from dashboard_contract import TAIPEI, assemble_market_view, market_session_date, parse_iso_date
 
 ROOT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = ROOT_DIR / "regime_config.json"
@@ -25,7 +25,7 @@ def read_json(path: Path) -> Optional[dict]:
 
 
 def load_tw_calendar(path: Path = DEFAULT_HOLIDAYS) -> dict:
-    from dashboard_contract import reliable_calendar, unreliable_calendar
+    from dashboard_contract import unreliable_calendar
     data = read_json(path)
     holidays = data.get("holidays") if isinstance(data, dict) else None
     if not isinstance(holidays, dict) or not holidays:
@@ -41,9 +41,15 @@ def load_tw_calendar(path: Path = DEFAULT_HOLIDAYS) -> dict:
             years.add(parsed.year)
     if not years:
         return unreliable_calendar("休市日曆沒有可解析日期，不判定過期")
-    calendar = reliable_calendar(closed, years)
-    calendar["last_synced"] = data.get("last_synced")
-    return calendar
+    # 檔內假期與 last_synced 不足以證明該年每個平日都已核對，不能宣稱全年完整。
+    return {
+        "reliable": False,
+        "trust": "partial_unproven",
+        "closed": closed,
+        "years": years,
+        "last_synced": data.get("last_synced") if isinstance(data, dict) else None,
+        "reason": "假期清單沒有可證明的完整來源與涵蓋截止，不依它判定開市或過期。",
+    }
 
 
 def fetch_twse_index() -> dict:
@@ -95,7 +101,11 @@ def fetch_yfinance_index() -> dict:
         "prev_close": prev_p,
         "change": change,
         "change_pct": change_pct,
-        "date": str(series.index[-1])[:10],
+        "date": (
+            market_session_date(series.index[-1]).isoformat()
+            if market_session_date(series.index[-1])
+            else None
+        ),
         "time": "13:30:00",
         "ma20": ma20,
         "ma60": ma60,

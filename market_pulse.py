@@ -745,38 +745,15 @@ class MarketPulseEngine:
         for b in bins:
             b["pct"] = round((b["count"] / total_cnt) * 100.0, 1)
 
-        # 3. 指數摘要跟 realtime_watch_hub 的實際欄位走，不把缺 source 改判成寫死後備。
-        from dashboard_contract import interpret_market_index_cache
-        index_view = interpret_market_index_cache(market_idx)
-        top_sector = None
-        bottom_sector = None
-        if group_nodes:
-            ranked = sorted(group_nodes, key=lambda g: g.get("median_change") or 0)
-            bottom = ranked[0]
-            top = ranked[-1]
-            top_sector = f"{top['name']} ({top['median_change']:+.2f}%)"
-            bottom_sector = f"{bottom['name']} ({bottom['median_change']:+.2f}%)"
-        summary = {
-            "index_change_pct": index_view.get("index_change_pct"),
-            "index_close": index_view.get("index_close"),
-            "as_of_date": index_view.get("as_of_date"),
-            "as_of_display": index_view.get("as_of_display"),
-            "quote_time": index_view.get("quote_time"),
-            "source": index_view.get("source"),
-            "status": index_view.get("status"),
-            "verified": index_view.get("verified"),
-            "is_realtime": index_view.get("is_realtime"),
-            "note": index_view.get("note"),
-            "up_count": up_count,
-            "down_count": down_count,
-            "flat_count": flat_count,
-            "top_sector": top_sector,
-            "bottom_sector": bottom_sector,
-            "sector_rank_source": index_view.get("source"),
-            "limit_up_count": None,
-            "limit_down_count": None,
-            "total_stocks_analyzed": len(all_stocks)
-        }
+        from dashboard_contract import build_treemap_index_summary
+        summary = build_treemap_index_summary(
+            market_idx,
+            group_nodes,
+            up_count=up_count,
+            down_count=down_count,
+            flat_count=flat_count,
+            total_stocks=len(all_stocks),
+        )
 
         return {
             "root": root_data,

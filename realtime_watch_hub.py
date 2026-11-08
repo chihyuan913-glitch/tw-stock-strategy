@@ -71,22 +71,9 @@ def _sync_fetch_all_watch_quotes(codes: List[str]):
 
     quotes = radar_manager.fetch_batch_realtime_quotes(fetch_list, max_cache_sec=0)
 
-    # 提取大盤資訊
-    if "t00" in quotes:
-        q_idx = quotes["t00"]
-        if q_idx.get("price"):
-            _MARKET_INDEX_CACHE = {
-                "index_close": q_idx["price"],
-                "change": q_idx.get("change"),
-                "change_pct": q_idx.get("change_pct"),
-                "time": q_idx.get("time"),
-                "feed_time": q_idx.get("feed_time"),
-                "feed_date": q_idx.get("feed_date"),
-                "date": q_idx.get("feed_date"),
-                "as_of_date": q_idx.get("feed_date"),
-                "source": "twse_mis",
-                "observation": "quote",
-            }
+    updated = index_cache_from_quotes(quotes)
+    if updated:
+        _MARKET_INDEX_CACHE = updated
 
     # 覆蓋更新個股行情
     valid_count = 0
@@ -97,6 +84,27 @@ def _sync_fetch_all_watch_quotes(codes: List[str]):
 
     _LAST_WATCH_FETCH_TIME = time.time()
     print(f"[*] 看盤行情中心成功同步 {valid_count}/{len(clean_codes)} 檔上市櫃個股真實報價 (大盤: {_MARKET_INDEX_CACHE['index_close']} {_MARKET_INDEX_CACHE['change_pct']}%)")
+
+def index_cache_from_quotes(quotes: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """把已解析的報價編成指數快取。只認 t00，不連線、不改其他快取。"""
+    if not isinstance(quotes, dict):
+        return None
+    quote = quotes.get("t00")
+    if not isinstance(quote, dict) or not quote.get("price"):
+        return None
+    return {
+        "index_close": quote["price"],
+        "change": quote.get("change"),
+        "change_pct": quote.get("change_pct"),
+        "time": quote.get("time"),
+        "feed_time": quote.get("feed_time"),
+        "feed_date": quote.get("feed_date"),
+        "date": quote.get("feed_date"),
+        "as_of_date": quote.get("feed_date"),
+        "source": "twse_mis",
+        "observation": "quote",
+    }
+
 
 def get_market_index_summary() -> Dict[str, Any]:
     """取得加權指數最新狀態"""

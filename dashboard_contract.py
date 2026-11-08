@@ -50,6 +50,24 @@ def isoformat_taipei(now: Optional[dt.datetime] = None) -> str:
     return now_taipei(now).isoformat(timespec="seconds")
 
 
+def market_session_date(value: Any) -> Optional[dt.date]:
+    """有時區的時間先換到台北再取日期。不能把 UTC 字串前 10 碼當成交易日。"""
+    if value is None:
+        return None
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(TAIPEI)
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
+    if hasattr(value, "to_pydatetime"):
+        try:
+            return market_session_date(value.to_pydatetime())
+        except Exception:
+            return None
+    return parse_iso_date(value)
+
+
 def parse_iso_date(value: Any) -> Optional[dt.date]:
     if value is None:
         return None
@@ -504,29 +522,53 @@ def assemble_market_view(
         calendar=calendar,
         rhythm=price_rhythm,
     )
-    if inferred.get("status") == "ok" and freshness.get("freshness") == "unknown":
+    source_aligned = bool(sync.get("verified"))
+    current = freshness.get("freshness") == "ok"
+    if source_aligned and freshness.get("freshness") == "stale":
+        inferred["status"] = "stale"
+        inferred["verified"] = False
+        inferred["current"] = False
+        inferred["source_aligned"] = True
+        inferred["label_display"] = "未知"
+        inferred["reason"] = "價格與均線日期已對齊，但不是這個時段的當期交易日，不能當成現在可採用的位階。"
+    elif inferred.get("status") == "ok" and not current:
         inferred["status"] = "unknown"
         inferred["verified"] = False
+        inferred["current"] = False
+        inferred["source_aligned"] = source_aligned
         inferred["label_display"] = "未知"
-        inferred["reason"] = freshness.get("reason") or "無法用休市日曆確認這筆行情是否對到預期交易日"
+        inferred["reason"] = freshness.get("reason") or "無法確認這筆行情是否為當期"
+    else:
+        inferred["current"] = current and inferred.get("status") == "ok"
+        inferred["source_aligned"] = source_aligned
+        if not inferred["current"]:
+            inferred["verified"] = False
+            if inferred.get("status") != "ok":
+                inferred["label_display"] = "未知"
     if price_source == "hardcoded_fallback":
         status = "fallback"
         verified = False
+        current = False
     elif price_source == "regime_config_snapshot":
         status = "config_snapshot"
         verified = False
-    elif not sync["verified"]:
+        current = False
+    elif not source_aligned:
         status = sync["status"]
         verified = False
+        current = False
     elif freshness["stale"]:
         status = "stale"
-        verified = True
+        verified = False
+        current = False
     elif freshness["freshness"] == "unknown":
         status = "unknown"
         verified = False
+        current = False
     else:
         status = "ok"
         verified = True
+        current = True
 
     effective = flatten_effective_regime(config if isinstance(config, Mapping) else None)
     return {
@@ -553,6 +595,8 @@ def assemble_market_view(
         "timezone": TIMEZONE_NAME,
         "status": status,
         "stale": bool(freshness["stale"]) and price_source not in {"hardcoded_fallback"},
+        "current": current,
+        "source_aligned": source_aligned,
         "verified": verified,
         "error": "；".join(errors) if errors and price_source in {"hardcoded_fallback", "regime_config_snapshot"} else None,
         "hardcoded_fallback": used_hardcoded,
@@ -808,8 +852,13 @@ def legacy_provenance(fieldnames: Optional[Iterable[str]], rows: Optional[Sequen
     }
 
 
-def build_batch_status(per_strategy: Sequence[Mapping[str, Any]]) -> dict:
-    """各策略日期不同就標衝突，不捏造單一交易日。"""
+def build_batch_status(
+    per_strategy: Sequence[Mapping[str, Any]],
+    now: Optional[dt.datetime] = None,
+    calendar: Optional[Mapping[str, Any]] = None,
+    rhythm: str = "daily_close",
+) -> dict:
+    """一致性與新鮮度分開。同一天不代表當期；沒有可信日曆就不判過期。"""
     listed = []
     all_dates = set()
     for item in per_strategy or ():
@@ -826,24 +875,92 @@ def build_batch_status(per_strategy: Sequence[Mapping[str, Any]]) -> dict:
             "rolling_total": item.get("rolling_total"),
         })
     ordered = sorted(all_dates, reverse=True)
+    date_freshness = []
+    for iso in ordered:
+        judged = classify_session_freshness(iso, now=now, calendar=calendar, rhythm=rhythm)
+        date_freshness.append({
+            "date": iso,
+            "freshness": judged.get("freshness"),
+            "stale": bool(judged.get("stale")),
+            "reason": judged.get("reason"),
+        })
     if not ordered:
         unity = "unknown"
         status = "unknown"
-        note = "結果檔沒有可解析的選股日期"
+        freshness = "unknown"
+        note = "結果檔沒有可解析的選股日期。不用檔案修改時間補交易日。"
     elif len(ordered) == 1:
         unity = "single_date"
-        status = "ok"
-        note = "目前讀到的策略批次是同一日"
+        freshness = date_freshness[0]["freshness"]
+        if freshness == "ok":
+            status = "ok"
+            note = f"批次一致於 {ordered[0]}，且對到這個時段的預期交易日。"
+        elif freshness == "stale":
+            status = "stale"
+            note = f"批次一致於 {ordered[0]}，但該日已過期，不能當成當前批次。"
+        else:
+            status = "unknown"
+            note = f"批次一致於 {ordered[0]}，但日曆不足以判斷是否當期。"
     else:
         unity = "conflict"
         status = "conflict"
-        note = "各策略批次日不同，不合併成單一盤勢日期"
+        if any(item["freshness"] == "unknown" for item in date_freshness):
+            freshness = "unknown"
+        elif any(item["stale"] for item in date_freshness):
+            freshness = "stale"
+        else:
+            freshness = "ok"
+        note = "各策略批次日不同，不合併成單一盤勢日期。"
     return {
         "status": status,
         "unity": unity,
+        "freshness": freshness,
         "dates": ordered,
+        "date_freshness": date_freshness,
         "by_strategy": listed,
         "note": note,
+    }
+
+
+def build_treemap_index_summary(
+    market_idx: Optional[Mapping[str, Any]],
+    group_nodes: Optional[Sequence[Mapping[str, Any]]] = None,
+    up_count: int = 0,
+    down_count: int = 0,
+    flat_count: int = 0,
+    total_stocks: int = 0,
+) -> dict:
+    """熱力圖指數摘要。與 interpret_market_index_cache 同一套欄位，不另判來源。"""
+    index_view = interpret_market_index_cache(market_idx)
+    top_sector = None
+    bottom_sector = None
+    nodes = list(group_nodes or [])
+    if nodes:
+        ranked = sorted(nodes, key=lambda group: group.get("median_change") or 0)
+        bottom = ranked[0]
+        top = ranked[-1]
+        top_sector = f"{top['name']} ({top['median_change']:+.2f}%)"
+        bottom_sector = f"{bottom['name']} ({bottom['median_change']:+.2f}%)"
+    return {
+        "index_change_pct": index_view.get("index_change_pct"),
+        "index_close": index_view.get("index_close"),
+        "as_of_date": index_view.get("as_of_date"),
+        "as_of_display": index_view.get("as_of_display"),
+        "quote_time": index_view.get("quote_time"),
+        "source": index_view.get("source"),
+        "status": index_view.get("status"),
+        "verified": index_view.get("verified"),
+        "is_realtime": index_view.get("is_realtime"),
+        "note": index_view.get("note"),
+        "up_count": up_count,
+        "down_count": down_count,
+        "flat_count": flat_count,
+        "top_sector": top_sector,
+        "bottom_sector": bottom_sector,
+        "sector_rank_source": index_view.get("source"),
+        "limit_up_count": None,
+        "limit_down_count": None,
+        "total_stocks_analyzed": total_stocks,
     }
 
 

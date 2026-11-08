@@ -25,6 +25,8 @@ def body_for(path: str):
                 "bias_ma20": -2.2,
                 "source": "twse_mis",
                 "verified": True,
+                "current": True,
+                "source_aligned": True,
                 "stale": False,
                 "as_of": "2026-11-06",
                 "fetched_at": "2026-11-08T11:00:00+08:00",
@@ -35,6 +37,7 @@ def body_for(path: str):
                     "label_display": "🟡【高檔震盪整理・箱型洗盤】",
                     "status": "ok",
                     "verified": True,
+                    "current": True,
                     "reason": "價格與均線同一交易日",
                 },
                 "effective_regime": {
@@ -133,22 +136,22 @@ def body_for(path: str):
             "history": [],
         }
     if path.startswith("/api/market_pulse/treemap"):
-        return {
-            "summary": {
-                "verified": False,
-                "as_of_display": "資料日未知",
-                "index_change_pct": None,
-                "up_count": 0,
-                "down_count": 0,
-                "top_sector": None,
-                "bottom_sector": None,
-                "limit_up_count": None,
-                "limit_down_count": None,
-            },
-            "root": {"name": "預覽", "children": []},
-            "distribution": [],
-            "scatter_data": [],
-        }
+        from mis_quote import parse_mis_quote_item
+        from realtime_watch_hub import index_cache_from_quotes
+        from dashboard_contract import build_treemap_index_summary
+        quote = parse_mis_quote_item(
+            {"c": "t00", "n": "發行量加權股價指數", "z": "40087.56", "y": "41000", "d": "20261106", "t": "13:24:01"},
+            {"t00"},
+        )
+        summary = build_treemap_index_summary(
+            index_cache_from_quotes({"t00": quote}),
+            [{"name": "半導體業", "median_change": -1.2}],
+            up_count=3,
+            down_count=5,
+            flat_count=1,
+            total_stocks=9,
+        )
+        return {"summary": summary, "root": {"name": "預覽", "children": []}, "distribution": [], "scatter_data": []}
     return {"status": "empty"}
 
 

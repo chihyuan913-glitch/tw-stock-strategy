@@ -625,45 +625,12 @@ def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
+                from mis_quote import parse_mis_quote_item
                 for item in data.get('msgArray', []):
-                    c = item.get('c', '')
-                    if not c or c not in clean_codes:
+                    quote_obj = parse_mis_quote_item(item, set(clean_codes), fallback_clock=time_str)
+                    if not quote_obj:
                         continue
-                    z_val = item.get('z', '-')
-                    trade_z = item.get('trade', {}).get('z', '-') if isinstance(item.get('trade'), dict) else '-'
-                    y_val = item.get('y', '-')
-                    o_val = item.get('o', '-')
-                    h_val = item.get('h', '-')
-                    l_val = item.get('l', '-')
-                    v_val = item.get('v', '-')
-
-                    price = None
-                    if z_val and z_val != '-':
-                        price = float(z_val)
-                    elif trade_z and trade_z != '-':
-                        price = float(trade_z)
-                    elif y_val and y_val != '-':
-                        price = float(y_val)
-
-                    prev_close = float(y_val) if (y_val and y_val != '-') else price
-                    chg = round(price - prev_close, 2) if (price is not None and prev_close is not None) else 0.0
-                    pct = round((chg / prev_close * 100), 2) if (prev_close and prev_close > 0) else 0.0
-
-                    quote_obj = {
-                        'code': c,
-                        'name': item.get('n', '').strip(),
-                        'price': price,
-                        'prev_close': prev_close,
-                        'change': chg,
-                        'change_pct': pct,
-                        'open': float(o_val) if (o_val and o_val != '-') else None,
-                        'high': float(h_val) if (h_val and h_val != '-') else None,
-                        'low': float(l_val) if (l_val and l_val != '-') else None,
-                        'volume': int(v_val) if (v_val and v_val != '-') else None,
-                        'time': item.get('t', time_str),
-                        'feed_time': item.get('t') or None,
-                        'feed_date': item.get('d') or None,
-                    }
+                    c = quote_obj['code']
                     quotes[c] = quote_obj
                     _QUOTE_CACHE[c] = quote_obj
         except Exception as e:

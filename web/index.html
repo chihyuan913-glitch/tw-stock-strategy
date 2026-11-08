@@ -623,9 +623,9 @@
         <div class="flex items-center gap-6">
           <h2 class="text-xl font-black text-white tracking-wider flex items-center gap-2">
             <span>看盤</span>
-            <span id="marketRealtimeBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shadow">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              <span>行情狀態待確認</span>
+            <span id="marketRealtimeBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/60 text-slate-300 border border-slate-600 flex items-center gap-1 shadow">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              <span>行情尚未核對</span>
             </span>
             <span id="marketQuoteTime" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-cyan-300">
               撮合時間：未知
@@ -3750,9 +3750,7 @@
         }
         if (statusEl) {
           const asOf = m.as_of || '資料日未知';
-          const verified = m.verified ? '已驗證' : '未驗證';
-          const stale = m.stale ? '過期' : '未標過期';
-          statusEl.innerText = `來源 ${m.source || '未知'}｜${verified}｜${stale}｜資料日 ${asOf}｜取得 ${m.fetched_at || '未知'}（${m.timezone || 'Asia/Taipei'}）${m.error ? '｜錯誤 ' + m.error : ''}`;
+          statusEl.innerText = `來源 ${m.source || '未知'}｜${formatMarketStatus(m)}｜資料日 ${asOf}｜取得 ${m.fetched_at || '未知'}（${m.timezone || 'Asia/Taipei'}）${m.error ? '｜錯誤 ' + m.error : ''}`;
         }
         const totalEl = document.getElementById('totalCandidatesCount');
         if (totalEl) totalEl.innerText = d.total_candidates;
@@ -4797,11 +4795,17 @@
         // 更新左下全市場統計
         const summary = data.summary || {};
         const timeBadge = document.getElementById('marketQuoteTime');
-        if (timeBadge) {
-          timeBadge.innerText = summary.verified ? `最新撮合: ${summary.as_of_date}` : `資料日：${summary.as_of_display || '未知'}`;
+        const described = describeTreemapSummary(summary);
+        if (timeBadge) timeBadge.innerText = `資料日：${described.asOf}`;
+        const watchBadge = document.getElementById('marketRealtimeBadge');
+        if (watchBadge) {
+          const dot = watchBadge.querySelector('span');
+          if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+          const label = watchBadge.querySelectorAll('span')[1];
+          if (label) label.textContent = described.badge;
         }
         const asOfEl = document.getElementById('summaryAsOf');
-        if (asOfEl) asOfEl.innerText = summary.as_of_display || '資料日未知';
+        if (asOfEl) asOfEl.innerText = described.asOf;
         const sumIndex = document.getElementById('summaryIndexChange');
         const sumBreadth = document.getElementById('summaryMarketBreadth');
         if (sumIndex) {
