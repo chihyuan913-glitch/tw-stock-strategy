@@ -681,13 +681,13 @@ def main():
     # 自動載入全域市場自適應操盤參數 (Adaptive Regime Parameters)
     adap_p = None
     market_label = "常態輪動"
-    cash_ratio_str = "40%~60%"
+    cash_ratio_str = "未知"
+    reg_cfg = None
     try:
         adap_p = get_strategy_adaptive_params("01")
         reg_cfg = load_adaptive_config()
         market_reg = reg_cfg.get("market_regime", {})
-        market_label = market_reg.get("label", "多空震盪")
-        cash_ratio_str = reg_cfg.get("cash_level_recommendation", "40%~60%")
+        market_label = market_reg.get("label") or "生效位階未知"
         is_defensive = (market_reg.get("key") in ("BEAR_DEFENSIVE", "HIGH_VOLATILITY")) or ("空頭" in market_label)
         if is_defensive:
             args.max_dist = min(args.max_dist, 0.5)
@@ -700,6 +700,12 @@ def main():
                 args.max_dist = float(adap_p["bb_lower_band_offset_pct"])
     except Exception:
         pass
+
+    try:
+        from dashboard_contract import flatten_effective_regime
+        cash_ratio_str = flatten_effective_regime(reg_cfg).get("cash_display", "未知")
+    except Exception:
+        cash_ratio_str = "未知"
 
     results = screen_stocks(
         date_str=args.date,

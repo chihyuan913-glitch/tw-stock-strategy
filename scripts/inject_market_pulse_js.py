@@ -2,6 +2,8 @@
 inject_market_pulse_js.py: 將 Market Pulse 與 Treemap 的完整前端邏輯注入 web/index.html
 """
 
+raise SystemExit("phase1: 此腳本會把過期的 10/29 與錯誤 DOM id 寫回 index.html，已停用。")
+
 INDEX_PATH = "web/index.html"
 
 with open(INDEX_PATH, "r", encoding="utf-8") as f:
@@ -50,7 +52,7 @@ pulse_js_code = """
         if (dateBadgeEl && data.as_of_date) dateBadgeEl.innerText = data.as_of_date;
         if (tabBadgeEl) tabBadgeEl.innerText = `${score.toFixed(1)}分`;
         if (ratioEl) ratioEl.innerText = `偏多 ${data.bullish_count || 4} · 偏空 ${data.bearish_count || 6}`;
-        if (cashTargetEl) cashTargetEl.innerText = `${data.cash_target_pct || 50}% 現金`;
+        if (cashTargetEl) cashTargetEl.innerText = (data.cash_target_pct === null || data.cash_target_pct === undefined) ? "未知 現金" : `${data.cash_target_pct}% 現金`;
 
         // 渲染 10 項訊號卡片
         renderSignalsList(data.signals || []);

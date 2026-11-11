@@ -96,16 +96,8 @@ STRATEGIES = [
     },
 ]
 
-def run_strategy(strat_info, line=False, force=False):
-    print("\n" + "=" * 70)
-    print(f"🚀 [執行策略] {strat_info['name']}")
-    print(f"📁 腳本位置: {strat_info['script']}")
-    print("=" * 70)
-
-    if not strat_info['script'].exists():
-        print(f"[X] 找不到腳本: {strat_info['script']}")
-        return False
-
+def build_strategy_cmd(strat_info, line=False, force=False):
+    """建構執行策略之指令列表"""
     cmd = [
         sys.executable,
         str(strat_info['script']),
@@ -116,21 +108,64 @@ def run_strategy(strat_info, line=False, force=False):
         cmd.append("--line")
     if force:
         cmd.append("--force")
+    return cmd
+
+
+def run_strategy(strat_info, line=False, force=False):
+    print("\n" + "=" * 70)
+    print(f"🚀 [執行策略] {strat_info['name']}")
+    print(f"📁 腳本位置: {strat_info['script']}")
+    print("=" * 70)
+
+    if not strat_info['script'].exists():
+        print(f"[X] 找不到腳本: {strat_info['script']}")
+        return {
+            "id": strat_info["id"],
+            "name": strat_info["name"],
+            "returncode": 127,
+            "stderr": "script not found",
+        }
+
+    cmd = build_strategy_cmd(strat_info, line=line, force=force)
 
     try:
         # 在策略所在目錄內執行，確保相對路徑正常
         cwd = strat_info['script'].parent
-        ret = subprocess.run(cmd, cwd=cwd, check=True)
-        print(f"[✓] {strat_info['name']} 執行成功！")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"[!] {strat_info['name']} 執行失敗，錯誤代碼: {e.returncode}")
-        return False
+        ret = subprocess.run(
+            cmd,
+            cwd=cwd,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if ret.stderr:
+            sys.stderr.write(ret.stderr)
+        stderr_tail = (ret.stderr or "")[-4000:]
+        if ret.returncode == 0:
+            print(f"[✓] {strat_info['name']} 執行成功！")
+        else:
+            print(f"[!] {strat_info['name']} 執行失敗，錯誤代碼: {ret.returncode}")
+        return {
+            "id": strat_info["id"],
+            "name": strat_info["name"],
+            "returncode": ret.returncode,
+            "stderr": stderr_tail,
+        }
     except Exception as e:
         print(f"[!] 執行過程發生未預期錯誤: {e}")
-        return False
+        return {
+            "id": strat_info["id"],
+            "name": strat_info["name"],
+            "returncode": 1,
+            "stderr": repr(e),
+        }
+
+LAST_RESULTS = []
 
 def main():
+    global LAST_RESULTS
+    LAST_RESULTS = []
     parser = argparse.ArgumentParser(description="台股選股策略總指揮 - 一鍵執行所有策略")
     parser.add_argument("--line", action="store_true", help="執行後推播各策略結果至 LINE")
     parser.add_argument("--strategy", type=str, default=None, help="指定單一策略執行 (01, 02, 03, 04)")
@@ -144,10 +179,12 @@ def main():
 
     from market_schedule import check_market_open_or_exit, verify_twse_data_settlement
     if not check_market_open_or_exit(context_name="全策略盤後選股排程", allow_force=True):
-        return
+        return 0
 
     # 夜間官方數據沉澱完整性檢核 (若為 17:00 後執行，確認官方信用交易與法人結算到位)
     verify_twse_data_settlement(verbose=True)
+
+    results = []
 
     # --------------------------------------------------------------------------
     # 🏛️ 台股盤後總體宏觀與信用交易全戰報分析 (Market Analyst)
@@ -159,8 +196,20 @@ def main():
         print("🏛️ [排程聯動] 啟動台股盤後總體宏觀與信用交易解析引擎...")
         print("=" * 70)
         run_market_analysis(line=args.line, force=args.force)
+        results.append({
+            "id": "market_analyst",
+            "name": "台股盤後總體宏觀與信用交易全戰報分析",
+            "returncode": 0,
+            "stderr": "",
+        })
     except Exception as e_analyst:
         print(f"[!] 台股盤後總體宏觀解析執行失敗或跳過: {e_analyst}")
+        results.append({
+            "id": "market_analyst",
+            "name": "台股盤後總體宏觀與信用交易全戰報分析",
+            "returncode": 1,
+            "stderr": repr(e_analyst),
+        })
 
     targets = list(STRATEGIES)
     known_ids = {s["id"] for s in targets}
@@ -180,15 +229,24 @@ def main():
         targets = [s for s in targets if args.strategy in s['id']]
         if not targets:
             print(f"[!] 找不到符合 '{args.strategy}' 的策略！")
-            return
+            return 2
 
-    success_count = 0
     for strat in targets:
-        if run_strategy(strat, line=args.line, force=args.force):
-            success_count += 1
+        res = run_strategy(strat, line=args.line, force=args.force)
+        results.append(res)
+
+    LAST_RESULTS = list(results)
 
     print("\n" + "=" * 70)
-    print(f"🏁 總指揮中心執行總結: 完成 {success_count}/{len(targets)} 項策略。")
+    success_count = sum(1 for r in results if r["returncode"] == 0)
+    print(f"🏁 總指揮中心執行總結: 完成 {success_count}/{len(results)} 項任務。")
+    for r in results:
+        status = "✓ 成功" if r["returncode"] == 0 else f"✗ 失敗 (代碼 {r['returncode']})"
+        print(f"  - [{r['id']}] {status}")
+        if r["returncode"] != 0 and r.get("stderr"):
+            lines = r["stderr"].strip().splitlines()
+            tail_20 = "\n".join(lines[-20:])
+            print(f"    [stderr 最後 20 行]:\n{tail_20}")
     print("=" * 70)
 
     # 自動跨日滾動校準雷達監控池四大防線與移動停利
@@ -238,5 +296,7 @@ def main():
     except Exception as e:
         print(f"[!] 籌碼K線自選股同步跳過或失敗: {e}")
 
+    return 1 if any(r["returncode"] != 0 for r in results) else 0
+
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

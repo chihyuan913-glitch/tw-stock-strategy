@@ -1,0 +1,1515 @@
+{
+  "version": 2,
+  "files": [
+    {
+      "path": ".github/workflows/cloud_daily_screener.yml",
+      "git_blob": "bc4d4456112169317f2f76e18efa49684bd98e54",
+      "sha256": "fc8e14be0c198b01020a74b8e665d367a1c14d18df5c2d6c7a5c2ea74698ab8c"
+    },
+    {
+      "path": ".github/workflows/cloud_etf_radar.yml",
+      "git_blob": "1f718dc3bd133ef736321562231d1be6577389ff",
+      "sha256": "41afc3154a6329f7c120fe47caee938994923213ffbe605791f44e88bb988f19"
+    },
+    {
+      "path": ".github/workflows/cloud_intraday_radar.yml",
+      "git_blob": "c0ba66f7a5b5fc00cd01efbab14a232bc551e55b",
+      "sha256": "4494cee67605e3929f132ab39705e0c007dfaf7ae4d2519a34a0bffeb855716f"
+    },
+    {
+      "path": ".github/workflows/cloud_render_keepalive.yml",
+      "git_blob": "6253ce2875d064dc59ac78fa571a3ab78bb4088b",
+      "sha256": "e876ff45a4ad2536bc2aa7ac55d2d8951882a35f4535a6104c151efe0e9214d8"
+    },
+    {
+      "path": ".github/workflows/cloud_weekly_optimizer.yml",
+      "git_blob": "a75414833037183f5e6117e307679a9ad110b984",
+      "sha256": "f99f7e2f70d4d61e9abadd4539ec4a4c5d23cb459bfe402c44f8da591eeed7f8"
+    },
+    {
+      "path": ".gitignore",
+      "git_blob": "3dffbca77960a916f228cca79882ddccc489be33",
+      "sha256": "465098f5db13eac60c1f6622bb95bb5bbd26a964f0bdaa670501ab3888e1135f"
+    },
+    {
+      "path": "AGENTS.md",
+      "git_blob": "7b7ef8b9595026b7fb51d3d0b1111a4cccb806f4",
+      "sha256": "1c42e4605d88f230f7ae88de4fa98aae5b0dd99ca48be83a10a78fc18e1fdf94"
+    },
+    {
+      "path": "Dockerfile",
+      "git_blob": "edf27bbefc6a293aaa6c358bc485b7b690d54c5a",
+      "sha256": "89477cce4bafead0e01a80856923104b299fe2131b336055197cd31bbc7cb6f9"
+    },
+    {
+      "path": "GEMINI.md",
+      "git_blob": "2681662b700df42abe3ebaefc1f3a1f66efb0ee9",
+      "sha256": "08cd166d0b843e3a8aa24b1e05d354d8d0a8d36ca5ff46e55f680d5a28eb55fe"
+    },
+    {
+      "path": "ISOLATE_APPLY.md",
+      "git_blob": "6d3cd148fb8e374c636ca76fcfe3fbba5496e922",
+      "sha256": "12f5217c9915d333502b1d1439606ab04569dd335583f6cac30f8e6b7603fa16"
+    },
+    {
+      "path": "Procfile",
+      "git_blob": "1a78299762ae1449ef8c85152b9b378a71b83180",
+      "sha256": "fe2ab48f2150abb625138be92d42310f42036444203e83b8b8676be903a91c0d"
+    },
+    {
+      "path": "README.md",
+      "git_blob": "dc5e29179ca001dba68fca19bfd1826978e0384d",
+      "sha256": "cda5ac1a4fe13698735a10df802a52651a26d0cf21ef4da11a8f06b5520887a0"
+    },
+    {
+      "path": "adaptive_regime_manager.py",
+      "git_blob": "006f3558d053fb9bd27b21b57a3c8247ccd32b30",
+      "sha256": "e333bb28516166f568706235df25718f12788aac43c501a286a5643ef19d0ecd"
+    },
+    {
+      "path": "add_chrome_bookmark.py",
+      "git_blob": "6f12471de3c9caa564ab8a0d2a5c5246913ff183",
+      "sha256": "401d9de0f1f220a9e664ca0af3ae768c182a6dc2f286084d2105d311cdcbef2c"
+    },
+    {
+      "path": "algo_guards.py",
+      "git_blob": "3f100c32c440f931c84136974f609e3d29720c86",
+      "sha256": "94df38ca07f2d3e72ffeb42563ddce7332a13d554541cb6bc342380c2ebbec06"
+    },
+    {
+      "path": "all_etf_event_radar.py",
+      "git_blob": "6de848febda1499fe73656b0782b6425fdbf1fd0",
+      "sha256": "6d559223de4124e94dd9e5448fbe3036268c94535956ba0e40e66c5e175130fa"
+    },
+    {
+      "path": "all_etf_pool.json",
+      "git_blob": "06b2c784b173b0f04ac521eab5f40bd328bda542",
+      "sha256": "d24403e5372dff4b4f3baa5a44c0f51efac7792239d6573de1f3647c57847b31"
+    },
+    {
+      "path": "all_etf_two_stage_radar.py",
+      "git_blob": "a0768828078f1506862f96e11245dd7724a9e7cb",
+      "sha256": "9287bd2eab799f3acd14780cb3d0798a19b62367b08b7ff9fc4e374b48c6adff"
+    },
+    {
+      "path": "all_etf_universe.json",
+      "git_blob": "cbe0035ac9a56faddb29ac9893653ed362ab951a",
+      "sha256": "afe08093222d716b30d6839c631c59cec04c868097c69956b421c6774f4eaa29"
+    },
+    {
+      "path": "app_icon.ico",
+      "git_blob": "3b796fe94ab54ff9625021b0790986dc136c122a",
+      "sha256": "fff9d3716689d916acd22e5db2a0da3a832119109fadf33cb044ed7d4dcf8a03"
+    },
+    {
+      "path": "auto_debugger.py",
+      "git_blob": "781bbd9faf7451b1e4566aacca0dd549abd7800e",
+      "sha256": "6c39b71836cced890a43abf0808ebab886fd6184c8fe6c6059a7e7f621e46437"
+    },
+    {
+      "path": "bind_line_groups.py",
+      "git_blob": "06ad49ec6fce7882c94d2e6064f52dd8db25e00b",
+      "sha256": "5589a57d0ba71e5eab85dc521cd7bf7442f1090058d5edd028183a809c2e81ff"
+    },
+    {
+      "path": "bind_strategy_05.bat",
+      "git_blob": "465b3e1238ee59a96d8b50f67654ed23e7ea0f3e",
+      "sha256": "f767993b5fbeb8203de07c6fb832b780378bb2273321e6692b7d2a583b8e51f5"
+    },
+    {
+      "path": "bind_strategy_05.py",
+      "git_blob": "9eebe32a8c8886e516969ba719b7cc790752f235",
+      "sha256": "d158f7c9499fd83a683b7d8434f687058b84c2e573a88c40db595629aedcf3b5"
+    },
+    {
+      "path": "bookmarks_tw_stock.html",
+      "git_blob": "4999fd765254ee4dafba3c5985e8e1141221534f",
+      "sha256": "0cbcb4900a911229a02f5e186a219f82403d270bc91df71d9d7fffdb21b543f6"
+    },
+    {
+      "path": "build_etf_universe.py",
+      "git_blob": "da8b907827796ee58a0f6e1919fb1d0e3e9fa2c7",
+      "sha256": "cb0293f15363fe60aa13d436ce22002ebd65845238cec0eaa3c693c91dfa7db8"
+    },
+    {
+      "path": "cloud_sync.py",
+      "git_blob": "97ef47b0a821bf05f15dfa8e119728315f56ca75",
+      "sha256": "e667880fa242ed6f4eb201946a7a53d359e1714f41d723df02a2805e715d8e47"
+    },
+    {
+      "path": "cmoney_sync.py",
+      "git_blob": "5267df1086a131a3b6e25d4e436bc5efaa93a6c8",
+      "sha256": "d515725a66efe8bb15906cf99790e11d8d52232798f4164538f2c1454c7f180c"
+    },
+    {
+      "path": "conftest.py",
+      "git_blob": "7eeb49c3cb9544594ed3f97113505aa30bd3e4b9",
+      "sha256": "bde2a9c0517130462a59bce50d7b93613ca60932952ccead93d5cc30f5c0089e"
+    },
+    {
+      "path": "cross_market_event_radar.py",
+      "git_blob": "3b02de8cf202d26bba02d52c600bb4162121126c",
+      "sha256": "0f5da581edaad99a3847eefb30473efdb9640ea2c7d94f0990bc4b0a56c52334"
+    },
+    {
+      "path": "dashboard_contract.py",
+      "git_blob": "d6b1d0c7259654fe77e711d6cd05563f2ff94df8",
+      "sha256": "36a7d660950197d2f4244b4f9e8c556b4d5ac84f70cd27cb47bc1181000f594f"
+    },
+    {
+      "path": "dashboard_twse_calendar.json",
+      "git_blob": "f2190dc938ba4a8f4cf4d933f43730cc4e6b9daf",
+      "sha256": "ede987004cc80d956ad796ea8ba8430256a1f5412c7e7e8a165f336c42c9147f"
+    },
+    {
+      "path": "dashboard_twse_calendar.payload.json",
+      "git_blob": "b0dfb83161104ad5869cc4e494d4abd5b4200a09",
+      "sha256": "7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117"
+    },
+    {
+      "path": "docs/api-spec.json",
+      "git_blob": "004fc840f83c482160d6e209a985d95e65964794",
+      "sha256": "4ea7f1d5e8f82d3e1a09d6846acbb20e48c9073792487c009edf330bf13f4d4c"
+    },
+    {
+      "path": "four_price_engine.py",
+      "git_blob": "bd26b6e9d643e3726c57a962b8a876810c79943e",
+      "sha256": "cf47beefc6d313a05e558fab70c4d8395d1317cbb6d50abc64930a16d0e5633f"
+    },
+    {
+      "path": "futures_helper.py",
+      "git_blob": "ecad608e3d6583ecd452d163d5b0aa4cfa52b248",
+      "sha256": "f71ad5db06d4bd0182d59e916939d9f2825814d931a8da5706a83da77cd472f7"
+    },
+    {
+      "path": "get_group_id.py",
+      "git_blob": "0659aaa460132e22643ee02cf89fa7628f514dcd",
+      "sha256": "76dffda0989615094f23df3e3cfcfa4b20c7f998f9b470eb3d5f191ad898629b"
+    },
+    {
+      "path": "handoff.md",
+      "git_blob": "709324e5bab9d9f284d2317587ea9d157e111119",
+      "sha256": "c4445f6b7a860b8dd65dfe067ce73fa30412fd09ff1a89b52f1e84bef621f4cb"
+    },
+    {
+      "path": "industry_radar_data.py",
+      "git_blob": "31db4355848fd7c37b1aa5f8946c0d3f6b5442b8",
+      "sha256": "55bfddb48d5f4bdfe017f7bacb21f63e17ca4231c30028be91d88467d60c944a"
+    },
+    {
+      "path": "isolate_entry.py",
+      "git_blob": "715af2b9de4a027353a9958d57cd5cfa2e613496",
+      "sha256": "35668795346902e36dbc5802c716a55511c7d1ab55e37b2ba7acda89c49699ef"
+    },
+    {
+      "path": "isolate_provenance.json",
+      "git_blob": "902d7fb8287397c8a0a83fb1ba8a3f9b16bcf409",
+      "sha256": "357ac805bdc3f97ab6a0b5cc74b937c093a319f0cfbd33f3b5f17d60dfb32242"
+    },
+    {
+      "path": "lab/__init__.py",
+      "git_blob": "c4f37c5423f323572ca26b41eda08419ebdd30a9",
+      "sha256": "3ef9fdbff8d5ab1656d4f284a45e4a1e0581537fc2c3d0d828f1419e72b23dc8"
+    },
+    {
+      "path": "lab/data/__init__.py",
+      "git_blob": "b8a9b545c6592ee294b3f0f3464b58e16c99f67c",
+      "sha256": "5c321741bb588e0e45a297fa8e7e316fc5df7ef75c246309e47def590f4c171b"
+    },
+    {
+      "path": "lab/data/loader.py",
+      "git_blob": "f30480a369be2df04386e4d23661a12d1f9a1a70",
+      "sha256": "7524709c04aadcecd4a620d5fabb315e3cc29cee630224c0cc5bd5b9d5d7af0a"
+    },
+    {
+      "path": "lab/data/storage.py",
+      "git_blob": "f543ddcf1440a978027528df6d3dad95604c2d52",
+      "sha256": "7dff01951a0481821b2733d5ae9834ce4575579b34195e5a6e3e60757ffccea4"
+    },
+    {
+      "path": "lab/data/tomorrow_trading_advisor.csv",
+      "git_blob": "86c58654a9cfacf8624a6b302180ab155cd983d5",
+      "sha256": "f998d51d3e32c48282d73e306c166e86da984d91d0406a64e427e52732ff9db2"
+    },
+    {
+      "path": "lab/engine/__init__.py",
+      "git_blob": "86dcde5080af5c2ba8ba84fc4d4cce86f665fe7d",
+      "sha256": "1db77153e5d19e46d7baff53ce9e5a0400c03aef7a3e18017d94c70e969ebf91"
+    },
+    {
+      "path": "lab/engine/allocator.py",
+      "git_blob": "4e2ec7a53a4804ded79b1cad4a6f4aaf17030476",
+      "sha256": "432cf51ee119bbef9d8e9129f6adde6972443ca0550fcded30e476d5a428a86d"
+    },
+    {
+      "path": "lab/engine/backtest_engine.py",
+      "git_blob": "3affca981b842454d036020edd8a446b09a67aa6",
+      "sha256": "a50dae5ae4bc64979b1d16c0ed85811c2aae88179d4ffa6f0d46e03245193313"
+    },
+    {
+      "path": "lab/engine/fusion.py",
+      "git_blob": "99d52d37a7d5b3c2c01f7a96029444d5ce64728b",
+      "sha256": "51caeca1f7d4e6b9c4cb639f3f2c58547531f85ceded1ced52afec6b4a763ab9"
+    },
+    {
+      "path": "lab/engine/performance.py",
+      "git_blob": "8241f5c6d99d9bb553736ac26c508bd69da246a4",
+      "sha256": "5470514790f76c7b7d387cc202b805ba4c00488dc0ec4e7ccc5598c0076e155c"
+    },
+    {
+      "path": "lab/engine/portfolio.py",
+      "git_blob": "5683076415c8fc0f58cafcfa79a65628cd4169c2",
+      "sha256": "89f941e331333ae5948796c11123d6b638aff211d9df4273c7364f96ceea10a7"
+    },
+    {
+      "path": "lab/engine/verification.py",
+      "git_blob": "ce61c44e371ac82ea96d60b06400a010745c172e",
+      "sha256": "a9042100fd81cd3019e16e9fa25ae88b43e7c96a59325dfa2bc6be3aa44e329b"
+    },
+    {
+      "path": "lab/strategies/__init__.py",
+      "git_blob": "2fea86d1ad74f38b6590c7e41dac6b782f012937",
+      "sha256": "237d7be2d64d492e8744704a661bf760432b5a851b49bd08efa8b0979fe123a8"
+    },
+    {
+      "path": "lab/strategies/adapters.py",
+      "git_blob": "4e95c0f2248ce3f03180fa59c9b69c5e4337a0be",
+      "sha256": "0f30c218012775109e12516bba50e29dcb3231c08349ba3bafa85da5f5da3cf0"
+    },
+    {
+      "path": "lab/strategies/base_strategy.py",
+      "git_blob": "304749f494854aff52069e671d29da6a24180456",
+      "sha256": "e628c257c418572d3a9ca7faa3541156efabc367b156a006efe46c45ef35ff67"
+    },
+    {
+      "path": "lab/web/__init__.py",
+      "git_blob": "3e2d9ed7ba0eae2c5143fcca24fda62c553693f2",
+      "sha256": "edcea59740b085b81c639269884f7453974287deb15eaf9ae57cdf21e7a5fba8"
+    },
+    {
+      "path": "lab/web/router.py",
+      "git_blob": "ef192d74f0e359064af3e9846f408f2fc58bab18",
+      "sha256": "8ce019a2626e72ef2dc759784a2ecbec665bfa504890a209a61567bc48362753"
+    },
+    {
+      "path": "lab/web/templates/lab.html",
+      "git_blob": "4220e43c4c78af3a5264d003646f84ef46e44b84",
+      "sha256": "363e579a22eb3be86f946041f92a804d351b477051901e29df5e55a361197d35"
+    },
+    {
+      "path": "launch_persistent_service.py",
+      "git_blob": "84e9f155115191b934c21a5136674fd7136768f2",
+      "sha256": "bfbcdc52690bd78a004561694b2bc2deeeea65dcd316a4d258cb8cbab834023a"
+    },
+    {
+      "path": "legacy/stop_web.py",
+      "git_blob": "242639347197f79daf6e3d3b6784d853fb39b9ab",
+      "sha256": "994cc47a76983c106d9a1ba43caba19af6525cacc87ca5720f9fe137c9254979"
+    },
+    {
+      "path": "legacy/關閉台股戰情系統.bat",
+      "git_blob": "8e28e6c4bc1b983d1729cf2668808a34839eec62",
+      "sha256": "80b18ede798b15bfb68fcb7a99706bb9d958fc56c89f1f023a82f7db50ef16c2"
+    },
+    {
+      "path": "line_bot_server.py",
+      "git_blob": "75cf811867b15b86078870984b57e0753743489f",
+      "sha256": "3cb08204d2c4cd906458102bdd98f0800b3b6342785c80f6292a8eb01fe28e6e"
+    },
+    {
+      "path": "line_sender.py",
+      "git_blob": "59198ee2d4f9b70e447cde9ddc737ac6992951f9",
+      "sha256": "75e4910dd6c8620f474c28ef32d7ada58821540b406e4c2df13359e368b334dc"
+    },
+    {
+      "path": "market_analyst.py",
+      "git_blob": "dfac112339f01e5f04b15d0c22b6eb078bcd8ade",
+      "sha256": "62ac7ac634555cc6507b8cc42d48ee2f30b59c99369eeb5f4fffa0019f4aaabf"
+    },
+    {
+      "path": "market_holidays.json",
+      "git_blob": "a3af41190cf2ca25f545577a8c350c59d3fabadb",
+      "sha256": "4821f947f5b69201879ec22fb0464aebe14da91a8bbb3d182c0451daa322e982"
+    },
+    {
+      "path": "market_pulse.py",
+      "git_blob": "2676c1ba2ee0cd5d1078ade49ffec0c3f2cdbafa",
+      "sha256": "f276d9ae1dbca66701dbbea3cafebfca025044884ef30f73d00ce1461d3bb9d0"
+    },
+    {
+      "path": "market_schedule.py",
+      "git_blob": "b0efd6932af0692baff31625b5c3e115910cbd3b",
+      "sha256": "b54fbcff709ae904ed294f5f0fd4ea5622616759761efb413ad69b00e97bd221"
+    },
+    {
+      "path": "market_snapshot.py",
+      "git_blob": "ab16b60c340b87176ae5d1133716df47b3968b16",
+      "sha256": "714de7b9b0169f4cbb6293867df463b5d08a8219b5e3756d916049724f241358"
+    },
+    {
+      "path": "mis_quote.py",
+      "git_blob": "ffd91c72d38b66dc2562734c4683b62f90b4a2a9",
+      "sha256": "5b7729658a5838fc215d80c41943c31061b0e0f3b7bf5d8576280d4ea46d78fb"
+    },
+    {
+      "path": "optimize_all.py",
+      "git_blob": "f9f01bb1f29dde2c6554bebcff02c776fc4855a9",
+      "sha256": "32f87abf2154ae366dde9ed3c95a88201527a03cdf72c3afdba9f882ae95ff8b"
+    },
+    {
+      "path": "radar_manager.py",
+      "git_blob": "b2c448ab225d4e8c337b961828f953a09ebc8550",
+      "sha256": "8850027ef9ba05c5a4785d8639d1a66b6cb452aa9ad9aec483ce5893f4efb9a1"
+    },
+    {
+      "path": "realtime_watch_hub.py",
+      "git_blob": "9cb9381de8268fb2a54eebfaa8844eb739f12704",
+      "sha256": "25efb4b68649c2e4c8c507c867d4897793849521f95be8b8fce6946d291ffd41"
+    },
+    {
+      "path": "render.yaml",
+      "git_blob": "f63d4a2d42a32e5dbec07a2aaea15863adbd8abe",
+      "sha256": "03b57d668a72aa6d944c451f4029e81b16c204b1407b0a4e173b821fd28fda3e"
+    },
+    {
+      "path": "requirements.txt",
+      "git_blob": "2e29cdfd55a156c25935fc9e04e8aec5dfc2feb5",
+      "sha256": "1b4fb9a57e6fa4d5f0acfc36b70528093e378a443c4bb9e117193c7f85735afd"
+    },
+    {
+      "path": "revenue_helper.py",
+      "git_blob": "ce4f181441c123bba543c6f7bf65690cde73d051",
+      "sha256": "a62baa4dec513642eabfe14d0f4c6bc2b39067de9b45b3b510b65d52afd4c776"
+    },
+    {
+      "path": "rolling_retention_manager.py",
+      "git_blob": "0d6edcd397e9b832d1f4ba5125ab29b3345d3c1e",
+      "sha256": "bd08cd57fc9cff70149fd6644516adc32756884d3a07bd215223477125e16bf0"
+    },
+    {
+      "path": "run_all.bat",
+      "git_blob": "c61677b77d1389397bc1767e89a75262e2b1b488",
+      "sha256": "e0382dfa3a1df8437981edd37e2ce31efb5ddd22a00a0a70836f97f58b5a6aca"
+    },
+    {
+      "path": "run_all.py",
+      "git_blob": "89c1afaf91869e77bd74158212df19be86e7449e",
+      "sha256": "bbf4252601474a34ee6033c286dac8a7bb080c5b799bad4dd1e049ec8b1da0a8"
+    },
+    {
+      "path": "run_all_etf_radar_once.bat",
+      "git_blob": "d976c586edb6e28fe9f0dc6d34ed419cb154ca2c",
+      "sha256": "2a7faecaa07ecb899ccaf16b35f56b2ede5e17f4f4722e1082d0d3222fa8bca9"
+    },
+    {
+      "path": "run_all_intraday.py",
+      "git_blob": "b264d9f98f07565ba2a7295a4e6ca30bd04ac06e",
+      "sha256": "3b6a907e8571e1f3020e974baa031e860becc9c16d07d016da54ba543cf2e159"
+    },
+    {
+      "path": "run_lab.py",
+      "git_blob": "42d0c8332f8466744fb56864f1991a45ff1cb102",
+      "sha256": "4bd80eb92b0e24ef083baaf87480a8c2132d84be249003faeb7ad77c31ec35d4"
+    },
+    {
+      "path": "run_line_bot.py",
+      "git_blob": "f933e2d9e00c6b40d51bfcc801d126e52afef223",
+      "sha256": "e69e0836bed513cb2c3955df640e5727603436d6df64ec280bbde119cc1c291f"
+    },
+    {
+      "path": "run_market_analyst.bat",
+      "git_blob": "4773ce6a13bc63708bf999cf90a308a81d48abaa",
+      "sha256": "c5da1948958accd958bdd19ff578eb889f3f03c59c7176cf581362f5585e4045"
+    },
+    {
+      "path": "run_nightly_final.bat",
+      "git_blob": "340ee30d8f436c8954efc635c87c6a8919cd9c1f",
+      "sha256": "b62d9f5ec71bbc432a3893a20c419d04bed64749ab3854523954ab1ba8c264c0"
+    },
+    {
+      "path": "run_open_confirmation.bat",
+      "git_blob": "6f7862fb05ff851abfa5ad379099e03a47c97902",
+      "sha256": "63a42f263f623baf4070fab020949902657a27bb12bed9a5381f616f9604e54b"
+    },
+    {
+      "path": "run_premarket_early_bird.bat",
+      "git_blob": "6c6572fec4dd42e7b4e8ea3d2205bacb6fcb991c",
+      "sha256": "66b82f7940335890d0e68e33ab918180f1073c7095f5a036e2daf09e93965d35"
+    },
+    {
+      "path": "run_weekly_optimizer.bat",
+      "git_blob": "11d29cba90947c4ce49484b0e20f3db7ccd408f2",
+      "sha256": "15bb5c65b7d1f164d4f66fcfe53880610338cf3bbeabcd7d1cf7bf2906283a88"
+    },
+    {
+      "path": "scripts/add_routes.py",
+      "git_blob": "91f0f15a68fca8e205cce1e8504bde0b5b23fe55",
+      "sha256": "16adaba410e613f29c0e657085ceefb853d908b195b9b5fbd2bcf80826fddde8"
+    },
+    {
+      "path": "scripts/inject_market_pulse_js.py",
+      "git_blob": "0c64ad303d6e0abec486451a780f8a8eefe7fbb0",
+      "sha256": "8b258ebd30e1129c9cd030e0506d961c088c5b70262b7570ef48fc5f819f99a1"
+    },
+    {
+      "path": "scripts/inject_market_pulse_ui.py",
+      "git_blob": "af6914a7db5fe6d6f9dfcfc7e94ed376939672d8",
+      "sha256": "7bab640f64d11730ec47c8d909d4582e92089887fff2a5a717a99e51032fb96c"
+    },
+    {
+      "path": "scripts/inject_studio_js.py",
+      "git_blob": "1847b5c9cc4b6e50becf28838254b73c9f5c6bf9",
+      "sha256": "0496d1a1b7a87cf01ad684c1e8fb134655e10490b0e8907ed0c8ca61092bbe50"
+    },
+    {
+      "path": "scripts/restart_server.py",
+      "git_blob": "cef225de4c3b6955320e5fcbf16f258d467bc060",
+      "sha256": "46d2a98e0473706b7c27817614bb18381ea19233d1f7a4d0782621a2ea548262"
+    },
+    {
+      "path": "scripts/sync_dashboard_twse_calendar.py",
+      "git_blob": "2bc30a40925d767219f2f3bfd26bf2cfb14698eb",
+      "sha256": "b70e8aacb0ff143e5741e3892711cd300e80bbb1edb037d940ba4c31a420b6b8"
+    },
+    {
+      "path": "scripts/test_d3_sum.py",
+      "git_blob": "c7e6ab1c9cf9ab3b8077cfdc30e8f445db700c62",
+      "sha256": "c53eaeab6e9cd1c15f39c108d93211839f069d6be4dd768b76223fc269894ada"
+    },
+    {
+      "path": "scripts/test_pulse.py",
+      "git_blob": "63657d04a625c09def186ee76cab75e21209f5e4",
+      "sha256": "aae14ac03c8659f02578f7225364ff6b6eeb6cd763882886cae227b2c0a8ad5b"
+    },
+    {
+      "path": "scripts/test_web_pulse.py",
+      "git_blob": "3d9d81d1ac863e5c21b791b13cbcd6ba65c0005c",
+      "sha256": "c1643d0311cf7dfa22dc8b23969ebfd875fa804b979062e6d34d6906eea368ff"
+    },
+    {
+      "path": "scripts/update_treemap_js.py",
+      "git_blob": "7277694babe3286402139adf2fe90d89bace57a3",
+      "sha256": "b9e297534c2e4d9557d5a45ed7c95254af820537c477cb6e0948d0c4b518f67f"
+    },
+    {
+      "path": "scripts/verify_live.py",
+      "git_blob": "3da2432e4e81986ceb9f2f56b24226c1b2ab33d1",
+      "sha256": "7574990fde01257984fbadd121c998fe15c4b14b67b38a78b3cee94cf7feaaff"
+    },
+    {
+      "path": "setup_task_scheduler.ps1",
+      "git_blob": "c24d36a40310102079e47fd5c39ba1e8271bfc8f",
+      "sha256": "036b1cc7e7217ac1597e00823424eecbcb5adb4b0169b9aaf49f68386b1ebfde"
+    },
+    {
+      "path": "start_all_etf_radar.bat",
+      "git_blob": "0e1c75fbb0f429a6501caec2e1879dfd271bb06f",
+      "sha256": "94b2c01cb40a712736019f5b0bc6fdf1895578095a220d70cc021822a43fe517"
+    },
+    {
+      "path": "start_all_intraday.bat",
+      "git_blob": "209fdf926994946052d6123f605c84c696d87832",
+      "sha256": "e1a10998231b3bdebd8343122110746eb9200ff7900cc81c6df1fa7e71c468d4"
+    },
+    {
+      "path": "start_line_bot.bat",
+      "git_blob": "b90090e382e5a9b83f924882259798c92b95285d",
+      "sha256": "ae8fdc4397038e5d640a2d6927e7c2c0afbeab8dcf31be66250e17d63d5c5f35"
+    },
+    {
+      "path": "start_line_bot_silent.vbs",
+      "git_blob": "4d4ed7b966f3f8fba3d21d49f5c89996ee40f37f",
+      "sha256": "03a103c5e5aaa709cf0bff284456fe523ce4c8f4754efaf8bbe2e59da9e834be"
+    },
+    {
+      "path": "start_silent.vbs",
+      "git_blob": "056981ae2fa3934245f957b1018397da15cdf2f3",
+      "sha256": "62d6e735adcec876627981480664114f9e941387edbeb0c766caf7aef315fcf1"
+    },
+    {
+      "path": "start_two_stage_radar.bat",
+      "git_blob": "2dfff3701578399e2416762a3a29ed698f84e136",
+      "sha256": "adacba87865f61e42e19fc3e64ea80bfc6596a2952e7f99a9a85b80645123e6c"
+    },
+    {
+      "path": "start_web.bat",
+      "git_blob": "355d45ef25af633d2a54dadb954126b2c5b5546f",
+      "sha256": "ea8f34854d77bb78199282bac53783a5e976b94f2859d36428008ed50c07138e"
+    },
+    {
+      "path": "start_web.py",
+      "git_blob": "e934a4ca99bec3011d292f71fe0be205a2f238b5",
+      "sha256": "79970b08bd95ffb7e76777a267583411a22d71c17ec37283e58b73ebdb4a0df7"
+    },
+    {
+      "path": "stock_analyzer.py",
+      "git_blob": "90da1cdfd9fc3fc09efadf6fbec39a4f91aabc08",
+      "sha256": "d82a63935b3b77dfb1b9b05fbf709e2d7e7f821be03f4ada60384415f360e09a"
+    },
+    {
+      "path": "stock_dict.json",
+      "git_blob": "5b6290bf31b56d9678e812ef06f5739502ba267a",
+      "sha256": "0033173973435ed77f10d94d5d1e0fa2db345fcd1faf8f4f1c0c05bc1613910e"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/README.md",
+      "git_blob": "0e5cd5d956daf4af28c0ad9fc8b5bbebcdef0440",
+      "sha256": "18db233a10e881e2781e8a43091bb023d438b06c4466334879fa1ffe68732bc6"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/SKILL.md",
+      "git_blob": "05701bbe5ff6520582bec214288652726572fcac",
+      "sha256": "05ce39e5acd0465251c11eb5ca6f30628f466ea857f9435518792a128f318f03"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/analyze_results.py",
+      "git_blob": "2368a35a56e9d5578a7090e5436b74649003d5ae",
+      "sha256": "72e2d2eae512d12d416fb1345dd55c098980e19d3d4a8147017d569d68bce703"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/backtest_engine.py",
+      "git_blob": "1b166ec87585cda1df1431e9730f179395386974",
+      "sha256": "4e8750c929a34620b4aff2a69bb99290ccd45ecd2a14a07ab86ff0b01d0e3deb"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/backtest_summary.json",
+      "git_blob": "4e4768e4a8268fcdc5af774194775625f96885f7",
+      "sha256": "60c7efcfbd6dc575a5d22b3b0e14bc49fc440196dc160d7b4dee5a1d82e25c49"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/backtest_trades.csv",
+      "git_blob": "b383da7aa681815817a7c508fa753ef3b1f1d5d0",
+      "sha256": "bd30e6b6bde1467ec67e3558499d19dada6cbe16282721247683e75baa864842"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/download_data.py",
+      "git_blob": "cc74e4f676a7ee9c79b357a74aca016ceee1c5dc",
+      "sha256": "630d214dce32cd4f687c9a0a00a25e56c98df295cc0c17ea7e9fd39fd1e67c25"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/download_t86_clean.py",
+      "git_blob": "f18a86b0666d53a816b050f93eb66fd212a4ca7d",
+      "sha256": "e6945ec9521185959113a381d8fbc7f1fcf6d88d69a9d561411e52f4e1e095c6"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/ohlcv.pkl",
+      "git_blob": "49358b78899a942c1589134ba553275206ef78bb",
+      "sha256": "1cebbd21e170b20fade63220b53e66fadbcbcd315221919cb03dac41a99b5667"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/optimize_strategy.py",
+      "git_blob": "bb3afe38afa08b71dfd2961393b24257836d5ed3",
+      "sha256": "acb6bb0e7d3b5d688ba3502a863aa8f407a8f61dcd6b87be607f778d8172e034"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/stock_names.json",
+      "git_blob": "1bd43a92d8ccfe6a353d558c186a67097cc7183b",
+      "sha256": "8eea93ad4ef155b34b4e7899b44b6463d792510d50756b1fab6717cfceb11694"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/test_v3_backtest.py",
+      "git_blob": "33b3222a96628b9d6e8f6253c41c90b19701df77",
+      "sha256": "185a186e111cf799c73a93e03f2681d91c99c8946c03cdb98299501e75380026"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/test_v3_fast_backtest.py",
+      "git_blob": "88bf351fba4fc764e4a2fea4dfa2512309425d92",
+      "sha256": "56b608cfb6f94afd9aee642771f2cd2193bd6703525b350bbd30549763b9ef70"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/backtest/test_v3_optimization_grid.py",
+      "git_blob": "84bb18674160fc95cb4880dd9ed3b2b8cf5069e7",
+      "sha256": "32d3a5b26eb6533513cd858f0a7b5a705fa7ae0a3bba3b2c98dd341b2f831a29"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/intraday_scanner.py",
+      "git_blob": "4149abedada5e75a049808eee7355b12f1f8b167",
+      "sha256": "1ea15368f63879aa9befec95d23e1d53cbb326022dc128a694d081fdad5687e8"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/legacy/tradingview_strategy.pine",
+      "git_blob": "034b4a241e0c8998a84bf414aa76a1d4b9be2064",
+      "sha256": "236bc6fabe31dc2ab9cc136f1c1617432949bdf8fbe14a062145a6c3f43e3410"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/legacy/xq_radar_v2.xs",
+      "git_blob": "d08c48a70ba5b980795a4991b7e5a505d49b159f",
+      "sha256": "d7cbb14787491b7215f323b165ee0ae27a375aa2985538152dd7a6bc3c49c6b1"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/legacy/xq_screener_v2.xs",
+      "git_blob": "441bbd4414aced1bdc6296bf41e116811b5044d3",
+      "sha256": "50a77a76e9c578134ca31b8b70d47031e278c9ef3e2db611cefbe2d52abfb6ff"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/legacy/xq_strategy.xs",
+      "git_blob": "441bbd4414aced1bdc6296bf41e116811b5044d3",
+      "sha256": "50a77a76e9c578134ca31b8b70d47031e278c9ef3e2db611cefbe2d52abfb6ff"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/result.csv",
+      "git_blob": "7954631fc6d0d1bf96e1dc4f68e2f5ec10bc7ce7",
+      "sha256": "675acff11f018ef60c2cf06b0f13770544c4c206ff84660dc32a440a150335fd"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/result.md",
+      "git_blob": "99e97a154e663f764768a2ab96dd0ce5fea6685e",
+      "sha256": "d9e2e59315168ca629c6c7a5a07121d7b0c75e8df6dfa6af5b219819fa63d35b"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/run_daily.bat",
+      "git_blob": "07f3d90ddc2f852f35fcbd1b0d380c8ff46ff943",
+      "sha256": "2514979a871fe452f43cc03f6864284e2bcb4ce8a2849c45b729b3328498bf60"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/screener.py",
+      "git_blob": "db7be9b60b8cbfec6e772eaca60dda1844f13851",
+      "sha256": "1d4cd97bcf9023ac534951319a628c5f061dfa281dcb6b16d1d702e6e3273f9b"
+    },
+    {
+      "path": "strategies/01_bollinger_reversal/start_intraday.bat",
+      "git_blob": "45121033ffb3085f9515f7eab55a466fcec2634c",
+      "sha256": "02f5852800f6716bb02de0f557b2a9a600b9ecdead6d72161ad4140a615f58ec"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/README.md",
+      "git_blob": "83341d7e37e47b1903cbef13b6e438a0bab125f4",
+      "sha256": "c02dc9d7d795a981b1f4d1d7c950d9f1e3f299743e349e3866a751470ec91d13"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/SKILL.md",
+      "git_blob": "037132ebe0e29a6c8d041879db0daf536ecda2fe",
+      "sha256": "c9310177927ae8f253a5c52d76b01eefcc3db76ed426b6f9d2db8552a13698e3"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_engine.py",
+      "git_blob": "6cdb2b5ee96aec849b025794d5ef4bfafdb148b4",
+      "sha256": "bdad2d2c0eb0552c085bce6a91446dbf47e9859e317572cdc4c90a1742330660"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_equity_curve.csv",
+      "git_blob": "0c50f47995a24c1254115196f3cbb19a9bdb195d",
+      "sha256": "cadd419f67b428f1093214bd3dee15c6767ef7b66d4cb73652a7dee67e8c1699"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_equity_curve_optimized.csv",
+      "git_blob": "c95d7d5b10780495f7d858faa3ff0a19b55483f0",
+      "sha256": "4bb775fddf226e9ffdc4535b21991007670920396a861b297a290a346b23bc83"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_monthly_returns.csv",
+      "git_blob": "8d8aef1ab3ca8a3b8cbb6e0c3e7f7dcf1d22f5c9",
+      "sha256": "bfc90e4abee40f281ebcaab435d0ebfe77decc1e22b910885d986c3cbf2dec0e"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_monthly_returns_optimized.csv",
+      "git_blob": "3068ced8dbc8c477b510c1ffd1715236425c26a6",
+      "sha256": "ecfe017f2881893c8d6c443c046651fc0eb496b632dd7ef3226270523b99d979"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_report_114_115.md",
+      "git_blob": "c0b9da50f5f7ed2a1a5342b056c7210daf652869",
+      "sha256": "4d8a6a29cd35c18d3ce39312723133c0b01889072bff6cdec31f1e77b25564be"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_trades_114_115.csv",
+      "git_blob": "9570df9cfd0ac7a6ac538fc3327e501d61062bca",
+      "sha256": "725d424047647da8dafcf3f85856adb13028db6d5c187ea157e2149202844e03"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/backtest_trades_optimized.csv",
+      "git_blob": "8f031417e18ea28e29621b3752a0db339c415299",
+      "sha256": "b54bcd30e889b383e5f5110310eab13683cfdc33367be2c2edee770c9431f540"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/download_chips.py",
+      "git_blob": "492ddf77f789d8deb04fac5b4cd1eef0a6a21bb1",
+      "sha256": "852ed9e0bcb3bec425efa33a642c1da3a57c53ba0ce5ba6dad74880e5c79416a"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/download_prices.py",
+      "git_blob": "f02c31acf85579f6dce97d8b0ee2266f02c26621",
+      "sha256": "8701f27e150edf846a6f8c12700aee3115183a207669e3463cb5a4bdacee316b"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/intraday_scanner.py",
+      "git_blob": "39cc994e3b9900d1f0ac112cae58ec555997f312",
+      "sha256": "9d7b403a24276aff1ca36ce3a16e1ede673378f61f90508445c00b6af885be44"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/legacy/tradingview_institutional_momentum.pine",
+      "git_blob": "f385791307b97de918ac7e2e1d9e7313e3decd6a",
+      "sha256": "c87146fa6e522babacc575b0d56d5c3b99ca0f0f631ce3146f1c85c8c40f2960"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/legacy/xq_institutional_momentum.xs",
+      "git_blob": "f17fcf21bec6cabf9208b69dc4c0fb96c9811e0d",
+      "sha256": "6b1b1035a72a040cd3397e1f9329fe4605ff15ec2e7cb6b9f40ea8452a226130"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/optimize_research.py",
+      "git_blob": "064be9410c23b14a0a315ccab3ad292cd718f4bf",
+      "sha256": "dd3c70ca6779908a30f6b1f10b9a7331e8d29bd4870d6afe5fca36128151f8a0"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/result.csv",
+      "git_blob": "70400f70fa77171be58ec9ef649ab54e69d58081",
+      "sha256": "d3bd5858c5cb8181b86c3a1523c50a34615ed0a9fc4c70f5c19f3f2621feddbd"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/result.md",
+      "git_blob": "bda363925c697aba451b836ba97667223e994161",
+      "sha256": "efaad14ff11d793a0d10d35481be78fc70014a9cae54ddb7b3609f49f00fb785"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/run_comparison.py",
+      "git_blob": "f887b341332e4df7b9d09bb2c8a8ee1dde820937",
+      "sha256": "cc173c5d5dd4516f48dce7bb5360d8e4e54ba91c1cbbfadf2260f4568c810ad4"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/run_daily.bat",
+      "git_blob": "07f3d90ddc2f852f35fcbd1b0d380c8ff46ff943",
+      "sha256": "2514979a871fe452f43cc03f6864284e2bcb4ce8a2849c45b729b3328498bf60"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/screener.py",
+      "git_blob": "aa9e9c6cc2be4216a9630adc9665038a63628a9c",
+      "sha256": "637d1e00a9a5ba1f41009c9198be24d656cbbc1f732617fc0e986af88884b92c"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/start_intraday.bat",
+      "git_blob": "9a7c2e3df5602b215f95ade9f30e35756d787765",
+      "sha256": "e4fdcb37e0c067235597faa6c1ce268eb7b903c3656ccb96d1a5c781681aa3fe"
+    },
+    {
+      "path": "strategies/02_institutional_momentum/test_exits.py",
+      "git_blob": "ce4a3ed6816a5e37365b117f280108b7f37aba1c",
+      "sha256": "4e491de5ba912612092fa986294567dbb6012bd7358c1ac3e4e256df760b7050"
+    },
+    {
+      "path": "strategies/03_short_momentum/README.md",
+      "git_blob": "95ad4c34f7f2558eb3de4ccf2e36a30e8446d0f3",
+      "sha256": "27fa4f36b200855cb2d565809b02c35e5e2bf2e642f85428fbbc75249b0af179"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/backtest_engine.py",
+      "git_blob": "06bcc3a79854829f4a57c1f5f124a52d8decccce",
+      "sha256": "a8775f00987ad85f9317579012d95697223ad2184c7b4863c30a040213dd1f91"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/backtest_report.md",
+      "git_blob": "5b066152d4d2c1b242c632f792521c1c6d3f752b",
+      "sha256": "c4e0686104d8030d291971a5098243e0487ad8907528c0855033232ab52b6c7c"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/backtest_summary.json",
+      "git_blob": "701ef495709656c0cbcb6bca40601c3221dedb40",
+      "sha256": "35d1d1c2577118def6cb8b6224f345f091713d9b64f2dcc8aa1f66ab3440e601"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/backtest_trades.csv",
+      "git_blob": "151840ed603e9d0efe08b82831074be50223c89f",
+      "sha256": "030986e939d24b7335b21a405e036d72c1d0ff43402e012cbaf337adc3458d97"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/download_data.py",
+      "git_blob": "d329f1f704d5290086cb1a41a39ab3c4c3547920",
+      "sha256": "29a07404e605942529a8ac82980cb36eb07571ea2ee363406e06fc011d1d8e63"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/ohlcv_futures.pkl",
+      "git_blob": "350112f3fe6e19cb421f75f599418b68f68704ea",
+      "sha256": "f2325f2ae74adfdd0a881609837c8db9651a1a4aee42a25804dbc0266a65512b"
+    },
+    {
+      "path": "strategies/03_short_momentum/backtest/optimize_strategy.py",
+      "git_blob": "3a78badd10cd79675791c4b7ee6d2e1ba4658bbb",
+      "sha256": "7bd4e1a9ba636451c498010e442a06150113cdeab784e2c29ce13cbaa24cf500"
+    },
+    {
+      "path": "strategies/03_short_momentum/intraday_scanner.py",
+      "git_blob": "7bb0d9ce225646b6a8c6fe0768697f6d17d6105f",
+      "sha256": "b7c26c6c9489d7467b4635472b2b193e89a0e396402f4192b420feb762c17be7"
+    },
+    {
+      "path": "strategies/03_short_momentum/legacy/tradingview_short_momentum.pine",
+      "git_blob": "5223950c081deb36ee46e74e6c69c1975c52c4ff",
+      "sha256": "760b51b7826b2b3f6f82cb4523a70c3c3fdbd62aaf80e40d4756c72b204abb53"
+    },
+    {
+      "path": "strategies/03_short_momentum/legacy/xq_short_momentum.xs",
+      "git_blob": "fb221c2290a6209e7e6f97b138ddf6ce0b4173fa",
+      "sha256": "9c02c5eeac26823f6dd13e82de4e119e48bdfaa6b255955bd109bbf5dbd085e8"
+    },
+    {
+      "path": "strategies/03_short_momentum/result.csv",
+      "git_blob": "57e70ebbeace25a701cdb14770ef5fd4656e54fd",
+      "sha256": "bb598833a34866b3350945eb5890f158e46ff90066663211cb2a9eb3dcaa250a"
+    },
+    {
+      "path": "strategies/03_short_momentum/result.md",
+      "git_blob": "a8ad985fcaaea06fc00238b096def987a04344f7",
+      "sha256": "b7c7a4c295aa305bedfa7451249d655edf04c8947887149032f92e1c0ddb5c98"
+    },
+    {
+      "path": "strategies/03_short_momentum/run_daily.bat",
+      "git_blob": "07f3d90ddc2f852f35fcbd1b0d380c8ff46ff943",
+      "sha256": "2514979a871fe452f43cc03f6864284e2bcb4ce8a2849c45b729b3328498bf60"
+    },
+    {
+      "path": "strategies/03_short_momentum/screener.py",
+      "git_blob": "c903dfa3a6d8d0bb2e2cd70b8264add557955eef",
+      "sha256": "50ad91439106e57fa230059fcd4c72c0f10fe5b4e11b9860bdeea7899a6bd781"
+    },
+    {
+      "path": "strategies/03_short_momentum/start_intraday.bat",
+      "git_blob": "8dec15fbd6366e5296fa115b6d2f4039eda7566c",
+      "sha256": "a41b292a4bd9726c2cd4ac186f2a3685512765f91824ffcf6092c87275d03640"
+    },
+    {
+      "path": "strategies/03_short_momentum/stock_futures_list.json",
+      "git_blob": "d7bd99740b9aaf2f78caa89ba4c25ff126750367",
+      "sha256": "a27c2bc59febda69249f17d0e0b9920c4cd47aa7797f01c6f6afde5694ad8f7f"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/README.md",
+      "git_blob": "859f99a5c087447b9e5c732fb95c0f2b145647a3",
+      "sha256": "cecf5b6bf1b1f95643a42d100dbd5a59f98ddbcfbfa8e3648e8ebc352ffa2221"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/README.md",
+      "git_blob": "40d3e765a795be517ab0a0e579217b4ed6f01e37",
+      "sha256": "da50a9395364f32799ddd8948d80b795d9593d564cb2a53f5362edb04d43d7bf"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_engine.py",
+      "git_blob": "dfc1199374c1853d4c251de987bb8a90415a56c2",
+      "sha256": "eee5bdb62f5792808289735c6c8f25bbc2a0d29a4bd1bec0c1920e0cbf73e477"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_summary.json",
+      "git_blob": "b2a2715991075ce4f6d62c64f1e1fe5f08dfed4e",
+      "sha256": "b6c65b88a95126e27a951840c85635e3d1d782e3fe85bb4b231bd8ed09a8936c"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_trades_listing_date_four_price_vol500.csv",
+      "git_blob": "c7014f839aaac9a2f3a81db69c50ab1964156b99",
+      "sha256": "4f869ad2ee9dbeb4fc389c0a3401755bf587263e2a6485163f0b7dbfb87a644d"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_trades_pricing_ambush_buy_and_hold_lockup_vol500.csv",
+      "git_blob": "4ed46d79da454dfd153d7948b63452ac1de2880b",
+      "sha256": "96156e4edd5d722b9f491ad3310b18a6f6095256a7a3e6772427e3593384a811"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_trades_pricing_ambush_conservative_tp1_vol500.csv",
+      "git_blob": "6c979ddeddd3e52002a9250c2109560244b9669c",
+      "sha256": "0eee87063702d9a7f40a39589b59999a927aba26b87fd71c8f3e7a8a538a03d2"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_trades_pricing_ambush_four_price_vol1000.csv",
+      "git_blob": "d79bf6c123c72d46d52e6a6b207690bccc8f2783",
+      "sha256": "698ad53d508f26dbcbac6229801bd44ee4eb55a3bc24f55a1b9b912d10624571"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_backtest_trades_pricing_ambush_four_price_vol500.csv",
+      "git_blob": "957e80abb93f01703086b8e8c47eed1ef5fbfc1d",
+      "sha256": "9042bf14f2d8a03c9ac1aed7bb8f9515cf772f2efa6f45cc3b13294861297f46"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/cb_issues_2025_2026.json",
+      "git_blob": "2f7b53118595e346700f8e6e25def1a9343a2499",
+      "sha256": "df7ad0423ee2ed769bb1da25faee5e218282af45bbcbf272a773b15ad8c0fddd"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/detailed_trades_all.csv",
+      "git_blob": "0543109665b6c587011f3490041d641766389403",
+      "sha256": "95c4c321b0da61b17a5ebde1a92017cfbeb3a470f9798a2486febb31652805d3"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/download_cb_data.py",
+      "git_blob": "3d666dd40ca12f46f3875113ff66a6f3322f4621",
+      "sha256": "6651c786541b52037ea034ab2f4f6a7b85d4db2a717155b43785fe77e436027e"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/eval_matrix.py",
+      "git_blob": "630c43a4054c8de04155f300d17192527568e669",
+      "sha256": "71a7c43e0c220e2a96e385b73a09edc7f065ee9fe247993aa6c42615515ec68b"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/export_analytics.py",
+      "git_blob": "8be4a5473d7ab282e86d79bd6f7c0be12c68774c",
+      "sha256": "9e98c609325763334db26d239f47ae9a3367c250e24a74baabcbd61d54d33837"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/ohlcv_cb_stocks.pkl",
+      "git_blob": "dc82f9bf2652d7c385e69c4e158d11c3e89e6a35",
+      "sha256": "07eb95b0d397ad7880c1fe89b7cabde5dc1c326ddfa06f36904c391af9b2b5f1"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/optimization_matrix.csv",
+      "git_blob": "b3935760d53658773c94e1b05bba6dc946230dd3",
+      "sha256": "aadbddedfed8e0e1c6886312bfb34780f867858ca58cba1793374731eb09a97f"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/quarterly_performance.csv",
+      "git_blob": "916035c3e55118a451addad7011bf8f516eddac0",
+      "sha256": "adab6f06186a1871544270297e1e837218fc43a8edef37888defb2f935713fe7"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/backtest/summarize_cases.py",
+      "git_blob": "26c0697dfe03e50cbae3ae9ade354e8cfbdbdf5b",
+      "sha256": "5902acaa6006da635102ec27730a55eb953df0c6677bce9281c42817688d7a94"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/cb_helper.py",
+      "git_blob": "7c6c46ffac70cb62cde5b1b8e280c19cd33035ac",
+      "sha256": "821020b088e50d3c27f8f59286c35aff2068d3059c9448178156775d55c3aad2"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/cb_pool.json",
+      "git_blob": "929ebafd1c1368d16668f8e7e23d79ecb38c5978",
+      "sha256": "ade9506bc9c2c9bd67aa9cdfac0364f7054d57c7d19bb503265044853b954dce"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/cb_pool_tpex_cache.json",
+      "git_blob": "5f44970b68cba574ecdb8a43a51ca3a7ed947b31",
+      "sha256": "3990bdb85bc0a583abca04e9ded3e4d1ef11d753013ec8a82142a8f312b5933a"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/intraday_scanner.py",
+      "git_blob": "979911fb22a2b264cc4b0019caa09eaaa16fce0c",
+      "sha256": "ab912a607a80cf248455fca21f0a8aebf6cd23a8808d6f922aeadddcd96d6b26"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/result.csv",
+      "git_blob": "4cbe54c2b69830401ce4f33c9ee8f7c342536a93",
+      "sha256": "0f5be6e01b12c87dfd3e8a3003a06b261922d59d87308280c4ef9845d3e921ea"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/result.md",
+      "git_blob": "606ef1deb3005240444d26a933a283bbbfb1aba4",
+      "sha256": "e4ab610b7d91ad7001780c446dbfde42dc0fce9a6341f35e1553a944d9b06bef"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/run_daily.bat",
+      "git_blob": "79f1d2e3b2dd154a4fb6d4c549440dd7c9fb126a",
+      "sha256": "e5138e3d73cf4999641f22099f1a9945fea5112964432a79a6cfeb9b27a5ec95"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/screener.py",
+      "git_blob": "9a546a9a6e91d8e1d561afb10964458a4d0f1a32",
+      "sha256": "923bf892ace518d1ff0c3018f884ff0f8cc158569fd9dfbc7398c1b8fb3b5b75"
+    },
+    {
+      "path": "strategies/04_cb_pricing_ambush/start_intraday.bat",
+      "git_blob": "37dd5b40a610ef2d6f82e04a494bba4ca45e0feb",
+      "sha256": "a02615bad27d2a161bf324dafc81247c1fc33ce26ebb3cff0a659ef92fba917a"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/README.md",
+      "git_blob": "eda881e0e6f093bb3e40ee241804f3dd3a31a512",
+      "sha256": "409d12db14112f30dd7b2f0a975d9a93ef02fba51e691cc4e0e9176c91d0235c"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/intraday_scanner.py",
+      "git_blob": "67c7c6c8c7a85b40b5e15289b84217da42af55c3",
+      "sha256": "49e52b4bd603bd59001003b74358bd25a1d14f83e1779125eba2c4b44f4d01fd"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/result.csv",
+      "git_blob": "0f4196fe2917ff377c6804817958df76f8fc3983",
+      "sha256": "25c36a0654a5e464b2b591b0876f0c216b666c861e34db94b39e8156f83039bd"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/result.md",
+      "git_blob": "c98556b477aa2f522e18c78f4d1bdb42b387fbbd",
+      "sha256": "fea795857a292fe02c395ff0a5a756c30097d041f8d57502cab6ad2f965bacd7"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/run_daily.bat",
+      "git_blob": "07f3d90ddc2f852f35fcbd1b0d380c8ff46ff943",
+      "sha256": "2514979a871fe452f43cc03f6864284e2bcb4ce8a2849c45b729b3328498bf60"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/screener.py",
+      "git_blob": "34b5d819bc6abf39a0c9717134d0702a5793337a",
+      "sha256": "bc60eb107b65ae4d1a2348e08358087f427a0a7fe49c71bcec96777a9f04bce9"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/start_intraday.bat",
+      "git_blob": "b5d746c7454206bb794ed6abbbdd0ff390b99aee",
+      "sha256": "1c0df2793374b4e3044e1d56b534c2957fae246ea8571e0806519533b44a4bbd"
+    },
+    {
+      "path": "strategies/05_stock_futures_long/stock_futures_list.json",
+      "git_blob": "d7bd99740b9aaf2f78caa89ba4c25ff126750367",
+      "sha256": "a27c2bc59febda69249f17d0e0b9920c4cd47aa7797f01c6f6afde5694ad8f7f"
+    },
+    {
+      "path": "strategies/06_volume_surge/README.md",
+      "git_blob": "3a2d902afffd1c84eb1f2180c3201f8adc3d66d5",
+      "sha256": "a7b514fd8a58533238a024a1fa464758d36ef995225069665580ba1c884d48c1"
+    },
+    {
+      "path": "strategies/06_volume_surge/intraday_scanner.py",
+      "git_blob": "ecd6f55ded0d90e07a212409c12c5a8a46ef3cad",
+      "sha256": "c7096b1aeed01fba5077dedc28452239cec36c917d765eb998d5ec7e130eaaeb"
+    },
+    {
+      "path": "strategies/06_volume_surge/result.csv",
+      "git_blob": "1d77ea813698a145f9609ba7ec3a39044e3b5b3a",
+      "sha256": "977e6eb888a7f081714ea5fe42961a202831623f7ae1f9c1aebf6058acc75815"
+    },
+    {
+      "path": "strategies/06_volume_surge/result.md",
+      "git_blob": "b28a46078d338ef8c9f1fa851f51ccfed7700dc3",
+      "sha256": "3614e94dbf7748d10d4064f9f8e45f71f7cee6a9dfe24651bebda84f252a3d18"
+    },
+    {
+      "path": "strategies/06_volume_surge/run_daily.bat",
+      "git_blob": "07f3d90ddc2f852f35fcbd1b0d380c8ff46ff943",
+      "sha256": "2514979a871fe452f43cc03f6864284e2bcb4ce8a2849c45b729b3328498bf60"
+    },
+    {
+      "path": "strategies/06_volume_surge/screener.py",
+      "git_blob": "8fc510bc07fc42457f404bfde38a3201e23e796e",
+      "sha256": "c5b9a5ebc82e97ce2fa0dabc2f6b97a5bab78326a16b68d593f5840088978ab2"
+    },
+    {
+      "path": "strategies/06_volume_surge/start_intraday.bat",
+      "git_blob": "b1b74bc6bfbc5d24f1f5268fb0ded63a13a36ae3",
+      "sha256": "b9f23bfbdf38256d2fdedac0c7c444114fb67616763e4ba0db707b8919de4912"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/README.md",
+      "git_blob": "f93c0c51a08b656985eabca49da758601482d1f9",
+      "sha256": "9ead2f07203554abbbd61f1ad9bd2c32a6ed9d4a7fdecfc50b814a95b0e1a79c"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/intraday_scanner.py",
+      "git_blob": "890effe1343c854f317773f98da3899696c38a62",
+      "sha256": "a5a9f8b686df195910330c33804fc82b865fbbd313705e4999639ce38417c91d"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/result.csv",
+      "git_blob": "b7927db57f33340d3aa753da029cf64e316cd223",
+      "sha256": "6d06caa38ebef72a6eb8b938eeceab7dc54beaef5c6b24e61298e41876fceb93"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/result.md",
+      "git_blob": "3e82c6922473ee6bebcdc2da5645526217beb72b",
+      "sha256": "5bad77bdbaa8a1e18b8cd1219c7197016cf6690c4bdbd1f12403a25f3dcda163"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/run_daily.bat",
+      "git_blob": "5c5df6fe104265f3494914bc58284510155baffa",
+      "sha256": "bb2881583c1cd0759aeae33adf182e682d3d65f70c2a79286b7ed4cf2e0f71a7"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/screener.py",
+      "git_blob": "7db6dec9e56e2fa582b728f2e5cfb59018545458",
+      "sha256": "42fd6e48e38d3f30ea210e534a901a4667a4e05ccfce289631c9686b0fe96f4d"
+    },
+    {
+      "path": "strategies/07_margin_call_ambush/start_intraday.bat",
+      "git_blob": "7766b1f029504322986598b719aa44d8a6278b7d",
+      "sha256": "5b00dfce64b611c26d885ca61cd3a687aa800359715095c88046bb52011c284e"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/README.md",
+      "git_blob": "0034ea72dd36343e48213636463103ba0b94e63e",
+      "sha256": "d0bf4756c45eb54582a03529d1063c21a24c16b39cf00b3fe4d718fc5d76ae20"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/group_pool.json",
+      "git_blob": "511c69260f9666e23aa1d2220dd8afcf05ab2e1f",
+      "sha256": "8d991f0a0c869e160142ee88e515dc1ee8bf4a064a73e9df1d9b830af7b859df"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/group_ranking.json",
+      "git_blob": "8310f3f010f817b9b21ad373750333e2c08e8103",
+      "sha256": "0b6f33864eb13e05a1d5ff290e046a8c673d7a46faa74b667564c38e8b54f919"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/intraday_scanner.py",
+      "git_blob": "b3d18f328a30af1a643f87b99261cb66c51c95fc",
+      "sha256": "e75fcc83f8e0cc28ee4449b5f97f27c53128dc5ed5880a091b26399961cfdc40"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/result.csv",
+      "git_blob": "71bcc1cf9d7d1daab7ead3e3b2338331b5872e50",
+      "sha256": "48083550afec0d7adc0445ee09b5ffb514fda0c95d55727e411f4b60c3673001"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/result.md",
+      "git_blob": "916105021c64a7d1a665d0542936b84eb366623d",
+      "sha256": "85dd00f971e3599d83e2c07dd1e3908a579d4c68dd72a8944b7e45234580c3b1"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/run_daily.bat",
+      "git_blob": "5c5df6fe104265f3494914bc58284510155baffa",
+      "sha256": "bb2881583c1cd0759aeae33adf182e682d3d65f70c2a79286b7ed4cf2e0f71a7"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/screener.py",
+      "git_blob": "53c4a5e83c044a7dfaba3f1fc5ca11aad5be934d",
+      "sha256": "0359ddbcbbfd7d5938d81712ef5d1a6016c76a48d2037ed437feb249cae1e14f"
+    },
+    {
+      "path": "strategies/08_group_window_dressing/start_intraday.bat",
+      "git_blob": "5cd19cab3d9ceee125fe1b61261931d0e5af571e",
+      "sha256": "d668f6c1ce96e78b4e62fb8730eb4bbf7cfafb471bb5c5482e9fdf02a263613d"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/README.md",
+      "git_blob": "63bad90e5d1bb58fff20856b3b7158088bd4a29f",
+      "sha256": "4e73b4f7e2cc8c286469a13975a4839437c2e89335b66872d6f79c8a41e4fd89"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/execution_history.json",
+      "git_blob": "2da79e96250cb5d7b6314ee39d682c36b47559a6",
+      "sha256": "42912accab465097f9befbd5c03cd654e2e63035d0f51cba123189b67f4ce809"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/insider_pool.json",
+      "git_blob": "76a6500b84e00a724dda0038c707c76c4625c9d4",
+      "sha256": "dd46819984dd2c2bc3a0350a0be89ff5273a0a8d994802c6c0722248f3ab8619"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/intraday_scanner.py",
+      "git_blob": "909007702cc35856718209f00620232e727facaa",
+      "sha256": "9eb7353603213b2b76472c013b63897c32b8eb66f2f6cb1c734e68d20cfa4ec2"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/result.csv",
+      "git_blob": "730ba6497376a6f0b51ee8e2e9408e8653af3909",
+      "sha256": "fe68ebcc8f12f19ece200fc856c6d897da601bbf6604b427977fd900e2c73791"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/result.md",
+      "git_blob": "693a1a6f597f329508cdb786c53eda2b11759298",
+      "sha256": "f420f5cc5a7da57e82f3201914ea887be5e648e61799416d424cfa8bdfa306ca"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/run_daily.bat",
+      "git_blob": "a9c474b674c21f758e675551c7837c48207b8234",
+      "sha256": "fede6fc8297068e210254db6263213b7cceb37a82051273660f167b65ff6672a"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/screener.py",
+      "git_blob": "ff64bd8322efb5e68a3015dcf6af774951ad4fc4",
+      "sha256": "935e275a9a310bb07eda6418b5c704bd9fd8026dc4ea68304a60660672729b5a"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/start_intraday.bat",
+      "git_blob": "b996778be592a0f822b44c5f8f0248c20ac120a6",
+      "sha256": "ae91edad0860833fd31f9762adfcbf985c34038d5d8819e12ca96fdb279c9d67"
+    },
+    {
+      "path": "strategies/09_treasury_stock_buyback/treasury_pool.json",
+      "git_blob": "aa1584825f5b583b10cf32f32ca3f706ce3f4cfd",
+      "sha256": "a7920098336119eb195f2da674812da036411462621ae313b536171fae544ab0"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/README.md",
+      "git_blob": "73d36ce3bc7c33cae984687badfb0cb429ceab24",
+      "sha256": "0273d833a259f058d02998f30c9d8a5e5d2913e8c3b95334d63fb26e7d3c5162"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/intraday_scanner.py",
+      "git_blob": "676ad925175c5525672e9a4254e22b254bb1ec18",
+      "sha256": "49521a5a9dffc4fca4c922605ff710964a08e65c925be60c7dd9726070f782f2"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/result.csv",
+      "git_blob": "a2c4d6da4e1ef1d6662bcbfd92f7abc8f8b11e30",
+      "sha256": "ce5acf7c7d04a584fb88dc52a0686444eda7a6c83f57efd990f93e158e7be614"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/result.md",
+      "git_blob": "bea039f45adec1a8d2c2d32f1882eda7a96f79fc",
+      "sha256": "1a71934c149e8e7485d38b5a1c99431c74d076152176ec89371aa8b8671679f0"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/run_daily.bat",
+      "git_blob": "ed2a25ebf66cf05f06761300190b1df952432c56",
+      "sha256": "1847c574dbfd4c2b1b544ed3dfe04c182a6b01054b7c4db4928cbae2dd095533"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/screener.py",
+      "git_blob": "235d16939f8bb23037e10e3e197ee43139aeaab1",
+      "sha256": "c4f3e4e86bebb03dbb30cd5028417829d09594375e2d892601b21c4a371ffaff"
+    },
+    {
+      "path": "strategies/10_investment_trust_sprint/start_intraday.bat",
+      "git_blob": "8ff28f977e4203b642cc3081c6209f35a433610c",
+      "sha256": "13a9c3e6527d2606703363d7159481b6badbc6660038888feef6bc442a6ce62e"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/README.md",
+      "git_blob": "3e28e6f802a0b71df608cd72dfa13b07d642a974",
+      "sha256": "c7947aa64e1298bcf49adf087d01e33edffd800f124a7c12545f3bccaf846f6d"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/backtest_engine.py",
+      "git_blob": "e1630e4c9d43b23baf413149c074b1b6002fbf16",
+      "sha256": "3a460c14f7e0ca817815c1a561a08e9ff125f49dc2dc59583958a5a52fafa9fd"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/backtest_report.md",
+      "git_blob": "40cf156889989bb6655e272e88eb79f666fd2b25",
+      "sha256": "0625d2d22c5c2cca2d72b775a3fd815eafae9be5e1a9bf153a3bafe2edcce5f7"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/intraday_scanner.py",
+      "git_blob": "3433df2364c2b1916376e9bf8ecc9d0a6c5bbb24",
+      "sha256": "c2d2cb7f3e78a45e774fa887b8c03e936df1f39136c304083a587be7eaf1df6b"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/result.csv",
+      "git_blob": "b4375344c6678c1d327d1dd07fc7da2c90301b7c",
+      "sha256": "796d609a930efb59cf6658e1f385805d23db820d802c8eac26f517712a32b23b"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/result.md",
+      "git_blob": "3e716299a659e9ff30e24b4e5ad8f1e9b75c4599",
+      "sha256": "db171330f17bebea45b755c8133ddccc4558a1b3641f579d19fa5205ebd48683"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/run_daily.bat",
+      "git_blob": "cf09aeebf741fc6c980dd0d8f2f4e4136c71569b",
+      "sha256": "947d6242a32c9326939c96a453c49c273788e6b0adb969e8e336081156162cc6"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/screener.py",
+      "git_blob": "49b44815adc603cbba0c4c05ee0e234a1868ed73",
+      "sha256": "76b9a496589c89d938d97f07338573ead40bf31df997947ab91ef33b4672c44d"
+    },
+    {
+      "path": "strategies/11_revenue_volume_breakout/start_intraday.bat",
+      "git_blob": "5e28614aae4fbfaa0d8bd416e22404bedfa6e533",
+      "sha256": "56e5040795fdd2c6ad3d1304cff3b2cf9068d61028f64dddf09849962e6c419c"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/README.md",
+      "git_blob": "dc353fd0ce32aaa21a36c1ff11e7ecc0b2b30c31",
+      "sha256": "b2e8d6ec5843f20a29fc9a8a17c1d79459bbb2aff76e71f2b6d8e1924fb6907a"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/intraday_scanner.py",
+      "git_blob": "46046a62fea4f33bb271a502de97c4a2e86d1e15",
+      "sha256": "5045d704be7090ee6017fd0c9a3ef04b6ec5976995087961fd373b5b97d09fb0"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/premarket_candidates.json",
+      "git_blob": "43c751873d8f50745e1186901f3f10b6dd852c1a",
+      "sha256": "d49b33e51bfc89633361f91961dfd29c80e29d6bf404cf5bd40cb0b6404d4a08"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/result.csv",
+      "git_blob": "40947dfb3a6cd650f8dfbb214e6c6838b93c20c6",
+      "sha256": "6ef895e6962391051ff8f6728217776cd14a22fd244ef989f9e48ff99a510967"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/result.md",
+      "git_blob": "5ad6ef0d0fa50c55d42a5e7e43b103cef879b3d3",
+      "sha256": "88e0810da4b617318c31366348316a872318851414c9c32e7eda8f2815c3a850"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/run_daily.bat",
+      "git_blob": "0a6cef07be70729836ef144aafcbda80196c156c",
+      "sha256": "9aaaec4e9c8e4c5503c084b50bb00969e08ff2def0a78e6f406d65cc33d3aa83"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/screener.py",
+      "git_blob": "db924a7a5de17b6caf6e83c692a92efe4793157b",
+      "sha256": "69e2d2d2ada010744b2e24316bc32e98a22057f010ef736de30240d87f3483b5"
+    },
+    {
+      "path": "strategies/12_etf_event_radar/start_intraday.bat",
+      "git_blob": "0f6f79c127f4327eee5abc91497e93d666ee649a",
+      "sha256": "a277cfbe94ef09915dc677cc360edf00762c35d7fc73312ffbe3c072a736f66c"
+    },
+    {
+      "path": "studio_manager.py",
+      "git_blob": "67756c9c779e2ea04c41f2fbedc71db101ebbeca",
+      "sha256": "db509a5132e3973e274e15ece8334fb003987a57d64ba8e05b966a1c506d2334"
+    },
+    {
+      "path": "tests/phase1_local_preview.py",
+      "git_blob": "ca913d80ddf36e2c6c7203fb17bd0cfc844aa6c5",
+      "sha256": "aa6b3b18b1f443d45ff1e8cbe87d66864f19d68e033e901fbe3e5f15a83d49bc"
+    },
+    {
+      "path": "tests/test_adaptive_regime.py",
+      "git_blob": "513d69743bdb5dcd9926e58aa7dbc794e141280b",
+      "sha256": "e445930e6759b000516f88549280a48b147c9d52b4f2ba4db8bf4216be307a51"
+    },
+    {
+      "path": "tests/test_cmoney_sync.py",
+      "git_blob": "34461705c484750bb9f41e7a9eaafb206cd6f403",
+      "sha256": "77b01f5945b7056f78b3b3f4a4204ac18ca421623f3918d5ac5cb95612ab4fa2"
+    },
+    {
+      "path": "tests/test_dashboard_phase1.py",
+      "git_blob": "adc4f42c125bbed65058c1ba22b95e901fdb9bb5",
+      "sha256": "1a221ae74bdc985b45778ac2636823a9363383bdb968daa96a3d4593d7b1cde4"
+    },
+    {
+      "path": "tests/test_four_price_engine.py",
+      "git_blob": "e4c909b1aaa6f713a0485d4616acece77e978091",
+      "sha256": "a7bfceb5a09de3f84be91f09461784b74d308c6cdddf5cbfc0f17bd8e8220496"
+    },
+    {
+      "path": "tests/test_isolate_mode.py",
+      "git_blob": "a5fb8ebae8ab4eb832a871fe00344d4253804a2d",
+      "sha256": "5f19cbae156c3ae6dd2e88d9bafcdada8601da49dcec230595bbdf0df627083b"
+    },
+    {
+      "path": "tests/test_lab_adapters.py",
+      "git_blob": "b6b83c3531aeea68c1d946af6ea003752fad404d",
+      "sha256": "f0e45a80fe503cf67bc86d486cd20fa4d5dfa0dac196df64b5a3428ff06e8045"
+    },
+    {
+      "path": "tests/test_lab_advanced.py",
+      "git_blob": "57a67289717a2500b18b7d7f764d6fcb65dcb4bf",
+      "sha256": "6853f1665b5331af64f026002af8456ce5e3fad26362e1ff63949fdf6346dae1"
+    },
+    {
+      "path": "tests/test_lab_data.py",
+      "git_blob": "4c4e96ff3873768b5ec1791193123256fe5242de",
+      "sha256": "c03b46d7f4b162f3fe13eefa2c58bdc2221c8f908a575e996abbb1eee13880bd"
+    },
+    {
+      "path": "tests/test_lab_engine.py",
+      "git_blob": "fae29ee93a5f5efd0f428deaf1e59a03c9259621",
+      "sha256": "9ed6c13d4b5a39f95bb4ea9cff166e111d917a93a07ddbe0e716c5e7ad44a6e0"
+    },
+    {
+      "path": "tests/test_lab_performance.py",
+      "git_blob": "c57821f1e2c71cc46795eef421217705d2ed6354",
+      "sha256": "1f0a31640d20ad22b8b49ad2f2b2a808e074cb78d4536beb689d6e045a675050"
+    },
+    {
+      "path": "tests/test_lab_web_api.py",
+      "git_blob": "71c10ee8b1a342588a626404d2ad0d0670970908",
+      "sha256": "637281eeb1e74cd92318bdc784b64fece07d1b53cd3a52953a78489765813c58"
+    },
+    {
+      "path": "tests/test_lifecycle_and_history.py",
+      "git_blob": "60bfc6bf4aae064a9ca0d1f0d423362e5cfdb6eb",
+      "sha256": "ae0c5b95d420847ff6a056a01612b541b3f557ff8ec2da73fb7c73dbeda18693"
+    },
+    {
+      "path": "tests/test_market_analyst.py",
+      "git_blob": "309b7d7d68ddca5f10e8a60df08a34f541c08123",
+      "sha256": "5dc218132e7c4d7496a29047f99976d6380bc67f45e7cef732bbbf2fd3d32a28"
+    },
+    {
+      "path": "tests/test_market_pulse.py",
+      "git_blob": "da3fd39a5714fff9d6211ebb13251669d14bea41",
+      "sha256": "5b13fe688248d0235cec0c76f5fdadf5730091a40771c8e71422d98583bd62e3"
+    },
+    {
+      "path": "tests/test_market_schedule.py",
+      "git_blob": "f83a3c14f8029a39da144e1040afa0c36a45534d",
+      "sha256": "bf4f216caa99c4c19d70d29142e70fba840b113698378f2e2a583c9f856a7626"
+    },
+    {
+      "path": "tests/test_review_fixes.py",
+      "git_blob": "d78b2ceab13e6d3b195a7bdf0adc3d4b91f13892",
+      "sha256": "23e8a36947a7f0eecc5111e46da90ff278eed7a2ab292c659a7923d25994c377"
+    },
+    {
+      "path": "tests/test_rolling_retention.py",
+      "git_blob": "1c0254a4b8bdf6a8d1b8a579b39a2169b32e561c",
+      "sha256": "05bbb050333fc0a83b6bde53e45e95ebd6b26168d5193ea6db66682baa4ae5af"
+    },
+    {
+      "path": "tests/test_strategy_04_cb_pricing.py",
+      "git_blob": "2921b85798aa35f7fc0835f2b7161ece013adb37",
+      "sha256": "d05f8174f3ecc126080c3fb3293eb47d549188b52362e33f5a17e47f00e116ea"
+    },
+    {
+      "path": "tests/test_strategy_05_stock_futures.py",
+      "git_blob": "f776a864e1b64424c71ed9d644f60657e037e8c3",
+      "sha256": "783cd731ab19a6ddecef5d0f5fece2430fd4c84678e5faa5119232667e225c8c"
+    },
+    {
+      "path": "tests/test_strategy_06.py",
+      "git_blob": "15cd5cd46b5f63372777f3dbdae280040624277c",
+      "sha256": "f010c3d510bb8cf09de077942d97fb26b010025e8d0f6f9a60d9e2777f9a5dae"
+    },
+    {
+      "path": "tests/test_strategy_07_margin_call.py",
+      "git_blob": "21c291d62b357379f85650430ff63b08a6b09d7f",
+      "sha256": "7f2ded5540cd237453257bd109ee2c3b759507c17890fe17c78eba8b87979d82"
+    },
+    {
+      "path": "tests/test_strategy_08_group_dressing.py",
+      "git_blob": "89a7aa3e8600698678007f403da28f9d74279115",
+      "sha256": "e1750ae84b3d5d40ae12e16c113fcf8f6e58ef77f9f96d5eebf4169467314ec8"
+    },
+    {
+      "path": "tests/test_strategy_09_treasury_buyback.py",
+      "git_blob": "d69f1125cbd411f27f249d79582d103d2ed3327a",
+      "sha256": "cb68eb1a746ebb5bda958c8729da6c70fa0326599c620f72e2f99e00b9bb3853"
+    },
+    {
+      "path": "tests/test_strategy_11_revenue_breakout.py",
+      "git_blob": "a971601839793db82003b6b8057640ebdaa557d2",
+      "sha256": "85b46ad6212ef48e5562593dd1e6b942fdb3285efa60b5ffb887f48d65461f03"
+    },
+    {
+      "path": "tests/test_strategy_12_etf_event_radar.py",
+      "git_blob": "14fcd634f6599b35897efb1b99cc1f65968db0c3",
+      "sha256": "3f110cfcc774904f363269aa5efdde135abd8d7ae2a0750852979498c94d63f3"
+    },
+    {
+      "path": "tests/test_strategy_tiers.py",
+      "git_blob": "3bdfd9e6321ffa17ff5a64cd0f13c0804ddbab10",
+      "sha256": "6ff6e93b77840862e3a533c09c2302ab27267167c87c55ea9126f53f8986a3d1"
+    },
+    {
+      "path": "tests/test_today_triggered_api.py",
+      "git_blob": "694033bd833134e84c222cf81eef45a69fe2ce64",
+      "sha256": "1d25791ccacab695866fe8336606aa1eaf5efd1c5fedd1e3021d674d608017f1"
+    },
+    {
+      "path": "trade_history_manager.py",
+      "git_blob": "746319bec1d7a46b916c1da0f4e7a524a05ad6c6",
+      "sha256": "2e456b0ad4b03ddfa93185ce18f50e3587d738c613ef13b999b1099c9568f281"
+    },
+    {
+      "path": "tunnel_manager.py",
+      "git_blob": "4322979e3eeb6d88729018ef591ce1523f4978b6",
+      "sha256": "530e31ae1210c03b15fc87dbb525dd0f0d7331a17ddd89680d733d90b0693521"
+    },
+    {
+      "path": "twse_calendar.py",
+      "git_blob": "f0615487a131685d053f3fc40cc9f0fac6d5caa2",
+      "sha256": "19ef666f6abb6c8212d2051f6e63c97b04f9c2b28162e18e8860ae3544001a0c"
+    },
+    {
+      "path": "update_webhook.py",
+      "git_blob": "510404bbca965bfb592ff8dc2c2efbf855083dc4",
+      "sha256": "8d7a3329816c6a4890119fca960da4a99d4f60a499204c6e908dce31ce0b79e3"
+    },
+    {
+      "path": "web/dashboard_guards.js",
+      "git_blob": "af8487b174d1bcf293b9b77a3799636c276d5934",
+      "sha256": "1d35d4172a01b6310468df6484b2989823ce02a83220d812c2aaa0659e3d3bcc"
+    },
+    {
+      "path": "web/index.html",
+      "git_blob": "6c58d55fd40f309c89bb192d21670dfc94f07287",
+      "sha256": "ebc3f85a6a10317fd89040eda497777244eb9b19e37252fdca5000c542bc7e6e"
+    },
+    {
+      "path": "weekly_report.md",
+      "git_blob": "23dcd2612f5fed9fefb4569b2485c843d80a9c03",
+      "sha256": "e325ed05b0d14cef3f40b2d030c0a3123ae2c8d7ea5610a556cc47321d2bb28e"
+    }
+  ]
+}

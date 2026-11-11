@@ -1,0 +1,13 @@
+{
+  "source_url": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+  "source_html": "https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=html",
+  "source_open_data": "https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=open_data",
+  "dataset_page": "https://data.gov.tw/en/datasets/11761",
+  "fetched_at": "2026-11-08T12:03:44+08:00",
+  "http_date": "Sun, 08 Nov 2026 04:03:44 GMT",
+  "http_last_modified": "Sat, 07 Nov 2026 21:23:49 GMT",
+  "content_type": "application/json",
+  "payload_sha256": "7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
+  "payload_bytes": 3774,
+  "coverage_rule": "Payload rows are one ROC year of the TWSE annual open/closed schedule. Coverage is that western calendar year only. Dates before Jan 1 or after Dec 31 of that year are unknown. Weekdays absent from the closure rows are scheduled sessions. Rows whose name or description contains 開始交易 or 最後交易 are explicit sessions, not closures. This snapshot does not include emergency closures published after fetched_at."
+}

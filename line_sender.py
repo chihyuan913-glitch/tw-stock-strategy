@@ -209,7 +209,6 @@ def send_telegram(
                     f_req = urllib.request.Request(url, data=json.dumps(fallback_payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
                     with urllib.request.urlopen(f_req, timeout=10) as f_resp:
                         if f_resp.status == 200:
-                            success_all = True
                             continue
                 except Exception:
                     pass
@@ -347,12 +346,11 @@ def send_line_notify(token: str, message: str) -> bool:
 
 def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False) -> bool:
     """
-    通用即時推播發送入口 (多軌分流・支援無限制推播)：
+    通用即時推播發送入口 (LINE 發送已停用，只走 Telegram；Discord 維持原行為)：
     1. 支援 Telegram Bot (100% 永久免費・無每月則數限制・手機即時秒推)
     2. 支援 Discord Webhook (100% 永久免費・無每月則數限制)
-    3. 支援多策略獨立 LINE 視窗/群組定向投遞 (strategy="01", "02", "03", "04"...)
-    4. 支援多 Token 自動容錯輪替 (主 Token 額度超額自動切換至備援 Token)
-    5. 內建台股未開盤日不推送守門員 (Non-Trading Day Push Suppression)
+    3. LINE 發送已停用（只保留 Telegram）
+    4. 內建台股未開盤日不推送守門員 (Non-Trading Day Push Suppression)
     """
     # --------------------------------------------------------------------------
     # 台股休市日不推送守衛 (Non-Trading Day Push Suppression Guard)
@@ -389,6 +387,10 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
         tg_text = tg_card or clean_text
         if send_telegram(tg_token, tg_chat, tg_text, parse_mode="HTML" if is_html else None, stock_code=stock_code):
             any_success = True
+        else:
+            print("[!] Telegram 推播失敗")
+    else:
+        print("[!] 未設定 Telegram")
 
     # 2. Discord Webhook 推播 (100% 永久免費・無額度限制)
     dc_url = (
@@ -399,24 +401,6 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
         if send_discord_webhook(dc_url, clean_text):
             any_success = True
 
-    # 3. LINE Messaging API / LINE Notify
-    tokens = resolve_tokens(strategy=strategy, env=env)
-    to_id, target_label = resolve_target_id(strategy=strategy, target_id=target_id, env=env)
-    notify_token = os.environ.get("LINE_NOTIFY_TOKEN") or env.get("LINE_NOTIFY_TOKEN")
-
-    if tokens and to_id:
-        line_ok = send_line_messaging_api(tokens, to_id, message, target_label=target_label)
-        default_user_id = os.environ.get("LINE_USER_ID") or env.get("LINE_USER_ID")
-        if not line_ok and default_user_id and to_id != default_user_id:
-            print(f"[⚡] 專屬群組推播未成功 (機器人可能尚未加入該群組)，自動觸發 Fallback 轉送至個人聊天室...")
-            line_ok = send_line_messaging_api(tokens, default_user_id, message, target_label="個人聊天室 (Fallback 備援)")
-        if line_ok:
-            any_success = True
-    elif notify_token:
-        line_ok = send_line_notify(notify_token, clean_text)
-        if line_ok:
-            any_success = True
-
     if not any_success:
         print("\n" + "!" * 65)
         print("【尚未設定任何有效推播管道或憑證額度已耗盡】")
@@ -424,9 +408,7 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
         print("1. Telegram (推薦！永久免費無限制):")
         print("   TELEGRAM_BOT_TOKEN=你的BotToken")
         print("   TELEGRAM_CHAT_ID=你的ChatId")
-        print("2. LINE Messaging API (每月限額):")
-        print("   LINE_CHANNEL_ACCESS_TOKEN=你的憑證")
-        print("   LINE_USER_ID=你的LINE個人ID")
+        print("2. LINE 發送已停用（只保留 Telegram）")
         print("!" * 65 + "\n")
         return False
 

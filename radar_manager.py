@@ -118,12 +118,15 @@ def get_radar_status() -> str:
     return "\n".join(lines)
 
 def generate_test_alert(token: str, target_id: str = "") -> str:
-    """發送一則全擬真的到價雷達測試卡片至專屬視窗"""
-    dest = target_id or get_radar_channel()
-    if not dest:
-        return "⚠️ 尚未設定雷達專屬視窗！請先在群組輸入「設定雷達視窗」進行綁定。"
-    if not token:
-        return "⚠️ 未設定 LINE_CHANNEL_ACCESS_TOKEN，無法發送測試訊息。"
+    """發送一則全擬真的到價雷達測試卡片至專屬視窗 (透過 Telegram，LINE 推播已停用)"""
+    from line_sender import load_env, send_telegram
+
+    env = load_env() if callable(load_env) else {}
+    tg_token = (os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    tg_chat = (os.environ.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_ID") or "").strip()
+
+    if not tg_token or not tg_chat:
+        return "⚠️ 未設定 Telegram（TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID），LINE 推播已停用，無法發送測試訊息。"
 
     now_tw = datetime.datetime.now(TZ_TW)
     time_str = now_tw.strftime('%H:%M:%S')
@@ -146,24 +149,13 @@ def generate_test_alert(token: str, target_id: str = "") -> str:
 ⏰ 觸發時間：{time_str}
 🤖 系統狀態：盤中到價雷達連線 100% 正常！到價自動推播已就緒。"""
 
-    push_url = "https://api.line.me/v2/bot/message/push"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
-    }
-    body = {
-        "to": dest,
-        "messages": [{"type": "text", "text": test_card}]
-    }
     try:
-        post_data = json.dumps(body, ensure_ascii=False).encode('utf-8')
-        req = urllib.request.Request(push_url, data=post_data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            if resp.status == 200:
-                return "✅【測試推播成功發送！】\n已向您的【盤中自動監控雷達專屬視窗】發送一則全擬真到價警報卡片，請查看群組訊息！"
+        ok = send_telegram(tg_token, tg_chat, test_card, parse_mode=None)
+        if ok:
+            return "✅【測試推播成功發送！】\n已透過 Telegram 發送一則全擬真到價警報卡片（LINE 推播已停用）。"
+        return "❌ 測試推播失敗：Telegram 發送未成功（LINE 推播已停用）。"
     except Exception as e:
         return f"❌ 測試推播失敗: {e}"
-    return "⚠️ 測試推播未完成。"
 
 # 方案四：熱門題材核心概念股字典 (繁簡雙向支援)
 THEMES = {
@@ -625,43 +617,12 @@ def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
+                from mis_quote import parse_mis_quote_item
                 for item in data.get('msgArray', []):
-                    c = item.get('c', '')
-                    if not c or c not in clean_codes:
+                    quote_obj = parse_mis_quote_item(item, set(clean_codes), fallback_clock=time_str)
+                    if not quote_obj:
                         continue
-                    z_val = item.get('z', '-')
-                    trade_z = item.get('trade', {}).get('z', '-') if isinstance(item.get('trade'), dict) else '-'
-                    y_val = item.get('y', '-')
-                    o_val = item.get('o', '-')
-                    h_val = item.get('h', '-')
-                    l_val = item.get('l', '-')
-                    v_val = item.get('v', '-')
-
-                    price = None
-                    if z_val and z_val != '-':
-                        price = float(z_val)
-                    elif trade_z and trade_z != '-':
-                        price = float(trade_z)
-                    elif y_val and y_val != '-':
-                        price = float(y_val)
-
-                    prev_close = float(y_val) if (y_val and y_val != '-') else price
-                    chg = round(price - prev_close, 2) if (price is not None and prev_close is not None) else 0.0
-                    pct = round((chg / prev_close * 100), 2) if (prev_close and prev_close > 0) else 0.0
-
-                    quote_obj = {
-                        'code': c,
-                        'name': item.get('n', '').strip(),
-                        'price': price,
-                        'prev_close': prev_close,
-                        'change': chg,
-                        'change_pct': pct,
-                        'open': float(o_val) if (o_val and o_val != '-') else None,
-                        'high': float(h_val) if (h_val and h_val != '-') else None,
-                        'low': float(l_val) if (l_val and l_val != '-') else None,
-                        'volume': int(v_val) if (v_val and v_val != '-') else None,
-                        'time': item.get('t', time_str)
-                    }
+                    c = quote_obj['code']
                     quotes[c] = quote_obj
                     _QUOTE_CACHE[c] = quote_obj
         except Exception as e:

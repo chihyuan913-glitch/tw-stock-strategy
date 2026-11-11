@@ -759,12 +759,18 @@ def run_screener(export_csv: bool = True, send_line: bool = False, pool_path: st
     return df
 
 
-if __name__ == "__main__":
+def build_arg_parser():
     parser = argparse.ArgumentParser(description=f"{STRATEGY_NAME} 盤後選股器")
     parser.add_argument("--line", action="store_true", help="執行後推播至 LINE 獨立視窗")
-    parser.add_argument("--export", action="store_true", default=True, help="匯出至 result.csv")
+    parser.add_argument("--export", nargs="?", const=CSV_FILE, default=CSV_FILE, type=str, help="匯出至 result.csv")
+    parser.add_argument("--no-export", action="store_true", help="不匯出 CSV 報表")
     parser.add_argument("--date", type=str, default=None, help="指定回測或執行基準日期 (YYYY-MM-DD)")
     parser.add_argument("--force", action="store_true", help="強制執行，跳過開休市與未開盤日檢核 (Rule 21)")
+    return parser
+
+
+if __name__ == "__main__":
+    parser = build_arg_parser()
     args = parser.parse_args()
 
     # 開休市檢核守門 (若非強制且非指定歷史日期)
@@ -777,4 +783,4 @@ if __name__ == "__main__":
     if now_hour >= 20 and not args.date and not args.force:
         verify_twse_data_settlement(max_retries=3, retry_delay_sec=10)
 
-    run_screener(export_csv=args.export, send_line=args.line, target_date=args.date)
+    run_screener(export_csv=(not args.no_export) and bool(args.export), send_line=args.line, target_date=args.date)

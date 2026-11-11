@@ -671,6 +671,7 @@ def main():
     parser.add_argument("--no-futures-filter", action="store_true", help="關閉個股期貨限制，允許篩選全市場普通股")
     parser.add_argument("--export", type=str, default=None, help="匯出報表檔名 (.csv 或 .md)")
     parser.add_argument("--line", action="store_true", help="發送選股通知至 LINE 策略 03 獨立視窗")
+    parser.add_argument("--force", action="store_true", help="相容 run_all 介面；本策略無休市守衛")
 
     args = parser.parse_args()
 
