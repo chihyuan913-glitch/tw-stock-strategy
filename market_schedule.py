@@ -311,16 +311,90 @@ def is_market_open_today(
     return True, f"正常開盤交易日 ({target_iso})"
 
 
+
+# ------------------------------------------------------------------------------
+# 中央盤中交易時段守護常數與統一函式 (Intraday Time Window Defense)
+# ------------------------------------------------------------------------------
+MARKET_OPEN_TIME = datetime.time(9, 0, 0)
+MARKET_CLOSE_TIME = datetime.time(13, 35, 0)
+PREMARKET_RUNNER_START_TIME = datetime.time(8, 58, 0)
+
+
+def is_intraday_window(
+    now_dt: Optional[datetime.datetime] = None,
+    allow_premarket_runner: bool = False
+) -> Tuple[bool, str]:
+    """
+    【中央盤中時段判斷 (Intraday Time Window Guard)】
+    建議交易時段為平日 09:00~13:35。
+    若 allow_premarket_runner=True (供 run_all_intraday.py 總調度器)，
+    允許於 08:58~08:59 提早啟動以供各 scanner 暖機並等待 09:00 開盤；
+    但在 13:35 之後一律判定為 False（已過收盤時段）。
+
+    回傳值:
+    - (True, 說明訊息)
+    - (False, 攔截原因說明)
+    """
+    now_tw = now_dt or get_taiwan_now()
+    now_time = now_tw.time()
+
+    # 1. 檢查今日是否為交易日
+    is_open, open_reason = is_market_open_today(now_tw)
+    if not is_open:
+        return False, f"今日非交易日 ({open_reason})"
+
+    # 2. 判斷收盤 (超過 13:35:00)
+    if now_time > MARKET_CLOSE_TIME:
+        return False, f"今日盤中交易已結束 (當前時間 {now_tw.strftime('%H:%M:%S')} 超過 13:35:00 收盤)"
+
+    # 3. 判斷開盤前
+    start_time = PREMARKET_RUNNER_START_TIME if allow_premarket_runner else MARKET_OPEN_TIME
+    if now_time < start_time:
+        start_str = "08:58" if allow_premarket_runner else "09:00"
+        return False, f"尚未達到盤中啟動時段 (當前時間 {now_tw.strftime('%H:%M:%S')} 早於 {start_str})"
+
+    return True, f"處於盤中交易時段 ({now_tw.strftime('%H:%M:%S')})"
+
+
+def is_intraday_push_suppressed(
+    now_dt: Optional[datetime.datetime] = None,
+    is_test_push: bool = False
+) -> Tuple[bool, str]:
+    """
+    【盤中到價與開盤確認推播時段守衛】
+    專門守護「盤中到價」與「開盤實戰確認」卡片：
+    若已過 13:35 或尚未開盤 (09:00)，必須攔截不得送出。
+    規則：force=True 不得穿過此守衛！只有明確的 is_test_push=True (CLI --test-push) 可放行連線測試。
+    """
+    if is_test_push:
+        return False, "測試推播模式 (--test-push)，放行連線驗證"
+
+    in_window, reason = is_intraday_window(now_dt=now_dt, allow_premarket_runner=False)
+    if not in_window:
+        return True, f"【🛑 時段守衛攔截】{reason}，嚴禁發送盤中到價或開盤確認！"
+
+    return False, ""
+
+
 def should_suppress_push(
     force: bool = False,
     date_val: Optional[Union[str, datetime.date]] = None,
-    task_type: str = "推播"
+    task_type: str = "推播",
+    is_intraday: bool = False,
+    is_test: bool = False,
+    now_dt: Optional[datetime.datetime] = None
 ) -> Tuple[bool, str]:
     """
     【推播發送前守門員 (Push Suppression Guard)】
     若回傳 (True, reason)：代表應【嚴格攔截、不發送推播】。
     若回傳 (False, "")：代表應【正常放行發送推播】。
     """
+    # 若指定為盤中到價/開盤確認任務，先走中央時段守衛 (force=True 不准穿透收盤後時段)
+    if is_intraday:
+        suppress_intra, reason_intra = is_intraday_push_suppressed(now_dt=now_dt, is_test_push=is_test)
+        if suppress_intra:
+            return True, reason_intra
+
     if force:
         return False, "啟用強制推送旗標 (--force / --force-push)，跳過休市檢查"
 
@@ -332,7 +406,9 @@ def should_suppress_push(
     return False, ""
 
 
-def check_market_open_or_exit(context_name: str = "排程任務", allow_force: bool = True) -> bool:
+def check_market_open_or_exit(context_name: str = "排程任務", allow_force: bool = True, force: Optional[bool] = None, **kwargs) -> bool:
+    if force is not None:
+        allow_force = force
     """
     【總調度與執行器專用：未開盤自動乾淨退出】
     用於 run_all.py 或 run_all_intraday.py 開頭，若未開盤則印出醒目提示並安全退出 (sys.exit(0))。

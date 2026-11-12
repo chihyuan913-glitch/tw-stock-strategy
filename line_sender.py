@@ -344,7 +344,77 @@ def send_line_notify(token: str, message: str) -> bool:
         return False
     return False
 
-def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False) -> bool:
+
+def is_intraday_alert_message(message, task_type=None) -> bool:
+    """
+    【精準辨識盤中即時到價警訊與開盤確認卡片】
+    僅精準比對真正的「盤中即時到價警訊」與「09:02 開盤實戰確認」標題或 task_type：
+    - 盤中到價 / 開盤確認：受平日 09:00~13:35 嚴格時段限制，收盤後 (13:35 後) 絕對禁止推播 (force=True 亦不准穿透)。
+    - 盤後選股 / 早鳥預警 / 晨報 / 外網通知：屬於正常盤後/非交易時段任務，絕不受盤中時段限制。
+    - 徹底移除「進場防線」、「到價」、「盤中雷達」等寬鬆通用詞，避免誤傷。
+    """
+    tt = str(task_type or "").strip()
+    if tt in ["盤中雷達", "到價推播", "開盤確認", "intraday", "price_alert", "open_confirm"]:
+        return True
+    if tt in ["盤後選股", "盤後選股戰報", "早鳥預警", "晨報", "外網通知", "postmarket", "screener", "morning_report", "tunnel", "system"]:
+        return False
+
+    texts_to_check = []
+    if isinstance(message, dict):
+        for k in ("altText", "_clean_text", "_tg_card", "_alert_type"):
+            val = message.get(k)
+            if val:
+                texts_to_check.append(str(val))
+    elif message:
+        texts_to_check.append(str(message))
+
+    if not texts_to_check:
+        return False
+
+    full_text = "\n".join(texts_to_check)
+    first_lines = [t.strip().splitlines()[0] for t in texts_to_check if t.strip()]
+
+    # 1. 顯式排除名單 (非盤中到價之重要通知與戰報一律放行)
+    EXCLUDE_PATTERNS = [
+        "盤前早鳥",
+        "台股開盤前夕・盤中到價雷達全自動啟動",
+        "台股戰情室・外網專屬連線已就緒",
+        "台股盤後量化選股戰報",
+        "盤後選股",
+        "台股收盤總結",
+        "Telegram 連線測試成功",
+        "Discord 連線測試成功"
+    ]
+    for exc in EXCLUDE_PATTERNS:
+        if any(exc in line for line in first_lines) or (exc in full_text and ("08:20" in full_text or "開盤前夕" in full_text or "外網專屬連線" in full_text)):
+            return False
+
+    # 2. 精確比對真正的盤中到價與開盤確認標題
+    # (a) 策略 12 09:02 開盤確認
+    if any("開盤實戰確認" in line for line in first_lines) or "🎯【09:02 開盤實戰確認" in full_text:
+        return True
+
+    # (b) 單檔盤中到價警訊 (TG 標題格式: <b>...【盤中雷達・到價警訊】</b>)
+    if "【盤中雷達・到價警訊】" in full_text:
+        return True
+
+    # (c) 單檔盤中到價警訊 (純文字 / Flex altText: 🚨【盤中雷達】)
+    for line in first_lines:
+        if line.startswith("🚨【盤中雷達】") or line.startswith("🚨 盤中到價雷達"):
+            return True
+
+    # (d) 多檔盤中到價快訊 (TG / 純文字 / Flex altText: 盤中多檔到價快訊)
+    if "盤中多檔到價快訊" in full_text:
+        return True
+
+    # (e) 策略 12 ETF 盤中雷達連線測試
+    if any("策略 12 ETF 盤中雷達" in line for line in first_lines):
+        return True
+
+    return False
+
+
+def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False, is_test: bool = False, task_type: str = None, **kwargs) -> bool:
     """
     通用即時推播發送入口 (LINE 發送已停用，只走 Telegram；Discord 維持原行為)：
     1. 支援 Telegram Bot (100% 永久免費・無每月則數限制・手機即時秒推)
@@ -353,11 +423,25 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
     4. 內建台股未開盤日不推送守門員 (Non-Trading Day Push Suppression)
     """
     # --------------------------------------------------------------------------
-    # 台股休市日不推送守衛 (Non-Trading Day Push Suppression Guard)
+    # 台股盤中時段與休市日雙層守衛 (Intraday Time Window & Holiday Suppression Guard)
     # --------------------------------------------------------------------------
     try:
-        from market_schedule import should_suppress_push
-        suppress, suppress_reason = should_suppress_push(force=force, task_type="戰報推播")
+        from market_schedule import should_suppress_push, is_intraday_push_suppressed
+        
+        # 判斷是否為明確的測試推播模式 (--test-push 或 is_test=True)
+        is_test_mode = is_test or kwargs.get("is_test_push", False) or ("--test-push" in sys.argv) or ("--force-test" in sys.argv)
+        
+        # 1. 盤中到價 / 開盤確認 中央時段守衛 (After-hours & Pre-market guard)
+        # 規則：若為盤中到價或開盤確認，超過 13:35 或未開盤一律攔截；force=True 絕對不准穿透！
+        if is_intraday_alert_message(message, task_type=task_type):
+            suppress_intra, reason_intra = is_intraday_push_suppressed(is_test_push=is_test_mode)
+            if suppress_intra:
+                print(f"[🛑 時段守衛攔截] {reason_intra}")
+                return False
+
+        # 2. 常規休市日守衛 (Non-Trading Day Push Suppression)
+        # 盤後任務 (例如 21:15 盤後選股、每週優化等) 僅受休市日守門約束，不受收盤時段限制
+        suppress, suppress_reason = should_suppress_push(force=force, task_type=task_type or "戰報推播")
         if suppress:
             print(f"[⏸️ 推播攔截] {suppress_reason}")
             return False

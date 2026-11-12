@@ -22,6 +22,7 @@ import time
 import json
 import argparse
 import datetime
+TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
 import urllib.request
 import math
 from typing import Dict, Any, List, Optional
@@ -73,7 +74,7 @@ MIN_REWARD_TO_RISK = 1.5         # 最低健康盈虧比門檻
 def fetch_twse_batch_quotes(query_items: List[Dict[str, Any]], batch_size: int = 25) -> Dict[str, Dict[str, Any]]:
     """抓取 ETF 開盤價、昨收價、最新收盤/成交價與成交量 (支援 tse 與 otc)"""
     quotes = {}
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(TZ_TW)
     hm = now.hour * 100 + now.minute
     is_live_trading = (now.weekday() < 5 and 900 <= hm <= 1335)
 
@@ -160,7 +161,13 @@ def fetch_twse_batch_quotes(query_items: List[Dict[str, Any]], batch_size: int =
 
 def run_open_confirmation(send_line: bool = True) -> List[Dict[str, Any]]:
     """09:02 開盤實盤確認：執行價格行為檢驗與下單指令產出"""
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_tw = datetime.datetime.now(TZ_TW)
+    hm = now_tw.hour * 100 + now_tw.minute
+    # 交易日收盤時段守衛：已過 13:35 跳過開盤確認，不得推播任何卡片
+    if now_tw.weekday() < 5 and hm > 1335:
+        print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，跳過開盤確認，不發送任何卡片。")
+        return []
+    now_str = datetime.datetime.now(TZ_TW).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now_str}] 啟動策略 12：09:02 開盤實戰確認 (價格行為 Price Action 與真實開盤價檢驗)...")
 
     if not os.path.exists(PREMARKET_FILE):
@@ -356,7 +363,7 @@ def run_open_confirmation(send_line: bool = True) -> List[Dict[str, Any]]:
 
         card_msg = "\n".join(lines).strip()
         print("\n" + "="*50 + "\n" + card_msg + "\n" + "="*50)
-        send_to_line(card_msg, strategy="12", force=True)
+        send_to_line(card_msg, strategy="12", force=False)
 
     return actionable_items
 
@@ -373,12 +380,12 @@ def run_intraday_polling(interval: int = 60, test_mode: bool = False, once: bool
         print("[+] 執行單次盤中快篩完成。")
         return
 
-    # 若為常駐監控，循環執行至收盤
+    # 若為常駐監控，循環執行至收盤 (以台北時間 UTC+8 判定)
     while True:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(TZ_TW)
         hm = now.hour * 100 + now.minute
         if hm > 1335 and now.weekday() < 5:
-            print("已過收盤時間 13:35，安全結束盤中雷達。")
+            print(f"[{now.strftime('%H:%M:%S')}] 已過台北時間收盤時間 13:35，安全結束盤中雷達。")
             break
         try:
             # 盤中輪詢邏輯：讀取候選清單比對四大防線
@@ -397,6 +404,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.confirm:
+        now_tw = datetime.datetime.now(TZ_TW)
+        hm = now_tw.hour * 100 + now_tw.minute
+        if now_tw.weekday() < 5 and hm > 1335:
+            print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，跳過開盤確認。")
+            sys.exit(0)
         run_open_confirmation(send_line=True)
     elif args.test_push:
         run_intraday_polling(test_mode=True)

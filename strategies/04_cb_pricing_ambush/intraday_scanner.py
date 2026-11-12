@@ -346,9 +346,10 @@ def run_intraday_scanner(interval: int = 180, once: bool = False, force_test: bo
     print("🚀 啟動【策略04：可轉債 (CB) 定價伏擊盤中即時雷達與到價推播系統 V4.0】")
     print("=" * 70)
 
-    # 檢查開盤日狀態 (Rule 21 未開盤日全面停止推送)
+    # 檢查開盤日狀態 (向後相容簽名：使用 context_name 與 allow_force)
     if not (force or force_test):
-        check_market_open_or_exit(force=False)
+        if not check_market_open_or_exit(context_name="策略 04 可轉債盤中雷達", allow_force=False):
+            return
 
     targets = load_cb_targets()
     if not targets:
@@ -357,16 +358,21 @@ def run_intraday_scanner(interval: int = 180, once: bool = False, force_test: bo
 
     notified_events = {}
 
+    now_init = datetime.datetime.now(TZ_TW)
+    if not force_test and now_init.weekday() < 5 and now_init.time() > datetime.time(13, 35):
+        print(f"[*] [{now_init.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠退出。")
+        return
+
     while True:
         now = datetime.datetime.now(TZ_TW)
         now_time = now.time()
         start_time = datetime.time(9, 0)
         end_time = datetime.time(13, 35)
 
-        # 非開盤時間防護 (若不是 --once 或 --force-test 或 --force)
-        if not (once or force_test or force) and (now_time < start_time or now_time > end_time):
-            if now_time > end_time:
-                print(f"[*] [{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠。")
+        # 非開盤時間防護：注意 --force 絕不准用來略過 13:35 收盤後時段守衛
+        if not (once or force_test) and (now_time < start_time or now_time > end_time):
+            if now_time > end_time and now.weekday() < 5:
+                print(f"[*] [{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠退出。")
                 break
             else:
                 print(f"[*] [{now.strftime('%H:%M:%S')}] 尚未開盤，等待 09:00 開盤中...")

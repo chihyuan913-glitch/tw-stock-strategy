@@ -332,6 +332,13 @@ def main():
     parser.add_argument("--force", action="store_true", help="強制模式（略過休市日檢核）")
     args = parser.parse_args()
 
+    # 收盤時段守衛：已過 13:35 立即結束
+    if not args.test_push:
+        now_tw = datetime.datetime.now(TZ_TW)
+        if now_tw.weekday() < 5 and (now_tw.hour, now_tw.minute) > (13, 35):
+            print(f"[-] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，安全退出。")
+            return
+
     # 開休市檢核守門 (若非強制且非測試)
     if not args.force and not args.test_push and not args.once:
         if not check_market_open_or_exit(f"{STRATEGY_NAME} 盤中雷達"):
@@ -353,16 +360,25 @@ def main():
         print(f"[+] 單次巡檢完成，觸發事件數: {trig}")
         return
 
+    # 交易日收盤時段守衛：已過 13:35 立即退出
+    now_tw_init = datetime.datetime.now(TZ_TW)
+    if not args.test_push and now_tw_init.weekday() < 5 and (now_tw_init.hour, now_tw_init.minute) > (13, 35):
+        print(f"[-] [{now_tw_init.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，安全退出。")
+        return
+
     print(f"[*] 啟動常駐監控模式 (輪詢間隔: {args.interval} 秒)...")
     try:
         while True:
             now_tw = datetime.datetime.now(TZ_TW)
-            # 若在盤中時間外 (09:00 ~ 13:35)，提示並休息
-            is_market_open = (9, 0) <= (now_tw.hour, now_tw.minute) <= (13, 35) and (now_tw.weekday() < 5)
-            if not is_market_open:
-                print(f"[-] 目前非盤中交易時段 ({now_tw.strftime('%H:%M:%S')})，等待中...")
-                time.sleep(min(args.interval * 2, 300))
-                continue
+            hm = (now_tw.hour, now_tw.minute)
+            if now_tw.weekday() < 5 and (hm < (9, 0) or hm > (13, 35)):
+                if hm > (13, 35):
+                    print(f"[-] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，結束行程安全退出。")
+                    break
+                else:
+                    print(f"[-] 目前尚未開盤 ({now_tw.strftime('%H:%M:%S')})，等待 09:00 開盤中...")
+                    time.sleep(30)
+                    continue
 
             scan_intraday_cycle(targets, alerted_set, use_tick_guard=use_guard)
             time.sleep(args.interval)

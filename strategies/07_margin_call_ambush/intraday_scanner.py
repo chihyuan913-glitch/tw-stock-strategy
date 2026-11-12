@@ -417,7 +417,14 @@ def fetch_realtime_quotes(stock_codes: list) -> dict:
 
 def scan_once(targets: dict, notified_events: dict, force_test: bool = False) -> list:
     """執行一次單輪盤中到價掃描"""
-    now_str = datetime.datetime.now(TZ_TW).strftime('%H:%M:%S')
+    now_tw = datetime.datetime.now(TZ_TW)
+    now_str = now_tw.strftime('%H:%M:%S')
+
+    # 收盤時段防護：交易日超過 13:35 不得掃描、不得推播 (不可依賴行情最後撮合時間 t)
+    if not force_test and now_tw.time() > datetime.time(13, 35) and now_tw.weekday() < 5:
+        print(f"[*] [{now_str}] 今日盤中交易已結束 (超過 13:35)，跳過 scan_once，禁止推播。")
+        return []
+
     print(f"\n[*] [{now_str}] 正在檢查 {len(targets)} 檔融資斷頭與清洗標的盤中到價情況...")
 
     codes = list(targets.keys())
@@ -576,6 +583,17 @@ def main():
     targets = load_targets()
     notified_events = {}
 
+    # 交易日收盤時段守衛：已過 13:35 立即結束，不可再 scan_once 或推播
+    now_tw = datetime.datetime.now(TZ_TW)
+    now_time = now_tw.time()
+    start_time = datetime.time(9, 0)
+    end_time = datetime.time(13, 35)
+
+    if not (args.test_push or args.test_alert):
+        if now_time > end_time and now_tw.weekday() < 5:
+            print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠退出。")
+            return
+
     if args.once:
         scan_once(targets, notified_events)
         return
@@ -587,6 +605,18 @@ def main():
 
     try:
         while True:
+            now_tw = datetime.datetime.now(TZ_TW)
+            now_time = now_tw.time()
+
+            if not (args.test_push or args.test_alert) and (now_time < start_time or now_time > end_time):
+                if now_time > end_time:
+                    print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠。")
+                    break
+                else:
+                    print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 尚未開盤，等待 09:00 開盤中...")
+                    time.sleep(30)
+                    continue
+
             scan_once(targets, notified_events)
             time.sleep(args.interval)
     except KeyboardInterrupt:

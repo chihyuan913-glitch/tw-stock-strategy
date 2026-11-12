@@ -145,11 +145,26 @@ def main():
     print(f" 🕒 啟動時間: {now_tw.strftime('%Y-%m-%d %H:%M:%S')} (台灣時間)")
     print(f"============================================================")
 
-    # 休市守衛攔截：若非測試推播且未帶強制旗標，遇休市自動跳過
-    if not args.test_push and not args.force:
-        from market_schedule import check_market_open_or_exit
-        if not check_market_open_or_exit(context_name="全策略盤中到價即時雷達", allow_force=False):
-            return
+    # 1. 測試推播連線模式：放行測試
+    if args.test_push:
+        pass
+    else:
+        # 2. 休市守衛檢查 (若帶入 --force 僅略過休市日，不可略過收盤時段)
+        from market_schedule import check_market_open_or_exit, is_intraday_window
+        if not args.force:
+            if not check_market_open_or_exit(context_name="全策略盤中到價即時雷達", allow_force=False):
+                return
+
+        # 3. 中央盤中時段守衛 (13:35 收盤後絕對不准啟動任何 scanner)
+        # allow_premarket_runner=True 允許 08:58~08:59 提早啟動以供各 scanner 暖機等待開盤
+        # 注意：--force 不准用來略過收盤後時段守衛！
+        in_window, window_reason = is_intraday_window(now_tw, allow_premarket_runner=True)
+        if not in_window:
+            print(f"\n============================================================")
+            print(f"🛑 [盤中時段保護] {window_reason}")
+            print(f"📌 今日盤中交易已結束 (13:35 收盤)，調度器安全退出，不啟動任何策略 Scanner 行程。")
+            print(f"============================================================\n")
+            return  # 成功碼 0 退出，不要當成失敗
 
     targets = INTRADAY_STRATEGIES
     if args.strategy:

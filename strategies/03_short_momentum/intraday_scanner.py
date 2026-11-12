@@ -421,6 +421,12 @@ def scan_once(targets, notified_events, force_test=False):
 
 def run_intraday_scanner(interval=60, once=False, force_test=False):
     """盤中雷達常駐主迴圈"""
+    now = datetime.datetime.now(TZ_TW)
+    market_close = now.replace(hour=13, minute=35, second=0, microsecond=0)
+    if not force_test and now > market_close and now.weekday() < 5:
+        print(f"[{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠退出。")
+        return
+
     print("=" * 70)
     print("🚀 啟動【策略03：法人出貨破線做空與個股期貨避險 - 盤中即時雷達與到價推播系統 V3.0】")
     print("=" * 70)
@@ -438,6 +444,13 @@ def run_intraday_scanner(interval=60, once=False, force_test=False):
         print("[✓] 測試推播已發送完畢。")
         return
 
+    # 交易日收盤時段守衛：已過 13:35 立即結束
+    now = datetime.datetime.now(TZ_TW)
+    market_close = now.replace(hour=13, minute=35, second=0, microsecond=0)
+    if not force_test and now > market_close and now.weekday() < 5:
+        print(f"[{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達休眠退出。")
+        return
+
     if once:
         print("[*] 執行單次巡邏掃描...")
         scan_once(targets, notified_events)
@@ -448,14 +461,18 @@ def run_intraday_scanner(interval=60, once=False, force_test=False):
     try:
         while True:
             now = datetime.datetime.now(TZ_TW)
-            # 若為平日 09:00 ~ 13:35 交易時段
             market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
             market_close = now.replace(hour=13, minute=35, second=0, microsecond=0)
 
             if market_open <= now <= market_close:
                 scan_once(targets, notified_events)
+            elif now > market_close and now.weekday() < 5:
+                print(f"[{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達結束行程退出。")
+                break
             else:
-                print(f"[{now.strftime('%H:%M:%S')}] 非台股盤中交易時段 (09:00~13:35)，待命中...")
+                print(f"[{now.strftime('%H:%M:%S')}] 尚未開盤 (09:00~13:35)，等待開盤中...")
+                time.sleep(30)
+                continue
 
             time.sleep(interval)
     except KeyboardInterrupt:
@@ -469,6 +486,13 @@ def main():
     parser.add_argument("--test-push", action="store_true", help="發送一筆測試推播驗證 LINE 連線與字卡排版")
 
     args = parser.parse_args()
+
+    if not args.test_push:
+        now = datetime.datetime.now(TZ_TW)
+        if now.time() > datetime.time(13, 35) and now.weekday() < 5:
+            print(f"[{now.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，結束行程退出。")
+            return
+
     run_intraday_scanner(interval=args.interval, once=args.once, force_test=args.test_push)
 
 

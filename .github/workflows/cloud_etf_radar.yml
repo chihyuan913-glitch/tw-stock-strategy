@@ -47,16 +47,41 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           STAGE="${{ github.event.inputs.stage }}"
-          UTC_HOUR=$(date -u +%H)
-          UTC_MIN=$(date -u +%M)
-          echo "[+] 當前 UTC 時間: ${UTC_HOUR}:${UTC_MIN} (台灣時間約 $(( (10#$UTC_HOUR + 8) % 24 )):${UTC_MIN})"
+          if [ -z "$STAGE" ]; then
+            STAGE="auto"
+          fi
 
-          if [ "$STAGE" = "premarket" ] || ([ "$STAGE" = "auto" ] && [ "$UTC_HOUR" -eq 0 ]); then
-            echo "[+] 啟動 08:20 盤前早鳥跨市場預警快篩..."
+          # 一律以台北時間 (UTC+8) 作為階段與時段守衛判定標準，禁止再以 UTC 小時判斷
+          TW_TIME=$(TZ="Asia/Taipei" date +%H%M)
+          TW_HOUR=$(TZ="Asia/Taipei" date +%H)
+          TW_MIN=$(TZ="Asia/Taipei" date +%M)
+          echo "[+] 當前台北時間 (UTC+8): ${TW_HOUR}:${TW_MIN} (數值: ${TW_TIME}) | 指定階段: ${STAGE}"
+
+          if [ "$STAGE" = "premarket" ]; then
+            echo "[+] 手動指定 premarket，啟動盤前早鳥快篩..."
             python strategies/12_etf_event_radar/screener.py --line
-          else
-            echo "[+] 啟動 09:02 開盤實盤確認與下單指令產出..."
+          elif [ "$STAGE" = "confirm" ]; then
+            if [ "$TW_TIME" -gt 1335 ]; then
+              echo "[*] [時段守衛] 台北時間已過 13:35 (${TW_HOUR}:${TW_MIN})，收盤後跳過開盤確認。"
+              exit 0
+            fi
+            echo "[+] 手動指定 confirm，啟動開盤確認與下單指令產出..."
             python strategies/12_etf_event_radar/intraday_scanner.py --confirm --line
+          else
+            # auto 自動模式判定規則：
+            # 1. 09:00 之前 (例如 08:20 排程)：執行盤前早鳥 (screener.py)
+            # 2. 09:00 ~ 13:35 (例如 09:02 排程)：執行開盤確認 (intraday_scanner.py --confirm --line)
+            # 3. 13:35 之後 (例如 GitHub 排程嚴重延遲至下午)：直接跳過，不跑 confirm、不跑 premarket，以成功碼結束
+            if [ "$TW_TIME" -lt 0900 ]; then
+              echo "[+] 台北時間 09:00 之前 (${TW_HOUR}:${TW_MIN})，啟動 08:20 盤前早鳥跨市場預警快篩..."
+              python strategies/12_etf_event_radar/screener.py --line
+            elif [ "$TW_TIME" -le 1335 ]; then
+              echo "[+] 台北時間 09:00~13:35 之間 (${TW_HOUR}:${TW_MIN})，啟動 09:02 開盤實盤確認與下單指令產出..."
+              python strategies/12_etf_event_radar/intraday_scanner.py --confirm --line
+            else
+              echo "[*] [時段守衛] 台北時間已過 13:35 (${TW_HOUR}:${TW_MIN})，收盤後自動跳過，不執行任何任務，以成功碼結束。"
+              exit 0
+            fi
           fi
 
       - name: 自動提交最新選股報表與快取 (result.csv / premarket_candidates.json)

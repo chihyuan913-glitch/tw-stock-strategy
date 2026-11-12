@@ -305,6 +305,12 @@ def load_scanner_targets() -> list:
 
 def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = False, force: bool = False):
     """盤中雷達掃描主迴圈"""
+    now_tw = datetime.datetime.now(TZ_TW)
+    t_int = now_tw.hour * 100 + now_tw.minute
+    if not test_push and now_tw.weekday() < 5 and t_int > 1335:
+        print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，結束行程退出。")
+        return
+
     print("=" * 75)
     print(f"📡 啟動【{STRATEGY_NAME}】盤中即時雷達")
     print(f"⏰ 執行時段：09:00 ~ 13:35 | 輪詢週期：{interval} 秒")
@@ -358,6 +364,12 @@ def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = 
         if once:
             return
 
+    now_tw_init = datetime.datetime.now(TZ_TW)
+    t_int_init = now_tw_init.hour * 100 + now_tw_init.minute
+    if not (test_push) and now_tw_init.weekday() < 5 and t_int_init > 1335:
+        print(f"[*] [{now_tw_init.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，結束行程退出。")
+        return
+
     alerted_set = set()
 
     while True:
@@ -365,11 +377,14 @@ def run_intraday_scan(once: bool = False, interval: int = 60, test_push: bool = 
         t_int = now_tw.hour * 100 + now_tw.minute
 
         # 盤中交易時段判定 (平日 09:00 ~ 13:35)
-        # 若為 once 模式則允許非交易時段單次執行
-        if not once and not force and (t_int < 900 or t_int > 1335):
-            print(f"[*] 目前非盤中交易時段 ({now_tw.strftime('%H:%M:%S')})，雷達休眠等待開盤...")
-            time.sleep(30)
-            continue
+        if not (test_push) and now_tw.weekday() < 5 and (t_int < 900 or t_int > 1335):
+            if t_int > 1335:
+                print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，盤中雷達結束行程退出。")
+                break
+            else:
+                print(f"[*] 目前尚未開盤 ({now_tw.strftime('%H:%M:%S')})，等待 09:00 開盤中...")
+                time.sleep(30)
+                continue
 
         print(f"\n[{now_tw.strftime('%H:%M:%S')}] 進行集團作帳標的盤中到價巡檢...")
 
@@ -425,6 +440,14 @@ def main():
     parser.add_argument("--test-push", action="store_true", help="發送一筆模擬到價推播以驗證 LINE 連線與卡片排版")
     parser.add_argument("--force", action="store_true", help="強制執行，跳過開休市與未開盤日檢核 (Rule 21)")
     args = parser.parse_args()
+
+    # 交易日收盤時段守衛：已過 13:35 立即結束 (即使 force 也不得於收盤後執行)
+    if not args.test_push:
+        now_tw = datetime.datetime.now(TZ_TW)
+        t_int = now_tw.hour * 100 + now_tw.minute
+        if now_tw.weekday() < 5 and t_int > 1335:
+            print(f"[*] [{now_tw.strftime('%H:%M:%S')}] 今日盤中交易已結束 (超過 13:35)，結束行程退出。")
+            return
 
     # 開休市檢核守門 (若非強制且非測試)
     if not args.force and not args.test_push and not args.once:
