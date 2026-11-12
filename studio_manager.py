@@ -497,6 +497,29 @@ def load_strategy_python_code(folder_name: str) -> str:
             pass
     return f"# 策略 {folder_name} Python 原始碼載入中..."
 
+def _studio_count_contract(folder_name: str) -> Dict[str, Any]:
+    """讀既有 csv 計算口徑。不改選股、不補追溯欄位。"""
+    import csv
+    from dashboard_contract import build_count_contract, legacy_provenance
+    path = ROOT_DIR / "strategies" / folder_name / "result.csv"
+    if not path.exists():
+        contract = build_count_contract([])
+        contract["provenance"] = legacy_provenance([])
+        return contract
+    try:
+        with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            rows = list(reader)
+            contract = build_count_contract(rows)
+            contract["provenance"] = legacy_provenance(reader.fieldnames, rows)
+            return contract
+    except Exception as exc:
+        contract = build_count_contract([])
+        contract["pool_status"] = "error"
+        contract["error"] = str(exc)
+        return contract
+
+
 def get_strategy_studio_report(folder_key: str) -> Dict[str, Any]:
     """產出完整單一策略的 FinLab Studio 戰報封包"""
     # 支援以數字編號查尋 (如 '01', '1', '11')
@@ -508,6 +531,7 @@ def get_strategy_studio_report(folder_key: str) -> Dict[str, Any]:
 
     meta = STRATEGY_META.get(folder_key, STRATEGY_META["11_revenue_volume_breakout"])
     holdings = load_strategy_holdings(folder_key)
+    count_contract = _studio_count_contract(folder_key)
     code_text = load_strategy_python_code(folder_key)
     equity_curve = generate_mock_equity_curve(
         meta["metrics"]["cagr"],
@@ -525,6 +549,10 @@ def get_strategy_studio_report(folder_key: str) -> Dict[str, Any]:
         "tier_badge": meta.get("tier_badge", "⚔️ A級・穩健波段"),
         "capital_weight_pct": meta.get("capital_weight_pct", 10.0),
         "best_regime": meta.get("best_regime", "全市場適用"),
+        "best_regime_role": "strategy_design_context",
+        "metrics_status": "illustrative_unverified",
+        "metrics_disclaimer": "目錄常數與合成曲線只是示範，不是回測結果，也不是實盤績效。",
+        "count_contract": count_contract,
         "direction": meta["direction"],
         "philosophy": meta["philosophy"],
         "dimensions": meta["dimensions"],

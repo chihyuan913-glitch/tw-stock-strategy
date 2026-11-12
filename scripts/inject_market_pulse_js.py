@@ -2,6 +2,8 @@
 inject_market_pulse_js.py: 將 Market Pulse 與 Treemap 的完整前端邏輯注入 web/index.html
 """
 
+raise SystemExit("phase1: 此腳本會把過期的 10/29 與錯誤 DOM id 寫回 index.html，已停用。")
+
 INDEX_PATH = "web/index.html"
 
 with open(INDEX_PATH, "r", encoding="utf-8") as f:
