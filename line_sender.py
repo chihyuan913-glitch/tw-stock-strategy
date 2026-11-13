@@ -722,14 +722,9 @@ def is_priority_advisor_target(code: str) -> tuple:
 
 
 def format_price_val(val) -> str:
-    """安全格式化股價數值"""
-    if val is None or val == "" or val == "-":
-        return "--"
-    try:
-        f = float(val)
-        return f"{f:,.2f}"
-    except (ValueError, TypeError):
-        return str(val)
+    """安全格式化股價數值 (對齊 four_price_engine.format_tw_price 全域升降單位規則)"""
+    from four_price_engine import format_tw_price
+    return format_tw_price(val)
 
 def build_price_alert_card(
     target: dict,

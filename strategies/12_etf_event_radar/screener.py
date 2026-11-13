@@ -47,7 +47,7 @@ except ImportError:
         return True
 
 try:
-    from four_price_engine import normalize_to_tick, get_twse_tick_size
+    from four_price_engine import normalize_to_tick, get_twse_tick_size, format_tw_price
 except ImportError:
     def normalize_to_tick(price: float, direction: str = 'nearest') -> float:
         return round(price, 2)
@@ -56,8 +56,16 @@ except ImportError:
         elif price < 50: return 0.05
         elif price < 100: return 0.10
         elif price < 500: return 0.50
-        elif price < 1000: return 1.00
-        else: return 5.00
+        elif price < 1000: return 1.0
+        else: return 5.0
+    def format_tw_price(val: Any) -> str:
+        if val is None or val == "" or val == "-": return "--"
+        try:
+            r = round(float(val), 2)
+            if r == 0: return "0"
+            s = f"{r:.2f}"
+            return s.rstrip("0").rstrip(".") if "." in s else s
+        except Exception: return str(val)
 
 UNIVERSE_FILE = os.path.join(ROOT_DIR, "all_etf_universe.json")
 PREMARKET_FILE = os.path.join(CURRENT_DIR, "premarket_candidates.json")
@@ -300,6 +308,7 @@ def run_screener(send_line: bool = False, is_replay: bool = False, export_path: 
 
         theo_price = normalize_to_tick(round(y_close * (1 + theo_chg / 100.0), 2))
 
+        close_p = q.get("close_price", 0.0)
         # 走弱標的 (防開盤虛高追價陷阱)
         if theo_chg <= -1.2:
             candidates.append({
@@ -309,6 +318,7 @@ def run_screener(send_line: bool = False, is_replay: bool = False, export_path: 
                 "category": item.get("category", "OVERSEAS_EQUITY"),
                 "type": "PREMIUM_RISK",
                 "tag": "⚠️ 實盤警戒・防開盤虛高追價",
+                "close_price": close_p,
                 "yesterday_close": y_close,
                 "theo_price": theo_price,
                 "theo_chg": theo_chg,
@@ -324,6 +334,7 @@ def run_screener(send_line: bool = False, is_replay: bool = False, export_path: 
                 "category": item.get("category", "OVERSEAS_EQUITY"),
                 "type": "DISCOUNT_OPPORTUNITY",
                 "tag": "🎯 實盤鎖定・折價低接潛力",
+                "close_price": close_p,
                 "yesterday_close": y_close,
                 "theo_price": theo_price,
                 "theo_chg": theo_chg,
@@ -343,20 +354,22 @@ def run_screener(send_line: bool = False, is_replay: bool = False, export_path: 
         target_csv = os.path.join(CURRENT_DIR, target_csv)
     with open(target_csv, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["股票代碼", "股票名稱", "市場", "事件類型", "昨日收盤", "動態公允開盤價", "預估漲跌幅(%)", "海外複合錨定", "實戰操盤指引"])
+        writer.writerow(["股票代碼", "股票名稱", "市場", "事件類型", "收盤價", "最新現價", "昨日收盤", "動態公允開盤價", "預估漲跌幅(%)", "海外複合錨定", "實戰操盤指引"])
         for c in candidates:
-            writer.writerow([c["code"], c["name"], c["market"], c["tag"], c["yesterday_close"], c["theo_price"], c["theo_chg"], c["anchor_desc"], c["advice"]])
+            cp_str = format_tw_price(c["close_price"]) if c.get("close_price") and c["close_price"] > 0 else ""
+            writer.writerow([c["code"], c["name"], c["market"], c["tag"], cp_str, cp_str, c["yesterday_close"], c["theo_price"], c["theo_chg"], c["anchor_desc"], c["advice"]])
 
     # 產出 Markdown 戰報 result.md
     md_lines = [
         f"# 策略 12：全台 ETF 跨市場折溢價事件雷達 盤前早鳥戰報",
         f"> 產出時間：{now_str} ｜ 監控母體：{len(anchor_items)} 檔跨市場 ETF ｜ 預警標的：{len(candidates)} 檔",
         "",
-        "| 代碼 | 名稱 | 市場 | 事件標籤 | 昨日收盤 | 動態公允開盤價 | 預估偏離 | 海外複合錨定 | 實戰操盤指引 |",
-        "| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :--- | :--- |"
+        "| 代碼 | 名稱 | 市場 | 事件標籤 | 今日收盤 | 昨日收盤 | 動態公允開盤價 | 預估偏離 | 海外複合錨定 | 實戰操盤指引 |",
+        "| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :--- | :--- |"
     ]
     for c in candidates:
-        md_lines.append(f"| **{c['code']}** | {c['name']} | {c['market'].upper()} | {c['tag']} | {c['yesterday_close']} | **{c['theo_price']}** | **{c['theo_chg']:+0.2f}%** | {c['anchor_desc']} | {c['advice']} |")
+        cp_disp = format_tw_price(c["close_price"]) if c.get("close_price") and c["close_price"] > 0 else "--"
+        md_lines.append(f"| **{c['code']}** | {c['name']} | {c['market'].upper()} | {c['tag']} | {cp_disp} | {c['yesterday_close']} | **{c['theo_price']}** | **{c['theo_chg']:+0.2f}%** | {c['anchor_desc']} | {c['advice']} |")
     with open(RESULT_MD, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 

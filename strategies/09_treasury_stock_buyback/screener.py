@@ -36,7 +36,7 @@ if ROOT_DIR not in sys.path:
 
 from algo_guards import evaluate_overnight_broker_risk
 from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
-from four_price_engine import normalize_to_tick, get_twse_tick_size, get_limit_prices
+from four_price_engine import normalize_to_tick, get_twse_tick_size, get_limit_prices, format_tw_price
 from market_schedule import (
     check_market_open_or_exit,
     verify_twse_data_settlement,
@@ -495,10 +495,10 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
         candidate_record = {
             "證券代號": code,
             "證券名稱": name,
-            "收盤價": close,
+            "收盤價": format_tw_price(close),
             "股票代碼": code,
             "股票名稱": name,
-            "最新現價": close,
+            "最新現價": format_tw_price(close),
             "漲跌額": market_data["change"],
             "漲跌幅(%)": market_data["pct_change"],
             "當日成交量(張)": market_data["volume"],
@@ -518,16 +518,16 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
             "歷史3年平均執行率(%)": hist_avg,
             "誠信評等": rel_desc,
             "三大法人買賣超(張)": inst_net,
-            "進場價位": four_prices["entry_price"],
-            "加碼價位": four_prices["addon_price"],
-            "停利TP1": four_prices["tp1_price"],
-            "停利TP2": four_prices["tp2_price"],
-            "停損價位": four_prices["sl_price"],
-            "進場買進上限": four_prices["entry_price"],
-            "續強加碼價": four_prices["addon_price"],
-            "目標停利TP1": four_prices["tp1_price"],
-            "目標停利TP2": four_prices["tp2_price"],
-            "嚴格停損價": four_prices["sl_price"],
+            "進場價位": format_tw_price(four_prices["entry_price"]),
+            "加碼價位": format_tw_price(four_prices["addon_price"]),
+            "停利TP1": format_tw_price(four_prices["tp1_price"]),
+            "停利TP2": format_tw_price(four_prices["tp2_price"]),
+            "停損價位": format_tw_price(four_prices["sl_price"]),
+            "進場買進上限": format_tw_price(four_prices["entry_price"]),
+            "續強加碼價": format_tw_price(four_prices["addon_price"]),
+            "目標停利TP1": format_tw_price(four_prices["tp1_price"]),
+            "目標停利TP2": format_tw_price(four_prices["tp2_price"]),
+            "嚴格停損價": format_tw_price(four_prices["sl_price"]),
             "隔日沖風險": "⚠️ 隔日沖集中" if overnight_risk.get("is_overnight_risk") else "正常",
             "評分": score,
             "星級推薦": stars,
@@ -591,7 +591,7 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
         tier3_candidates.append({
             "股票代碼": code,
             "股票名稱": name,
-            "最新現價": c_price,
+            "最新現價": format_tw_price(c_price),
             "漲跌額": 0.5,
             "漲跌幅(%)": 1.0,
             "當日成交量": 2000,

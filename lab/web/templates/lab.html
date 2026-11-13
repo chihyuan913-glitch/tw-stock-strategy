@@ -855,10 +855,10 @@
           <td><strong>${r.symbol}</strong></td>
           <td>${r.strategy_name}</td>
           <td><span class="tag ${r.status === '買進' ? 'tag-buy' : (r.status === '被濾網擋下' ? 'tag-warn' : '')}">${r.status}</span></td>
-          <td>$${r.close_price.toFixed(2)}</td>
-          <td>$${r.entry_price.toFixed(2)}</td>
-          <td>$${r.tp1_price.toFixed(2)}</td>
-          <td>$${r.stop_loss_price.toFixed(2)}</td>
+          <td>$${Number(r.close_price).toFixed(2).replace(/\.?0+$/, '')}</td>
+          <td>$${Number(r.entry_price).toFixed(2).replace(/\.?0+$/, '')}</td>
+          <td>$${Number(r.tp1_price).toFixed(2).replace(/\.?0+$/, '')}</td>
+          <td>$${Number(r.stop_loss_price).toFixed(2).replace(/\.?0+$/, '')}</td>
           <td>${r.note || '-'}</td>
         </tr>
       `).join('');
@@ -1045,6 +1045,14 @@
       a.click();
     }
 
+    function formatLabPrice(v) {
+      if (v === null || v === undefined || v === '' || v === '-') return '--';
+      const num = Number(v);
+      if (isNaN(num) || !isFinite(num)) return '--';
+      if (num === 0) return '0';
+      return num.toFixed(2).replace(/\.?0+$/, '');
+    }
+
     async function loadScreenerFusion() {
       const box = document.getElementById('fusionContainer');
       const res = await fetch('/api/lab/fusion/summary');
@@ -1062,7 +1070,7 @@
           sel.appendChild(opt);
         }
         const syms = (s.top_symbols || []).slice(0, 5).join(', ');
-        const firstPick = (s.picks && s.picks.length > 0) ? `${s.picks[0].symbol} ${s.picks[0].name} (進:$${s.picks[0].entry_price} / TP1:$${s.picks[0].tp1_price} / SL:$${s.picks[0].stop_loss_price})` : '無';
+        const firstPick = (s.picks && s.picks.length > 0) ? `${s.picks[0].symbol} ${s.picks[0].name} (進:$${formatLabPrice(s.picks[0].entry_price)} / TP1:$${formatLabPrice(s.picks[0].tp1_price)} / SL:$${formatLabPrice(s.picks[0].stop_loss_price)})` : '無';
         html += `<tr>
           <td><strong>${s.name}</strong><br/><span style="font-size:0.76rem; color:var(--text-muted);">首選防線: ${firstPick}</span></td>
           <td><span class="tag tag-buy">${s.pick_count} 檔</span></td>

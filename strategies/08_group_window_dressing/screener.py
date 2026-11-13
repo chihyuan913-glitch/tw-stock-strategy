@@ -40,6 +40,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from algo_guards import evaluate_overnight_broker_risk
+from four_price_engine import format_tw_price
 from adaptive_regime_manager import get_strategy_adaptive_params, load_adaptive_config
 from futures_helper import (
     load_stock_futures_pool,
@@ -1785,7 +1786,7 @@ def run_screener(export_path: str = None, send_line_flag: bool = False, cmoney_f
             "集團共振率%": it.get('group_resonance_ratio', 0.0),
             "同集團轉強兄弟股": siblings_str,
             "作帳日曆階段": calendar_meta.get('phase_badge', ''),
-            "收盤價": it.get('close', 0.0),
+            "收盤價": format_tw_price(it.get('close', 0.0)),
             "多空狀態": it.get('state_badge', ''),
             "狀態代碼": it.get('state_code', ''),
             "門檻層級": it.get('門檻層級', it.get('tier_level', '')),
@@ -1798,18 +1799,18 @@ def run_screener(export_path: str = None, send_line_flag: bool = False, cmoney_f
             "5日均量(張)": it.get('avg_vol_5d', 0),
             "20MA": round(float(it.get('ma20', 0.0)), 2),
             "月線乖離%": it.get('bias20_pct', 0.0),
-            "進場價位": it.get('entry_price', 0.0),
-            "加碼價位": it.get('addon_price', 0.0),
-            "停利TP1": it.get('tp1_price', 0.0),
-            "停利TP2": it.get('tp2_price', 0.0),
-            "停損價位": it.get('sl_price', 0.0),
-            "現貨進場": it.get('entry_price', 0.0),
-            "現貨加碼": it.get('addon_price', 0.0),
-            "現貨TP1": it.get('tp1_price', 0.0),
-            "現貨TP2": it.get('tp2_price', 0.0),
-            "現貨停損": it.get('sl_price', 0.0),
-            "漲停價": it.get('limit_up', 0.0),
-            "跌停價": it.get('limit_down', 0.0),
+            "進場價位": format_tw_price(it.get('entry_price', 0.0)),
+            "加碼價位": format_tw_price(it.get('addon_price', 0.0)),
+            "停利TP1": format_tw_price(it.get('tp1_price', 0.0)),
+            "停利TP2": format_tw_price(it.get('tp2_price', 0.0)),
+            "停損價位": format_tw_price(it.get('sl_price', 0.0)),
+            "現貨進場": format_tw_price(it.get('entry_price', 0.0)),
+            "現貨加碼": format_tw_price(it.get('addon_price', 0.0)),
+            "現貨TP1": format_tw_price(it.get('tp1_price', 0.0)),
+            "現貨TP2": format_tw_price(it.get('tp2_price', 0.0)),
+            "現貨停損": format_tw_price(it.get('sl_price', 0.0)),
+            "漲停價": format_tw_price(it.get('limit_up', 0.0)),
+            "跌停價": format_tw_price(it.get('limit_down', 0.0)),
             "盈虧比": it.get('risk_reward_ratio', 2.0),
             "期貨契約": fut.get('contract_sym', '--'),
             "期貨月份": fut.get('month', '--'),

@@ -1531,6 +1531,25 @@
     // 初始化 Lucide 圖標
     lucide.createIcons();
 
+    /**
+     * 依據臺灣證券交易所升降單位與小數精度格式化股價（對齊 Python four_price_engine.format_tw_price 規範）：
+     * - 四捨五入至小數兩位精度 (round(val, 2))
+     * - 去除末尾多餘的 0 與小數點 (例如 58.60 -> 58.6, 1440.0 -> 1440, 167.0 -> 167)
+     * - 48.03, 24.23 等分位精確保留
+     * - 不輸出強制千分位或多餘零 (1440 而非 1,440.00)
+     * - 消除 0.1 + 0.2 (0.3) 等 IEEE 浮點誤差與 float32 殘值 (58.599998474121094 -> 58.6)
+     * - null, undefined, '', NaN, 非數字回傳 '--'，0 回傳 '0'
+     */
+    function formatTwPrice(v) {
+      if (v === null || v === undefined || v === '' || v === '-') return '--';
+      const num = Number(v);
+      if (isNaN(num) || !isFinite(num)) return '--';
+      const r = Math.round((num + Number.EPSILON) * 100) / 100;
+      if (r === 0) return '0';
+      const s = r.toFixed(2);
+      return s.replace(/\.?0+$/, '');
+    }
+
     let currentTunnelUrl = '';
     async function checkNetworkInfo() {
       try {
@@ -1829,18 +1848,18 @@
         const code = it.code || '';
         const name = it.name || code;
         const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
-        const bp = Number(it.base_price || 0).toFixed(2);
-        const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
-        const ad = Number(it.addon_price || 0).toFixed(2);
-        const tp1 = Number(it.tp1_price || 0).toFixed(2);
-        const tp2 = Number(it.tp2_price || 0).toFixed(2);
-        const sl = Number(it.sl_price || 0).toFixed(2);
+        const bp = formatTwPrice(it.base_price);
+        const ep = formatTwPrice(it.entry_price || it.entry_high || it.base_price);
+        const ad = formatTwPrice(it.addon_price);
+        const tp1 = formatTwPrice(it.tp1_price);
+        const tp2 = formatTwPrice(it.tp2_price);
+        const sl = formatTwPrice(it.sl_price);
 
         // 即時現價與漲跌幅
         const rtPrice = (it.realtime_price !== undefined && it.realtime_price !== null && Number(it.realtime_price) > 0)
           ? Number(it.realtime_price)
           : Number(it.base_price || 0);
-        const rtPriceFormatted = rtPrice > 0 ? rtPrice.toFixed(2) : bp;
+        const rtPriceFormatted = rtPrice > 0 ? formatTwPrice(rtPrice) : bp;
         const rtChange = Number(it.realtime_change || 0);
         const rtChangePct = Number(it.realtime_change_pct || 0);
         const quoteTime = it.quote_time ? String(it.quote_time).substring(0, 5) : '';
@@ -2139,12 +2158,12 @@
         const code = it.code || '';
         const name = it.name || code;
         const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
-        const bp = Number(it.base_price || 0).toFixed(2);
-        const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
-        const ad = Number(it.addon_price || 0).toFixed(2);
-        const tp1 = Number(it.tp1_price || 0).toFixed(2);
-        const tp2 = Number(it.tp2_price || 0).toFixed(2);
-        const sl = Number(it.sl_price || 0).toFixed(2);
+        const bp = formatTwPrice(it.base_price);
+        const ep = formatTwPrice(it.entry_price || it.entry_high || it.base_price);
+        const ad = formatTwPrice(it.addon_price);
+        const tp1 = formatTwPrice(it.tp1_price);
+        const tp2 = formatTwPrice(it.tp2_price);
+        const sl = formatTwPrice(it.sl_price);
         const addedAt = (it.added_at || '').substring(5, 16);
         const pushAt = (it.last_push_at || '').substring(5, 16);
         const timeLabel = pushAt && pushAt >= addedAt ? `推送: ${pushAt}` : `掛入: ${addedAt}`;
@@ -2153,7 +2172,7 @@
         const rtPrice = (it.realtime_price !== undefined && it.realtime_price !== null && Number(it.realtime_price) > 0)
           ? Number(it.realtime_price)
           : Number(it.base_price || 0);
-        const rtPriceFormatted = rtPrice > 0 ? rtPrice.toFixed(2) : bp;
+        const rtPriceFormatted = rtPrice > 0 ? formatTwPrice(rtPrice) : bp;
         const rtChange = Number(it.realtime_change || 0);
         const rtChangePct = Number(it.realtime_change_pct || 0);
         const quoteTime = it.quote_time ? String(it.quote_time).substring(0, 5) : '';
@@ -2411,18 +2430,18 @@
         const code = it.code || '';
         const name = it.name || code;
         const isShort = it.direction === 'SHORT' || it.is_short || (it.name && (it.name.includes('弱勢破線') || it.name.includes('做空')));
-        const bp = Number(it.base_price || 0).toFixed(2);
-        const ep = Number(it.entry_price || it.entry_high || it.base_price || 0).toFixed(2);
-        const ad = Number(it.addon_price || 0).toFixed(2);
-        const tp1 = Number(it.tp1_price || 0).toFixed(2);
-        const sl = Number(it.sl_price || 0).toFixed(2);
+        const bp = formatTwPrice(it.base_price);
+        const ep = formatTwPrice(it.entry_price || it.entry_high || it.base_price);
+        const ad = formatTwPrice(it.addon_price);
+        const tp1 = formatTwPrice(it.tp1_price);
+        const sl = formatTwPrice(it.sl_price);
         const addedAt = (it.added_at || '').substring(5, 16);
 
         // 即時現價與漲跌
         const rtPrice = (it.realtime_price !== undefined && it.realtime_price !== null && Number(it.realtime_price) > 0)
           ? Number(it.realtime_price)
           : Number(it.base_price || 0);
-        const rtPriceFormatted = rtPrice > 0 ? rtPrice.toFixed(2) : bp;
+        const rtPriceFormatted = rtPrice > 0 ? formatTwPrice(rtPrice) : bp;
         const rtChange = Number(it.realtime_change || 0);
         const rtChangePct = Number(it.realtime_change_pct || 0);
 
@@ -2639,7 +2658,7 @@
             <div class="flex items-baseline gap-3">
               <div class="text-right">
                 <div class="text-xs text-slate-400">最新現價</div>
-                <div class="text-3xl font-black font-mono text-white">${Number(d.current_price).toFixed(2)}</div>
+                <div class="text-3xl font-black font-mono text-white">${formatTwPrice(d.current_price)}</div>
               </div>
               <div class="px-3 py-1.5 rounded-xl ${chgBg} border text-sm font-bold font-mono ${chgColor}">
                 ${d.chg_icon} ${d.chg_val > 0 ? '+' : ''}${Number(d.chg_val).toFixed(2)} (${d.chg_pct > 0 ? '+' : ''}${Number(d.chg_pct).toFixed(2)}%)
@@ -2660,7 +2679,7 @@
                   <span>🟢 建議進場</span>
                   <span class="text-[10px] text-emerald-500/80 font-normal">買進上限 / 防追高</span>
                 </div>
-                <div class="text-2xl font-black font-mono text-emerald-400 my-1">${Number(d.entry_price).toFixed(2)} <span class="text-xs font-sans">元</span></div>
+                <div class="text-2xl font-black font-mono text-emerald-400 my-1">${formatTwPrice(d.entry_price)} <span class="text-xs font-sans">元</span></div>
                 <div class="text-[10px] text-emerald-300/70 truncate">${d.entry_strat || '合適建倉點位'}</div>
               </div>
 
@@ -2670,7 +2689,7 @@
                   <span>🔵 動能加碼</span>
                   <span class="text-[10px] text-blue-500/80 font-normal">放量過高續強</span>
                 </div>
-                <div class="text-2xl font-black font-mono text-blue-400 my-1">${Number(d.addon_price).toFixed(2)} <span class="text-xs font-sans">元</span></div>
+                <div class="text-2xl font-black font-mono text-blue-400 my-1">${formatTwPrice(d.addon_price)} <span class="text-xs font-sans">元</span></div>
                 <div class="text-[10px] text-blue-300/70 truncate">突破關鍵高點順勢追擊</div>
               </div>
 
@@ -2681,7 +2700,7 @@
                   <span class="text-[10px] text-rose-500/80 font-normal">分批拔檔獲利</span>
                 </div>
                 <div class="text-lg font-black font-mono text-rose-400 my-1">
-                  TP1 ${Number(d.tp1_price).toFixed(2)} ｜ TP2 ${Number(d.tp2_price).toFixed(2)}
+                  TP1 ${formatTwPrice(d.tp1_price)} ｜ TP2 ${formatTwPrice(d.tp2_price)}
                 </div>
                 <div class="text-[10px] text-rose-300/70 truncate">前高反壓 / 1:1等幅滿足</div>
               </div>
@@ -2692,7 +2711,7 @@
                   <span>🛑 嚴格停損</span>
                   <span class="text-[10px] text-amber-500/80 font-normal">風控無條件退</span>
                 </div>
-                <div class="text-2xl font-black font-mono text-amber-400 my-1">${Number(d.stop_loss).toFixed(2)} <span class="text-xs font-sans">元</span></div>
+                <div class="text-2xl font-black font-mono text-amber-400 my-1">${formatTwPrice(d.stop_loss)} <span class="text-xs font-sans">元</span></div>
                 <div class="text-[10px] text-amber-300/70 truncate">跌破關鍵支撐無條件離場</div>
               </div>
             </div>
@@ -4339,7 +4358,7 @@
                 <div class="mt-2 flex items-baseline gap-2">
                   <span class="text-xl font-black text-white font-mono">${r.symbol}</span>
                   <span class="text-lg font-bold text-slate-100">${r.name}</span>
-                  <span class="text-xs text-slate-500">現價 $${r.close_price}</span>
+                  <span class="text-xs text-slate-500">現價 $${formatTwPrice(r.close_price)}</span>
                 </div>
               </div>
               <div class="text-right">
@@ -4352,19 +4371,19 @@
             <div class="grid grid-cols-2 gap-2 mt-3 text-xs font-mono">
               <div class="p-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex justify-between items-center">
                 <span class="text-emerald-400 font-sans text-[11px]">🟢 進場上限</span>
-                <span class="text-emerald-300 font-bold">$${r.entry_price}</span>
+                <span class="text-emerald-300 font-bold">$${formatTwPrice(r.entry_price)}</span>
               </div>
               <div class="p-2 rounded-lg bg-blue-950/30 border border-blue-800/40 flex justify-between items-center">
                 <span class="text-blue-400 font-sans text-[11px]">🔵 突破加碼</span>
-                <span class="text-blue-300 font-bold">$${r.addon_price}</span>
+                <span class="text-blue-300 font-bold">$${formatTwPrice(r.addon_price)}</span>
               </div>
               <div class="p-2 rounded-lg bg-amber-950/30 border border-amber-800/40 flex justify-between items-center">
                 <span class="text-amber-400 font-sans text-[11px]">🔴 目標停利</span>
-                <span class="text-amber-300 font-bold">$${r.tp1_price}</span>
+                <span class="text-amber-300 font-bold">$${formatTwPrice(r.tp1_price)}</span>
               </div>
               <div class="p-2 rounded-lg bg-rose-950/30 border border-rose-800/40 flex justify-between items-center">
                 <span class="text-rose-400 font-sans text-[11px]">🛑 嚴格停損</span>
-                <span class="text-rose-300 font-bold">$${r.stop_loss_price}</span>
+                <span class="text-rose-300 font-bold">$${formatTwPrice(r.stop_loss_price)}</span>
               </div>
             </div>
 

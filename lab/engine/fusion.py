@@ -6,6 +6,8 @@ ScreenerFusionBridge: 台股量化策略實驗室 × 實盤 9 大選股策略 (0
 3. 一鍵將實盤選股池匯入量化實驗室執行：事件驅動回測、蒙地卡羅壓力測試、前進分析與多策略資金配置
 """
 
+from four_price_engine import format_tw_price
+
 import io
 import os
 import csv
@@ -140,9 +142,11 @@ class ScreenerFusionBridge:
                             or sym
                         ).strip()
                         date_str = (row.get("選股日期") or "").strip()
-                        close_p = _safe_float(
-                            row.get("收盤價") or row.get("現價") or row.get("最新現價"), 100.0
-                        )
+                        raw_close = row.get("收盤價") or row.get("現價") or row.get("最新現價")
+                        close_p = _safe_float(raw_close, None)
+                        if close_p is None or close_p <= 0.0:
+                            # 嚴禁填入 100.0 等假現價，取不到可信現價則直接跳過此標的，避免推導假價位與錯誤部位
+                            continue
                         entry_p = _safe_float(
                             row.get("進場價位") or row.get("建議進場價") or row.get("進場買進上限"), close_p
                         )
@@ -371,9 +375,9 @@ class ScreenerFusionBridge:
                         priority = 1
                         futures_note = f"（或股期空單 {rec_futures_lots} 口，保證金約 ${int(futures_margin_1lot):,}/口）" if rec_futures_lots > 0 else ""
                         plan_zh = (
-                            f"【明日放空】開盤或反彈接近 ${p['entry_price']} 佈局空單（建議 {rec_shares:,} 股{futures_note}），"
-                            f"點位盈虧比 1:{rr_ratio}；摜破 ${p['addon_price']} 加空，目標回補 TP1 ${p['tp1_price']} / TP2 ${p['tp2_price']}，"
-                            f"突破 ${p['stop_loss_price']} 嚴格回補停損。"
+                            f"【明日放空】開盤或反彈接近 ${format_tw_price(p['entry_price'])} 佈局空單（建議 {rec_shares:,} 股{futures_note}），"
+                            f"點位盈虧比 1:{rr_ratio}；摜破 ${format_tw_price(p['addon_price'])} 加空，目標回補 TP1 ${format_tw_price(p['tp1_price'])} / TP2 ${format_tw_price(p['tp2_price'])}，"
+                            f"突破 ${format_tw_price(p['stop_loss_price'])} 嚴格回補停損。"
                         )
                     else:
                         action_tag = "⚪ 觀望剔除 (SKIP)"
@@ -387,9 +391,9 @@ class ScreenerFusionBridge:
                         priority = 1
                         futures_note = f"（或股期多單 {rec_futures_lots} 口，保證金約 ${int(futures_margin_1lot):,}/口）" if rec_futures_lots > 0 else ""
                         plan_zh = (
-                            f"【明日首選買進】於 ${p['close_price']} ~ ${p['entry_price']} 掛限價單建倉（建議 {rec_shares:,} 股{futures_note}），"
-                            f"盈虧比 1:{rr_ratio}（期望值 +{expectancy_pct}%）；超過 ${p['entry_price']} 嚴禁追高，"
-                            f"帶量突破 ${p['addon_price']} 加碼，停利 TP1 ${p['tp1_price']} / TP2 ${p['tp2_price']}，跌破 ${p['stop_loss_price']} 停損。"
+                            f"【明日首選買進】於 ${format_tw_price(p['close_price'])} ~ ${format_tw_price(p['entry_price'])} 掛限價單建倉（建議 {rec_shares:,} 股{futures_note}），"
+                            f"盈虧比 1:{rr_ratio}（期望值 +{expectancy_pct}%）；超過 ${format_tw_price(p['entry_price'])} 嚴禁追高，"
+                            f"帶量突破 ${format_tw_price(p['addon_price'])} 加碼，停利 TP1 ${format_tw_price(p['tp1_price'])} / TP2 ${format_tw_price(p['tp2_price'])}，跌破 ${format_tw_price(p['stop_loss_price'])} 停損。"
                         )
                     elif hist_ret >= 0.0:
                         action_tag = "🟡 拉回低接 (BUY ON DIP)"
@@ -397,8 +401,8 @@ class ScreenerFusionBridge:
                         priority = 2
                         plan_zh = (
                             f"【明日拉回低接】歷史回測報酬 +{hist_ret}%（勝率 {hist_wr}%、盈虧比 1:{rr_ratio}），籌碼註記「{p['overnight_risk']}」；"
-                            f"明日早盤嚴禁追高，待回測 ${p['close_price']} 附近分批低接（建議 {rec_shares:,} 股），"
-                            f"目標停利 ${p['tp1_price']}，防守停損 ${p['stop_loss_price']}。"
+                            f"明日早盤嚴禁追高，待回測 ${format_tw_price(p['close_price'])} 附近分批低接（建議 {rec_shares:,} 股），"
+                            f"目標停利 ${format_tw_price(p['tp1_price'])}，防守停損 ${format_tw_price(p['stop_loss_price'])}。"
                         )
                     else:
                         action_tag = "🛑 建議剔除 (FILTERED)"
@@ -429,12 +433,12 @@ class ScreenerFusionBridge:
                     "matched_strategies": matched_strats,
                     "tomorrow_action": action_tag,
                     "verdict": verdict,
-                    "close_price": p["close_price"],
-                    "entry_price": p["entry_price"],
-                    "addon_price": p["addon_price"],
-                    "tp1_price": p["tp1_price"],
-                    "tp2_price": p["tp2_price"],
-                    "stop_loss_price": p["stop_loss_price"],
+                    "close_price": format_tw_price(p["close_price"]),
+                    "entry_price": format_tw_price(p["entry_price"]),
+                    "addon_price": format_tw_price(p["addon_price"]),
+                    "tp1_price": format_tw_price(p["tp1_price"]),
+                    "tp2_price": format_tw_price(p["tp2_price"]),
+                    "stop_loss_price": format_tw_price(p["stop_loss_price"]),
                     "rr_ratio": rr_ratio,
                     "expectancy_pct": expectancy_pct,
                     "recommended_shares": rec_shares,
@@ -648,13 +652,13 @@ class ScreenerFusionBridge:
         top_picks = [r for r in report.get("recommendations", []) if r["priority"] == 1][:6]
         for idx, r in enumerate(top_picks, start=1):
             lines.extend([
-                f"{idx}. {r['tomorrow_action']}｜{r['symbol']} {r['name']}（現價 ${r['close_price']}）",
+                f"{idx}. {r['tomorrow_action']}｜{r['symbol']} {r['name']}（現價 ${format_tw_price(r['close_price'])}）",
                 f"   🏷️ 來源：{r['source_strategy']}（{r['verdict']}）",
                 f"   📈 歷史回測：報酬 +{r['hist_return_pct']}%｜勝率 {r['hist_win_rate_pct']}%｜夏普 {r['hist_sharpe']}｜盈虧比 1:{r.get('rr_ratio', 2.0)}",
-                f"   🟢 建議進場：${r['entry_price']}（建議 {r['recommended_shares']:,} 股）",
-                f"   🔵 突破加碼：${r['addon_price']}",
-                f"   🔴 目標停利：TP1 ${r['tp1_price']} ／ TP2 ${r['tp2_price']}",
-                f"   🛑 嚴格停損：${r['stop_loss_price']}",
+                f"   🟢 建議進場：${format_tw_price(r['entry_price'])}（建議 {r['recommended_shares']:,} 股）",
+                f"   🔵 突破加碼：${format_tw_price(r['addon_price'])}",
+                f"   🔴 目標停利：TP1 ${format_tw_price(r['tp1_price'])} ／ TP2 ${format_tw_price(r['tp2_price'])}",
+                f"   🛑 嚴格停損：${format_tw_price(r['stop_loss_price'])}",
                 "",
             ])
         lines.append("💡 操盤鐵律：開盤跳空越過進場上限嚴禁追高，觸及停損無條件出場。")

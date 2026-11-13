@@ -83,6 +83,37 @@ def normalize_to_tick(price: float, direction: str = 'nearest') -> float:
     return res
 
 
+
+
+def format_tw_price(val: Any) -> str:
+    """
+    依據臺灣證券交易所升降單位與小數精度格式化股價，徹底消除 float32 殘值與多餘的 0：
+    - 至少處理到小數兩位精度 (round(val, 2))
+    - 去除末尾多餘的 0 與小數點 (例如 58.60 -> 58.6, 1440.0 -> 1440, 167.0 -> 167)
+    - 48.03, 24.23 等分位精確保留
+    - 不輸出 1,440.00 這種強制千分位或多餘零
+    - 消除 0.1 + 0.2 (0.30000000000000004) 等 IEEE 浮點誤差
+    """
+    if val is None or val == "" or val == "-":
+        return "--"
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return "--"
+        r = round(f, 2)
+        if r == 0:
+            return "0"
+        s = f"{r:.2f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
+    except (ValueError, TypeError):
+        return str(val)
+
+
+format_price = format_tw_price
+format_twse_price = format_tw_price
+
 def get_limit_prices(prev_close: float) -> Tuple[float, float]:
     """
     精算當日台股法定漲跌停價 (Limit Up / Limit Down, ±10%)
@@ -273,11 +304,11 @@ def calculate_four_prices_long(
         "risk_reward_ratio": rr_ratio,
         "volatility_factor": round(volatility_factor, 2),
         "guidance": {
-            "entry_desc": f"建議買進上限 {entry_price} 元 (現價 {curr_price} 元以內皆為甜蜜買點，超過嚴禁追價)",
-            "addon_desc": f"突破 {addon_price} 元帶量確認續強，啟動第 2 階段順勢加碼",
-            "tp1_desc": f"目標一 {tp1_price} 元分批拔檔 50% 並啟動保本防守",
-            "tp2_desc": f"目標二 {tp2_price} 元波段主升段等幅滿足全數落袋",
-            "sl_desc": f"跌破 {sl_price} 元無條件停損離場，嚴守風控底線"
+            "entry_desc": f"建議買進上限 {format_tw_price(entry_price)} 元 (現價 {format_tw_price(curr_price)} 元以內皆為甜蜜買點，超過嚴禁追價)",
+            "addon_desc": f"突破 {format_tw_price(addon_price)} 元帶量確認續強，啟動第 2 階段順勢加碼",
+            "tp1_desc": f"目標一 {format_tw_price(tp1_price)} 元分批拔檔 50% 並啟動保本防守",
+            "tp2_desc": f"目標二 {format_tw_price(tp2_price)} 元波段主升段等幅滿足全數落袋",
+            "sl_desc": f"跌破 {format_tw_price(sl_price)} 元無條件停損離場，嚴守風控底線"
         }
     }
 
@@ -407,11 +438,11 @@ def calculate_four_prices_short(
         "risk_reward_ratio": rr_ratio,
         "volatility_factor": round(volatility_factor, 2),
         "guidance": {
-            "entry_desc": f"建議放空上限 {entry_price} 元 (現價 {curr_price} 元，反彈不過此上限為黃金空點)",
-            "addon_desc": f"摜破 {addon_price} 元確認弱勢續殺，啟動第 2 階段順勢加空",
-            "tp1_desc": f"回補目標一 {tp1_price} 元分批回補 50% 鎖定利潤",
-            "tp2_desc": f"回補目標二 {tp2_price} 元主跌段等幅滿足全數回補",
-            "sl_desc": f"突破 {sl_price} 元無條件空單停損回補，嚴控風險"
+            "entry_desc": f"建議放空上限 {format_tw_price(entry_price)} 元 (現價 {format_tw_price(curr_price)} 元，反彈不過此上限為黃金空點)",
+            "addon_desc": f"摜破 {format_tw_price(addon_price)} 元確認弱勢續殺，啟動第 2 階段順勢加空",
+            "tp1_desc": f"回補目標一 {format_tw_price(tp1_price)} 元分批回補 50% 鎖定利潤",
+            "tp2_desc": f"回補目標二 {format_tw_price(tp2_price)} 元主跌段等幅滿足全數回補",
+            "sl_desc": f"突破 {format_tw_price(sl_price)} 元無條件空單停損回補，嚴控風險"
         }
     }
 
