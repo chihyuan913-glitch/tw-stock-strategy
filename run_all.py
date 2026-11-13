@@ -172,12 +172,26 @@ def main():
     parser.add_argument("--force", action="store_true", help="強制執行策略，忽略台股休市守衛檢查")
     args = parser.parse_args()
 
+    from market_schedule import get_taiwan_now, is_daily_screener_window, check_market_open_or_exit, verify_twse_data_settlement
+    now_tw = get_taiwan_now()
+
     print(f"============================================================")
     print(f" 🎯 台股量化選股策略最高總指揮中心 - 全策略排程巡邏")
-    print(f" 🕒 啟動時間: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f" 🕒 啟動時間 (台北時間): {now_tw.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"============================================================")
 
-    from market_schedule import check_market_open_or_exit, verify_twse_data_settlement
+    # 1. 台北時間盤後選股專用時段守衛 (週一至週五 21:10:00 ~ 21:40:59)
+    # 杜絕因 GitHub Actions 排程延誤數小時而在凌晨誤執行與誤推播前一日過期戰報
+    # 注意：--force / --force-push 絕對不准略過此時段檢查
+    in_window, window_reason = is_daily_screener_window(now_tw)
+    if not in_window:
+        border = "=" * 70
+        print(f"\n{border}")
+        print(f"⏸️  [時段守衛攔截] {window_reason}")
+        print(f"🛑  為杜絕排程延誤誤推播，任務安全退出 (Exit 0)，不啟動策略且不發送推播！")
+        print(f"{border}\n")
+        return 0
+
     if not check_market_open_or_exit(context_name="全策略盤後選股排程", allow_force=True):
         return 0
 

@@ -20,18 +20,39 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: 檢驗台北盤後選股時段視窗 (21:10 ~ 21:40)
+        id: check_window
+        run: |
+          python3 - << 'EOF'
+          import os, sys
+          if "." not in sys.path:
+              sys.path.insert(0, ".")
+          from market_schedule import is_daily_screener_window
+          in_win, reason = is_daily_screener_window()
+          print(f"[*] 台北盤後選股時段判定: {reason}")
+          out_file = os.environ.get("GITHUB_OUTPUT")
+          if out_file:
+              with open(out_file, "a", encoding="utf-8") as f:
+                  f.write(f"in_window={str(in_win).lower()}\n")
+          if not in_win:
+              print("[⏸️ 視窗外攔截] 當前時間不在 21:10~21:40 視窗內，後續選股與推播步驟將自動跳過。")
+          EOF
+
       - name: 設定 Python 環境 (3.11)
+        if: steps.check_window.outputs.in_window == 'true' 
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
       - name: 安裝相依套件
+        if: steps.check_window.outputs.in_window == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: 執行全策略盤後選股並定向推播至專屬 LINE 視窗
+        if: steps.check_window.outputs.in_window == 'true'
         env:
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_CHANNEL_ACCESS_TOKEN_BACKUP: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN_BACKUP }}
@@ -57,6 +78,7 @@ jobs:
           python run_all.py --line
 
       - name: 自動同步最新選股報表與明日買賣建議回 Git 倉庫
+        if: steps.check_window.outputs.in_window == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -70,8 +92,8 @@ jobs:
           fi
 
       - name: 封存選股報表 Artifact
+        if: always() && steps.check_window.outputs.in_window == 'true'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: daily-screener-results
           path: |

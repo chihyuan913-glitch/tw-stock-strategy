@@ -319,6 +319,49 @@ MARKET_OPEN_TIME = datetime.time(9, 0, 0)
 MARKET_CLOSE_TIME = datetime.time(13, 35, 0)
 PREMARKET_RUNNER_START_TIME = datetime.time(8, 58, 0)
 
+# 盤後選股與推播專用視窗 (台北時間 21:10:00 ~ 21:40:59)
+SCREENER_WINDOW_START_TIME = datetime.time(21, 10, 0)
+SCREENER_WINDOW_END_TIME = datetime.time(21, 41, 0)
+
+
+def is_daily_screener_window(now_dt: Optional[datetime.datetime] = None) -> Tuple[bool, str]:
+    """
+    【盤後選股與推播專用時段守衛 (Daily Screener Time Window Guard)】
+    防止 GitHub Actions 排程嚴重延誤（延遲數小時至隔日凌晨）時誤執行盤後選股並誤推播前一日過期戰報。
+
+    規則定義：
+    1. 時區：一律使用台北時間 (UTC+8 / TZ_TW)，禁止使用主機/runner 本地時區或 UTC 小時判斷。
+    2. 星期：限週一至週五 (weekday < 5)。
+    3. 時段：當日 21:10:00 (含) 起至 21:41:00 (不含)，即 21:10:00 ~ 21:40:59 算視窗內。
+    4. 嚴格性：--force、--force-push、force=True 絕對不准略過此時段檢查。
+
+    回傳值:
+    - (True, 說明訊息)
+    - (False, 攔截原因說明)
+    """
+    if now_dt is None:
+        now_tw = get_taiwan_now()
+    else:
+        if now_dt.tzinfo is not None:
+            now_tw = now_dt.astimezone(TZ_TW)
+        else:
+            now_tw = now_dt.replace(tzinfo=TZ_TW)
+
+    # 1. 檢查是否為週一至週五
+    weekday_idx = now_tw.weekday()
+    if weekday_idx >= 5:
+        weekday_names = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+        return False, f"今日非平日盤後選股日 (當前台北時間 {now_tw.strftime('%Y-%m-%d %H:%M:%S')}，為{weekday_names[weekday_idx]})"
+
+    # 2. 檢查時間是否在 21:10:00 (含) ~ 21:41:00 (不含) 之間
+    now_time = now_tw.time()
+    if now_time < SCREENER_WINDOW_START_TIME:
+        return False, f"尚未達到盤後選股視窗時段 (當前台北時間 {now_tw.strftime('%H:%M:%S')} 早於 21:10:00)"
+    if now_time >= SCREENER_WINDOW_END_TIME:
+        return False, f"已超過盤後選股視窗時段 (當前台北時間 {now_tw.strftime('%H:%M:%S')} 晚於或等於 21:41:00，判定為延遲啟動)"
+
+    return True, f"處於盤後選股時段視窗內 (當前台北時間 {now_tw.strftime('%Y-%m-%d %H:%M:%S')})"
+
 
 def is_intraday_window(
     now_dt: Optional[datetime.datetime] = None,
