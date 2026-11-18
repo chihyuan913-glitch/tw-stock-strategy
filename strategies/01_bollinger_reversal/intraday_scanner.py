@@ -96,8 +96,11 @@ def load_targets():
             if targets:
                 print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔布林超跌精選標的。")
                 return targets
+            print("result.csv 今日無有效標的，盤中雷達待命，不建立示範母池")
+            return {}
         except Exception as e:
-            print(f"[!] 讀取 result.csv 失敗: {e}，將建立備用母池...")
+            print(f"[!] 讀取 result.csv 失敗: {e}，不建立示範母池")
+            return {}
 
     # 若無 result.csv 則從證交所快速挑選代表性標的
     print("[*] 查無 result.csv，從市場備用焦點股建立監控母池...")

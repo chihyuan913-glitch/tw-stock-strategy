@@ -21,6 +21,7 @@
 
 import sys
 import os
+import math
 import argparse
 import datetime
 import json
@@ -329,7 +330,9 @@ def fetch_stock_market_data(code: str, target_date_str: str = None, market: str 
 
             # 抓取每股淨值 book value
             info = t_obj.info if t_obj else {}
-            book_value = (info.get('bookValue') if info else None) or (close * 0.85)
+            book_value = float((info.get('bookValue') if info else None) or (close * 0.85))
+            if not all(math.isfinite(v) for v in (close, prev_close, ma20, ma60, high, low, open_p, book_value)) or close <= 0:
+                raise ValueError("non-finite market data")
             pb_ratio = round(close / book_value, 2) if book_value and book_value > 0 else 1.0
 
             return {
@@ -398,176 +401,183 @@ def apply_treasury_screening(pool: list, history: dict, insider_pool: list, targ
 
     for item in pool:
         code = str(item.get("code"))
-        name = str(item.get("name"))
-        status = item.get("status", "ACTIVE")
-        if status == "EXPIRED":
-            continue
-
-        ann_date_str = item.get("announcement_date", "2026-10-01")
         try:
-            ann_date = datetime.datetime.strptime(ann_date_str, "%Y-%m-%d").date()
-        except Exception:
-            ann_date = curr_date - datetime.timedelta(days=10)
+            name = str(item.get("name"))
+            status = item.get("status", "ACTIVE")
+            if status == "EXPIRED":
+                continue
 
-        days_since_ann = (curr_date - ann_date).days
+            ann_date_str = item.get("announcement_date", "2026-10-01")
+            try:
+                ann_date = datetime.datetime.strptime(ann_date_str, "%Y-%m-%d").date()
+            except Exception:
+                ann_date = curr_date - datetime.timedelta(days=10)
 
-        # 抓取市場行情與基本面
-        market_type = item.get("market", "上市")
-        market_data = fetch_stock_market_data(code, target_date_str, market=market_type)
-        close = market_data["close"]
-        vol5 = market_data["volume_5ma"]
-        pb = market_data["pb_ratio"]
-        ma20 = market_data["ma20"]
-        book_val = float(item.get("book_value", market_data["book_value"]))
-        price_min = float(item.get("price_min", close * 0.8))
-        price_max = float(item.get("price_max", close * 1.3))
-        planned_shares = int(item.get("planned_shares", 10000))
-        cap_ratio = float(item.get("capital_ratio_pct", 1.8))
-        exec_rate = float(item.get("execution_rate_pct", 0.0))
-        purpose = item.get("purpose", "維護公司信用及股東權益")
+            days_since_ann = (curr_date - ann_date).days
 
-        # 空間防追高檢驗：現價距買回上限空間
-        distance_to_max_pct = round(((price_max - close) / close) * 100, 2)
+            # 抓取市場行情與基本面
+            market_type = item.get("market", "上市")
+            market_data = fetch_stock_market_data(code, target_date_str, market=market_type)
+            close = float(market_data["close"])
+            vol5 = market_data["volume_5ma"]
+            pb = float(market_data["pb_ratio"])
+            ma20 = float(market_data["ma20"])
+            book_val = float(item.get("book_value", market_data["book_value"]))
+            price_min = float(item.get("price_min", close * 0.8))
+            price_max = float(item.get("price_max", close * 1.3))
+            if not (math.isfinite(close) and close > 0 and math.isfinite(price_max) and price_max > 0):
+                raise ValueError("non-finite price")
+            planned_shares = int(item.get("planned_shares", 10000))
+            cap_ratio = float(item.get("capital_ratio_pct", 1.8))
+            exec_rate = float(item.get("execution_rate_pct", 0.0))
+            purpose = item.get("purpose", "維護公司信用及股東權益")
 
-        # 歷史執行率評估 (狼來了過濾器)
-        hist_avg, rel_status, is_reliable, rel_pts, rel_desc = evaluate_treasury_execution_reliability(code, history)
+            # 空間防追高檢驗：現價距買回上限空間
+            distance_to_max_pct = round(((price_max - close) / close) * 100, 2)
 
-        # 法人籌碼防對倒 (賣超合計不超過 500 張)
-        inst_net = market_data["institutional_net"]
+            # 歷史執行率評估 (狼來了過濾器)
+            hist_avg, rel_status, is_reliable, rel_pts, rel_desc = evaluate_treasury_execution_reliability(code, history)
 
-        # 四大防線定價
-        four_prices = calculate_treasury_four_price(
-            close, price_min, price_max, book_val, market_data["high"], market_data["low"], adaptive_params=adaptive_params
-        )
+            # 法人籌碼防對倒 (賣超合計不超過 500 張)
+            inst_net = market_data["institutional_net"]
 
-        # 軟評分計算 (100分制)
-        score = 50
-        score += rel_pts  # 誠信加減分 (+15 或 -20)
+            # 四大防線定價
+            four_prices = calculate_treasury_four_price(
+                close, price_min, price_max, book_val, market_data["high"], market_data["low"], adaptive_params=adaptive_params
+            )
+
+            # 軟評分計算 (100分制)
+            score = 50
+            score += rel_pts  # 誠信加減分 (+15 或 -20)
         
-        # PB 估值位階分
-        if pb <= 0.9:
-            score += 15
-        elif pb <= 1.1:
-            score += 10
-        elif pb <= 1.25:
-            score += 5
+            # PB 估值位階分
+            if pb <= 0.9:
+                score += 15
+            elif pb <= 1.1:
+                score += 10
+            elif pb <= 1.25:
+                score += 5
             
-        # 股本規模分
-        if cap_ratio >= 2.5:
-            score += 15
-        elif cap_ratio >= 1.8:
-            score += 10
-        elif cap_ratio >= 1.5:
-            score += 5
+            # 股本規模分
+            if cap_ratio >= 2.5:
+                score += 15
+            elif cap_ratio >= 1.8:
+                score += 10
+            elif cap_ratio >= 1.5:
+                score += 5
 
-        # 距上限獲利空間分
-        if distance_to_max_pct >= 25.0:
-            score += 10
-        elif distance_to_max_pct >= 15.0:
-            score += 5
+            # 距上限獲利空間分
+            if distance_to_max_pct >= 25.0:
+                score += 10
+            elif distance_to_max_pct >= 15.0:
+                score += 5
 
-        # 法人認同度分
-        if inst_net > 500:
-            score += 10
-        elif inst_net >= 0:
-            score += 5
+            # 法人認同度分
+            if inst_net > 500:
+                score += 10
+            elif inst_net >= 0:
+                score += 5
 
-        # 隔日沖券商洗盤扣分
-        day_vol = market_data.get("volume", vol5)
-        inst_ratio = round((inst_net / day_vol) * 100, 2) if day_vol > 0 else 0.0
-        meta_dict = {'volume': day_vol, 'inst_ratio': inst_ratio, 'foreign': inst_net}
-        overnight_risk = evaluate_overnight_broker_risk(code, meta=meta_dict)
-        if overnight_risk.get("is_overnight_warning", False) or overnight_risk.get("is_overnight_risk", False):
-            score -= overnight_risk.get("penalty_score", overnight_risk.get("penalty_points", 10))
+            # 隔日沖券商洗盤扣分
+            day_vol = market_data.get("volume", vol5)
+            inst_ratio = round((inst_net / day_vol) * 100, 2) if day_vol > 0 else 0.0
+            meta_dict = {'volume': day_vol, 'inst_ratio': inst_ratio, 'foreign': inst_net}
+            overnight_risk = evaluate_overnight_broker_risk(code, meta=meta_dict)
+            if overnight_risk.get("is_overnight_warning", False) or overnight_risk.get("is_overnight_risk", False):
+                score -= overnight_risk.get("penalty_score", overnight_risk.get("penalty_points", 10))
 
-        score = max(30, min(100, score))
+            score = max(30, min(100, score))
 
-        # 星級計算
-        if score >= 85:
-            stars = "★★★★★"
-        elif score >= 75:
-            stars = "★★★★☆"
-        elif score >= 65:
-            stars = "★★★☆☆"
-        else:
-            stars = "★★☆☆☆"
+            # 星級計算
+            if score >= 85:
+                stars = "★★★★★"
+            elif score >= 75:
+                stars = "★★★★☆"
+            elif score >= 65:
+                stars = "★★★☆☆"
+            else:
+                stars = "★★☆☆☆"
 
-        candidate_record = {
-            "證券代號": code,
-            "證券名稱": name,
-            "收盤價": format_tw_price(close),
-            "股票代碼": code,
-            "股票名稱": name,
-            "最新現價": format_tw_price(close),
-            "漲跌額": market_data["change"],
-            "漲跌幅(%)": market_data["pct_change"],
-            "當日成交量(張)": market_data["volume"],
-            "5日均量(張)": vol5,
-            "當日成交量": market_data["volume"],
-            "5日均量": vol5,
-            "每股淨值": book_val,
-            "股價淨值比(PB)": pb,
-            "宣告日期": ann_date_str,
-            "買回目的": purpose,
-            "預定買回張數": planned_shares,
-            "佔發行股本(%)": cap_ratio,
-            "預定買回區間下限": price_min,
-            "預定買回區間上限": price_max,
-            "距上限空間(%)": distance_to_max_pct,
-            "已買回進度(%)": exec_rate,
-            "歷史3年平均執行率(%)": hist_avg,
-            "誠信評等": rel_desc,
-            "三大法人買賣超(張)": inst_net,
-            "進場價位": format_tw_price(four_prices["entry_price"]),
-            "加碼價位": format_tw_price(four_prices["addon_price"]),
-            "停利TP1": format_tw_price(four_prices["tp1_price"]),
-            "停利TP2": format_tw_price(four_prices["tp2_price"]),
-            "停損價位": format_tw_price(four_prices["sl_price"]),
-            "進場買進上限": format_tw_price(four_prices["entry_price"]),
-            "續強加碼價": format_tw_price(four_prices["addon_price"]),
-            "目標停利TP1": format_tw_price(four_prices["tp1_price"]),
-            "目標停利TP2": format_tw_price(four_prices["tp2_price"]),
-            "嚴格停損價": format_tw_price(four_prices["sl_price"]),
-            "隔日沖風險": "⚠️ 隔日沖集中" if overnight_risk.get("is_overnight_risk") else "正常",
-            "評分": score,
-            "星級推薦": stars,
-            "raw_close": close,
-            "price_min": price_min,
-            "price_max": price_max,
-            "book_val": book_val,
-            "days_since_ann": days_since_ann,
-            "is_reliable": is_reliable
-        }
+            candidate_record = {
+                "證券代號": code,
+                "證券名稱": name,
+                "收盤價": format_tw_price(close),
+                "股票代碼": code,
+                "股票名稱": name,
+                "最新現價": format_tw_price(close),
+                "漲跌額": market_data["change"],
+                "漲跌幅(%)": market_data["pct_change"],
+                "當日成交量(張)": market_data["volume"],
+                "5日均量(張)": vol5,
+                "當日成交量": market_data["volume"],
+                "5日均量": vol5,
+                "每股淨值": book_val,
+                "股價淨值比(PB)": pb,
+                "宣告日期": ann_date_str,
+                "買回目的": purpose,
+                "預定買回張數": planned_shares,
+                "佔發行股本(%)": cap_ratio,
+                "預定買回區間下限": price_min,
+                "預定買回區間上限": price_max,
+                "距上限空間(%)": distance_to_max_pct,
+                "已買回進度(%)": exec_rate,
+                "歷史3年平均執行率(%)": hist_avg,
+                "誠信評等": rel_desc,
+                "三大法人買賣超(張)": inst_net,
+                "進場價位": format_tw_price(four_prices["entry_price"]),
+                "加碼價位": format_tw_price(four_prices["addon_price"]),
+                "停利TP1": format_tw_price(four_prices["tp1_price"]),
+                "停利TP2": format_tw_price(four_prices["tp2_price"]),
+                "停損價位": format_tw_price(four_prices["sl_price"]),
+                "進場買進上限": format_tw_price(four_prices["entry_price"]),
+                "續強加碼價": format_tw_price(four_prices["addon_price"]),
+                "目標停利TP1": format_tw_price(four_prices["tp1_price"]),
+                "目標停利TP2": format_tw_price(four_prices["tp2_price"]),
+                "嚴格停損價": format_tw_price(four_prices["sl_price"]),
+                "隔日沖風險": "⚠️ 隔日沖集中" if overnight_risk.get("is_overnight_risk") else "正常",
+                "評分": score,
+                "星級推薦": stars,
+                "raw_close": close,
+                "price_min": price_min,
+                "price_max": price_max,
+                "book_val": book_val,
+                "days_since_ann": days_since_ann,
+                "is_reliable": is_reliable
+            }
 
-        # -------------------------------------------------------------
-        # Tier-1 檢驗: 近 5 個交易日全新申報 + 4+1 維度硬篩 + 誠信過濾
-        # -------------------------------------------------------------
-        # 條件 1: 5日均量 >= 1,000 張
-        cond_vol = (vol5 >= 1000)
-        # 條件 2: PB <= 1.25 且股價非自由落體破底
-        cond_pb = (pb <= 1.25 and close >= ma20 * 0.90)
-        # 條件 3: 買回股數佔股本 >= 1.5%
-        cond_size = (cap_ratio >= 1.50)
-        # 條件 4: 空間防追高 (距買回上限 >= 12%)
-        cond_space = (distance_to_max_pct >= 12.0)
-        # 條件 5: 法人防對倒 (外資+投信賣超 <= 500 張)
-        cond_inst = (inst_net >= -500)
-        # 誠信條件: 拒絕狼來了口水護盤
-        cond_rel = is_reliable
+            # -------------------------------------------------------------
+            # Tier-1 檢驗: 近 5 個交易日全新申報 + 4+1 維度硬篩 + 誠信過濾
+            # -------------------------------------------------------------
+            # 條件 1: 5日均量 >= 1,000 張
+            cond_vol = (vol5 >= 1000)
+            # 條件 2: PB <= 1.25 且股價非自由落體破底
+            cond_pb = (pb <= 1.25 and close >= ma20 * 0.90)
+            # 條件 3: 買回股數佔股本 >= 1.5%
+            cond_size = (cap_ratio >= 1.50)
+            # 條件 4: 空間防追高 (距買回上限 >= 12%)
+            cond_space = (distance_to_max_pct >= 12.0)
+            # 條件 5: 法人防對倒 (外資+投信賣超 <= 500 張)
+            cond_inst = (inst_net >= -500)
+            # 誠信條件: 拒絕狼來了口水護盤
+            cond_rel = is_reliable
 
-        if days_since_ann <= 7 and cond_vol and cond_pb and cond_size and cond_space and cond_inst and cond_rel:
-            candidate_record["多空位階"] = "🟢【庫藏宣告・低估護盤】"
-            candidate_record["層級分類"] = "Tier-1 全新宣告精選"
-            tier1_candidates.append(candidate_record)
+            if days_since_ann <= 7 and cond_vol and cond_pb and cond_size and cond_space and cond_inst and cond_rel:
+                candidate_record["多空位階"] = "🟢【庫藏宣告・低估護盤】"
+                candidate_record["層級分類"] = "Tier-1 全新宣告精選"
+                tier1_candidates.append(candidate_record)
 
-        # -------------------------------------------------------------
-        # Tier-2 候補檢驗: 60天實施期進行中 + 買回進度 < 80% + 低估值
-        # -------------------------------------------------------------
-        if days_since_ann <= 60 and exec_rate < 80.0 and vol5 >= 600 and pb <= 1.35 and distance_to_max_pct >= 10.0 and cond_rel:
-            candidate_record_t2 = dict(candidate_record)
-            candidate_record_t2["多空位階"] = "🔵【實施伏擊・逢低分批】"
-            candidate_record_t2["層級分類"] = "Tier-2 實施期伏擊候補"
-            tier2_candidates.append(candidate_record_t2)
+            # -------------------------------------------------------------
+            # Tier-2 候補檢驗: 60天實施期進行中 + 買回進度 < 80% + 低估值
+            # -------------------------------------------------------------
+            if days_since_ann <= 60 and exec_rate < 80.0 and vol5 >= 600 and pb <= 1.35 and distance_to_max_pct >= 10.0 and cond_rel:
+                candidate_record_t2 = dict(candidate_record)
+                candidate_record_t2["多空位階"] = "🔵【實施伏擊・逢低分批】"
+                candidate_record_t2["層級分類"] = "Tier-2 實施期伏擊候補"
+                tier2_candidates.append(candidate_record_t2)
+
+        except Exception as e:
+            print(f"[!] 策略 09 單檔略過 {code}: {type(e).__name__}")
+            continue
 
     # 決策輸出層級
     if tier1_candidates:

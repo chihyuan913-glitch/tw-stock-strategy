@@ -7,7 +7,10 @@
 
 import os
 import sys
+import json
+import time
 import argparse
+import threading
 import subprocess
 import datetime
 from pathlib import Path
@@ -20,6 +23,95 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 ROOT_DIR = Path(__file__).resolve().parent
+CMONEY_STATUS_PATH = ROOT_DIR / "cache" / "cmoney_sync_status.json"
+
+
+def _effective_cmoney_timeout(timeout=None) -> float:
+    if timeout is not None:
+        return max(0.1, min(600.0, float(timeout)))
+    raw = os.environ.get("TW_CMONEY_TIMEOUT_SEC")
+    if raw is None or not str(raw).strip():
+        try:
+            from line_sender import load_env
+            raw = (load_env() or {}).get("TW_CMONEY_TIMEOUT_SEC")
+        except Exception:
+            raw = None
+    if raw is not None and str(raw).strip():
+        try:
+            return float(max(10, min(600, int(str(raw).strip()))))
+        except Exception:
+            pass
+    return 90.0
+
+
+def run_cmoney_sync_nonblocking(timeout=None, *, sync_fn=None, status_path=None) -> dict:
+    """在 daemon 執行緒執行 CMoney 同步並設逾時，絕不阻斷或影響主行程 exit code。"""
+    eff_timeout = _effective_cmoney_timeout(timeout)
+    box = {"res": None, "err": None, "done": False}
+
+    def _worker():
+        try:
+            fn = sync_fn
+            if fn is None:
+                from cmoney_sync import sync_stocks_to_cmoney
+                fn = sync_stocks_to_cmoney
+            box["res"] = fn(verbose=True)
+        except Exception as e:
+            box["err"] = type(e).__name__
+        finally:
+            box["done"] = True
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(eff_timeout)
+
+    if t.is_alive() and not box["done"]:
+        status = "timeout"
+        sec_str = str(int(eff_timeout)) if float(eff_timeout).is_integer() else str(eff_timeout)
+        reason = f"逾時 {sec_str} 秒"
+        print(f"CMoney 同步失敗（{reason}）")
+    elif box["err"] is not None:
+        status = "failed"
+        reason = box["err"]
+        print(f"CMoney 同步失敗（{reason}）")
+    elif box["res"] is None:
+        status = "done"
+        reason = "none"
+        print("CMoney 同步：完成（done）")
+    elif isinstance(box["res"], dict):
+        res = box["res"]
+        if res.get("cloud_sync_success"):
+            status = "ok"
+            reason = "ok"
+            print("CMoney 同步：完成（ok）")
+        else:
+            msg = str(res.get("message") or "")
+            if any(kw in msg for kw in ("未設定", "未配置", "尚未")):
+                status = "local"
+                reason = "unconfigured"
+                print("CMoney 同步：完成（local）")
+            else:
+                status = "failed"
+                reason = str(res.get("error_type") or "sync_failed")
+                print(f"CMoney 同步失敗（{reason}）")
+    else:
+        status = "done"
+        reason = "ok"
+        print("CMoney 同步：完成（done）")
+
+    tz_tw = datetime.timezone(datetime.timedelta(hours=8))
+    payload = {
+        "status": status,
+        "reason": reason,
+        "finished_at": datetime.datetime.now(tz_tw).isoformat(),
+    }
+    target = Path(status_path) if status_path is not None else CMONEY_STATUS_PATH
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as write_err:
+        print(f"CMoney 狀態檔寫入失敗: {type(write_err).__name__}")
+    return payload
 
 STRATEGIES = [
     {
@@ -270,6 +362,12 @@ def main():
     except Exception as e:
         print(f"[!] 雷達監控池跨日滾動校準跳過或失敗: {e}")
 
+    # 自動同步每日精選標的至籌碼K線 (CMoney) 自選股（非阻斷，於送出盤後戰報前完成）
+    cmoney_status = run_cmoney_sync_nonblocking()
+    cmoney_fail_note = ""
+    if cmoney_status.get("status") in ("failed", "timeout"):
+        cmoney_fail_note = f"CMoney 同步失敗（{cmoney_status.get('reason', 'unknown')}）"
+
     # 自動同步至量化策略實驗室：執行盤後選股池自動回測體檢並更新明日 (T+1) 買賣建議
     try:
         from lab.data.storage import MarketStorage
@@ -291,6 +389,8 @@ def main():
         if args.line:
             try:
                 line_text = ScreenerFusionBridge.format_advisor_line_text(adv_report)
+                if cmoney_fail_note:
+                    line_text = f"{line_text}\n\n{cmoney_fail_note}"
                 from line_sender import send_to_line
                 send_to_line(line_text, strategy="01")
                 print("[✓] 已成功推播量化實驗室明日買賣建議決策戰報至 LINE！")
@@ -302,13 +402,12 @@ def main():
         )
     except Exception as e:
         print(f"[!] 量化實驗室自動回測同步跳過或失敗: {e}")
-
-    # 自動同步每日精選標的至籌碼K線 (CMoney) 自選股
-    try:
-        from cmoney_sync import sync_stocks_to_cmoney
-        sync_stocks_to_cmoney(verbose=True)
-    except Exception as e:
-        print(f"[!] 籌碼K線自選股同步跳過或失敗: {e}")
+        if args.line and cmoney_fail_note:
+            try:
+                from line_sender import send_to_line
+                send_to_line(f"盤後戰報摘要（實驗室回測未完成）\n{cmoney_fail_note}", strategy="01")
+            except Exception as e_push:
+                print(f"[!] 盤後戰報 CMoney 異常通知推播失敗: {e_push}")
 
     return 1 if any(r["returncode"] != 0 for r in results) else 0
 

@@ -686,7 +686,34 @@ def main():
     )
 
     if not results:
-        print("\n[!] 經檢核，所選條件下無符合所有做空複合條件的個股。")
+        raw_d = (args.date or "").strip().replace("/", "-")
+        if len(raw_d) == 8 and raw_d.isdigit():
+            target_date = f"{raw_d[:4]}-{raw_d[4:6]}-{raw_d[6:8]}"
+        elif len(raw_d) == 10 and raw_d[4] == "-" and raw_d[7] == "-":
+            target_date = raw_d
+        else:
+            tz_tw = datetime.timezone(datetime.timedelta(hours=8))
+            target_date = datetime.datetime.now(tz_tw).strftime("%Y-%m-%d")
+        print("今日無符合做空複合條件的個股")
+        if args.export:
+            export_path = args.export
+            if not os.path.isabs(export_path) and os.path.dirname(export_path) == "":
+                export_path = os.path.join(os.path.dirname(__file__), export_path)
+            cols_show = ['證券代號', '證券名稱', '期貨契約', '期貨月份', '收盤價', '期貨收盤價', '價差(Basis)',
+                         '空單進場', '加空價位', '停利TP1', '停利TP2', '停損回補', '1口保證金(約)', '期貨未平倉(OI)', '綜合評分', '星級推薦']
+            md_content = (
+                "# 【策略 03：法人出貨破線做空】最新選股戰報\n\n"
+                f"- 交易日期：`{target_date}`\n\n"
+                "今日無標的符合做空複合條件，建議觀望。\n"
+            )
+            if export_path.endswith('.csv'):
+                save_rolling_result_csv(export_path, pd.DataFrame(columns=cols_show), today_date_str=target_date, max_days=5)
+                md_path = export_path[:-4] + ".md"
+                with open(md_path, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
+            elif export_path.endswith('.md'):
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
         return
 
     df_res = pd.DataFrame(results)

@@ -147,7 +147,7 @@ class CMoneyWatchlistClient:
         if not self.account or not self.password:
             return False, "尚未於 .env 中配置 CMONEY_ACCOUNT 或 CMONEY_PASSWORD"
 
-        print(f"[*] 正在連線 CMoney 會員身份驗證伺服器 (帳號: {self.account[:3]}***)...")
+        print("[*] 正在連線 CMoney 會員身份驗證伺服器（帳號已設定）...")
 
         import http.cookiejar
         import html as html_lib

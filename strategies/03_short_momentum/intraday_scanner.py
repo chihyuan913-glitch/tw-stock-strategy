@@ -159,8 +159,11 @@ def load_targets():
                 settle_info = get_futures_settlement_info()
                 print(f"[*] 【期貨結算週期戰情】{settle_info['badge_text']} (法定結算日: {settle_info['front_settle_short']})")
                 return targets
+            print("result.csv 今日無有效標的，盤中雷達待命，不建立示範母池")
+            return {}
         except Exception as e:
-            print(f"[!] 讀取 result.csv 失敗: {e}，將建立備用母池...")
+            print(f"[!] 讀取 result.csv 失敗: {e}，不建立示範母池")
+            return {}
 
     # 若無 result.csv 則建立代表性做空標的池
     print("[*] 查無 result.csv，從市場弱勢代表個股期建立監控母池...")

@@ -28,11 +28,12 @@ from pathlib import Path
 import threading
 from typing import Set, Optional
 from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 import uvicorn
 
 # 導入同目錄下的股票分析引擎
 from stock_analyzer import analyze_stock
+from access_guard import ExternalGuardMiddleware, is_external, redact_text, verify_line_signature
 
 # Windows 命令列編碼保護
 if hasattr(sys.stdout, 'reconfigure'):
@@ -58,8 +59,17 @@ def load_env():
 
 ENV = load_env()
 CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or ENV.get("LINE_CHANNEL_ACCESS_TOKEN", "")
+LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET") or ENV.get("LINE_CHANNEL_SECRET", "")
+_LAST_SECRET_WARN_AT = None
 
 app = FastAPI(title="台股盤中即時隨傳隨回 LINE Bot")
+
+
+def _on_external_block(method: str, path: str):
+    log_debug(f"[安全] 已拒絕外部請求 {method} {path}")
+
+
+app.add_middleware(ExternalGuardMiddleware, on_block=_on_external_block)
 
 STRATEGIES = [
     "01_bollinger_reversal",
@@ -89,9 +99,10 @@ SERVER_LOGS = collections.deque(maxlen=200)
 
 def log_debug(msg: str):
     """帶時間戳的除錯日誌，同時輸出至 stdout 與記憶體日誌隊列"""
+    safe_msg = redact_text(msg)
     tz_tw = datetime.timezone(datetime.timedelta(hours=8))
     ts = datetime.datetime.now(tz_tw).strftime("%H:%M:%S")
-    formatted = f"[{ts}] {msg}"
+    formatted = f"[{ts}] {safe_msg}"
     print(formatted, flush=True)
     SERVER_LOGS.append(formatted)
 
@@ -178,7 +189,7 @@ def process_event_task(event: dict):
     if event_type == 'join':
         source = event.get('source', {})
         group_id = source.get('groupId', '')
-        print(f"[+] 機器人已成功加入新群組！群組 ID: {group_id}", flush=True)
+        print("[+] 機器人已加入新群組（群組 ID 不顯示）", flush=True)
         welcome_msg = f"""🎉 成功加入新群組！
 
 💡 若要將本群組設定為【盤中自動監控雷達・獨立專屬視窗】：
@@ -200,7 +211,7 @@ def process_event_task(event: dict):
     source = event.get('source', {})
     group_id = source.get('groupId', '')
     user_id = source.get('userId', '未知用戶')
-    from_desc = f"群組 [{group_id[:8]}...]" if group_id else f"個人 [{user_id[:8]}...]"
+    from_desc = "群組" if group_id else "個人"
     log_debug(f"[*] 收到來自 {from_desc} 的訊息: \"{user_text}\"")
 
     # 導入雷達管理模組 (支援四大進階匯入方案與獨立視窗分流)
@@ -367,14 +378,15 @@ async def startup_event():
     from radar_manager import scan_and_generate_alerts
 
     async def intraday_radar_worker():
+        import intraday_speed
         log_debug("[✓] 盤中到價雷達背景巡邏引擎已啟動 (09:00 ~ 13:35 自動盯盤)")
         notified_morning = ""
         notified_closing = ""
+        scheduler = intraday_speed.RadarScheduler()
 
         while True:
             try:
-                tz_tw = datetime.timezone(datetime.timedelta(hours=8))
-                now_tw = datetime.datetime.now(tz_tw)
+                now_tw = intraday_speed.taipei_now()
                 today_str = now_tw.strftime('%Y-%m-%d')
                 weekday = now_tw.weekday()
 
@@ -402,7 +414,7 @@ async def startup_event():
                             m_card = f"""🔔【台股開盤前夕・盤中到價雷達全自動啟動】
 ━━━━━━━━━━━━━━━
 今日共鎖定 {len(w)} 檔焦點標的！
-雲端即時盯盤引擎已就緒，盤中將每 60 秒比對四大防線價位。
+雲端即時盯盤引擎已就緒，盤中「優先買進」標的每 {intraday_speed.get_int('TW_RADAR_PRIORITY_INTERVAL_SEC')} 秒、其餘每 {intraday_speed.get_int('TW_RADAR_NORMAL_INTERVAL_SEC')} 秒比對四大防線價位。
 一旦觸及「🟢進場、🔵加碼、🔴停利、🛑停損」，將立即在此視窗為您即時推播！
 祝福今日操盤順利，嚴守紀律！"""
                             try:
@@ -413,12 +425,22 @@ async def startup_event():
                                 log_debug(f"[!] 開盤晨報推播失敗: {e}")
                         notified_morning = today_str
 
-                    # 2. 盤中即時盯盤比對 (09:00 ~ 13:35)
-                    if 858 <= t_int <= 1335:
-                        default_uid = os.environ.get("LINE_USER_ID", "")
-                        alerts = scan_and_generate_alerts(CHANNEL_ACCESS_TOKEN, default_uid)
-                        if alerts:
-                            log_debug(f"[⚡] 盤中到價雷達觸發事件: {', '.join(alerts)}")
+                    # 2. 盤中即時盯盤比對 (09:00 ~ 13:30)
+                    allowed, _ = await asyncio.to_thread(intraday_speed.is_radar_push_allowed, now_tw)
+                    if allowed:
+                        from radar_manager import load_watchlist
+                        codes = scheduler.due_codes(list(load_watchlist().keys()), intraday_speed.priority_codes())
+                        if codes:
+                            default_uid = os.environ.get("LINE_USER_ID", "")
+                            alerts = await asyncio.to_thread(
+                                scan_and_generate_alerts,
+                                CHANNEL_ACCESS_TOKEN,
+                                default_uid,
+                                now_tw=now_tw,
+                                codes=codes,
+                            )
+                            if alerts:
+                                log_debug(f"[⚡] 盤中到價雷達觸發事件: {', '.join(alerts)}")
 
                     # 3. 收盤總結 (13:31)
                     if 1331 <= t_int <= 1335 and notified_closing != today_str:
@@ -440,7 +462,7 @@ async def startup_event():
             except Exception as e:
                 log_debug(f"[!] 盤中雷達輪詢例外: {e}")
 
-            await asyncio.sleep(60)
+            await asyncio.sleep(intraday_speed.worker_sleep_seconds())
 
     async def render_keep_alive_worker():
         """Render 免費版防休眠背景心跳任務 (每 10 分鐘自動保活，防止 15 分鐘無流量休眠)"""
@@ -596,7 +618,7 @@ def browser_leaving():
 WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 @app.get("/api/system/network_info")
-def get_network_info_endpoint():
+def get_network_info_endpoint(request: Request):
     """提供本機、區域網路與外網 Cloudflare 專屬連線資訊"""
     import socket
     try:
@@ -605,18 +627,22 @@ def get_network_info_endpoint():
     except Exception:
         tunnel_url = ""
 
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        lan_ip = s.getsockname()[0]
-        s.close()
-    except Exception:
-        lan_ip = "127.0.0.1"
-
     port = os.environ.get("PORT", "8989")
+    if is_external(request.scope):
+        lan_url = ""
+    else:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            lan_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            lan_ip = "127.0.0.1"
+        lan_url = f"http://{lan_ip}:{port}"
+
     return {
         "local_url": f"http://127.0.0.1:{port}",
-        "lan_url": f"http://{lan_ip}:{port}",
+        "lan_url": lan_url,
         "tunnel_url": tunnel_url
     }
 
@@ -920,6 +946,40 @@ async def get_overview():
         "deployment_note": "此程序回應不等於公開站已經部署同一提交。",
     }
 
+def _norm_report_ymd(raw: str) -> str:
+    s = str(raw or "").strip().replace("/", "-")
+    if len(s) == 8 and s.isdigit():
+        return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+    if len(s) >= 10 and s[4] == "-" and s[7] == "-":
+        return s[:10]
+    return ""
+
+
+def resolve_report_date(df, md_file) -> str:
+    """解析戰報日期：同時檢查 CSV 選股日期與 result.md，正規化為 YYYY-MM-DD 後取較新者。"""
+    candidates = []
+    if df is not None and "選股日期" in df.columns and not df["選股日期"].dropna().empty:
+        for d in df["選股日期"].dropna().unique():
+            nd = _norm_report_ymd(str(d))
+            if nd:
+                candidates.append(nd)
+    md_path = Path(md_file) if md_file is not None else None
+    if md_path is not None and md_path.exists():
+        try:
+            with open(md_path, "r", encoding="utf-8") as mf:
+                for line in mf:
+                    if "交易日期" in line or "產出時間" in line:
+                        m = re.search(r'[`\s](\d{4}[-/]?\d{2}[-/]?\d{2})', line)
+                        if m:
+                            nd = _norm_report_ymd(m.group(1))
+                            if nd:
+                                candidates.append(nd)
+                        break
+        except Exception:
+            pass
+    return max(candidates) if candidates else ""
+
+
 @app.get("/api/strategy/{strat_id}")
 async def get_strategy_data(strat_id: str, quotes: bool = True):
     """取得指定策略選股表。quotes 預設 true 以維持舊客戶；戰情頁傳 quotes=0 只讀快取。"""
@@ -1056,28 +1116,7 @@ async def get_strategy_data(strat_id: str, quotes: bool = True):
             r['pnl_status'] = r.get('損益狀態', '')
 
         # 解析戰報交易日期與 5 日滾動統計
-        date_str = ""
-        if "選股日期" in df.columns and not df["選股日期"].dropna().empty:
-            dates = sorted([str(d).strip() for d in df["選股日期"].dropna().unique() if str(d).strip()], reverse=True)
-            if dates:
-                date_str = dates[0]
-
-        if not date_str:
-            md_file = csv_file.parent / "result.md"
-            if md_file.exists():
-                try:
-                    with open(md_file, "r", encoding="utf-8") as mf:
-                        for line in mf:
-                            if "交易日期" in line or "產出時間" in line:
-                                import re
-                                m = re.search(r'[`\s](\d{4}[-/]?\d{2}[-/]?\d{2})', line)
-                                if m:
-                                    date_str = m.group(1)
-                                break
-                except Exception:
-                    pass
-        if not date_str:
-            date_str = ""
+        date_str = resolve_report_date(df, csv_file.parent / "result.md")
 
         today_rows = [r for r in rows if str(r.get('選股日期', '')).strip() == date_str or 'T+0' in str(r.get('入選天數', '')) or '今日' in str(r.get('狀態標註', ''))]
         pending_rows = [r for r in rows if str(r.get('lifecycle')) == 'PENDING_REMOVAL' or '待剔除' in str(r.get('狀態標註', ''))]
@@ -1421,6 +1460,56 @@ async def get_radar_triggered_today_endpoint():
         "items": res.get("today_triggered_items", [])
     }
 
+_RADAR_SSE_HUB = None
+
+def _get_radar_sse_hub():
+    global _RADAR_SSE_HUB
+    if _RADAR_SSE_HUB is None:
+        from radar_sse import RadarSseHub
+        _RADAR_SSE_HUB = RadarSseHub()
+    return _RADAR_SSE_HUB
+
+class _SseStreamingResponse(StreamingResponse):
+    def __init__(self, content, *, on_finish, **kwargs):
+        super().__init__(content, **kwargs)
+        self._on_finish = on_finish
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await self._on_finish()
+
+@app.get("/api/radar/stream")
+async def get_radar_stream_endpoint(request: Request):
+    """SSE 推送盤中雷達到價事件"""
+    hub = _get_radar_sse_hub()
+    ext = is_external(request.scope)
+    if not hub.try_register(external=ext):
+        return JSONResponse(
+            status_code=503,
+            content={"status": "busy"},
+            headers={"Retry-After": "30"},
+        )
+    from radar_sse import SlotGuardedStream
+    body = None
+    try:
+        body = SlotGuardedStream(hub, hub.stream(request.is_disconnected, external=ext), external=ext)
+        return _SseStreamingResponse(
+            body,
+            on_finish=body.finalize,
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    except BaseException:
+        if body is not None:
+            await body.finalize()
+        else:
+            unreg = getattr(hub, "unregister", None)
+            if callable(unreg):
+                unreg(external=ext)
+        raise
+
 @app.post("/api/radar/add")
 async def add_to_radar_endpoint(request: Request):
     """手動將標的加入盤中到價雷達 (支援代碼、多檔批次、中文股名、題材概念股)"""
@@ -1518,10 +1607,9 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
         return {"message": "已在背景啟動全策略盤後選股 (run_all.py)！"}
 
     elif action_name == "run_radar":
-        def _task():
-            subprocess.run([sys.executable, str(root_dir / "run_all_intraday.py"), "--once"])
-        background_tasks.add_task(_task)
-        return {"message": "已在背景啟動全策略盤中到價掃描 (run_all_intraday.py --once)！"}
+        from run_all_intraday import web_trigger_once
+        _ok, msg = web_trigger_once()
+        return {"message": msg}
 
     elif action_name == "run_optimizer":
         def _task():
@@ -1600,15 +1688,26 @@ async def get_logs():
     return {
         "count": len(SERVER_LOGS),
         "token_set": bool(CHANNEL_ACCESS_TOKEN),
-        "token_prefix": CHANNEL_ACCESS_TOKEN[:10] + "..." if CHANNEL_ACCESS_TOKEN else "None",
         "logs": list(SERVER_LOGS)
     }
 
 @app.post("/callback")
 async def callback(request: Request, background_tasks: BackgroundTasks):
     """LINE Webhook 接收端點"""
+    global _LAST_SECRET_WARN_AT
+    raw_body = await request.body()
+    if LINE_CHANNEL_SECRET:
+        sig = request.headers.get("x-line-signature", "")
+        if not verify_line_signature(LINE_CHANNEL_SECRET, raw_body, sig):
+            log_debug("[安全] LINE 簽章驗證失敗，已拒收")
+            return JSONResponse(status_code=403, content={"status": "invalid_signature"})
+    else:
+        now_ts = time.time()
+        if _LAST_SECRET_WARN_AT is None or (now_ts - _LAST_SECRET_WARN_AT) >= 600:
+            _LAST_SECRET_WARN_AT = now_ts
+            log_debug("[安全] LINE 簽章密鑰未設定，/callback 未驗證照舊處理，請在 .env 補上 LINE_CHANNEL_SECRET")
+
     try:
-        raw_body = await request.body()
         body = json.loads(raw_body.decode('utf-8'))
     except Exception as e:
         log_debug(f"[!] /callback 收到無效 JSON: {e}")
@@ -1627,6 +1726,7 @@ if __name__ == '__main__':
     print(f"  台股即時隨傳隨回 LINE 操盤機器人伺服器啟動中...")
     print(f"  本機端點: http://127.0.0.1:{port}/callback")
     print(f"  LINE Token 設定狀態: {'已就緒' if CHANNEL_ACCESS_TOKEN else '未設定'}")
+    print(f"  LINE 簽章密鑰：{'已設定' if LINE_CHANNEL_SECRET else '未設定'}")
     print(f"=====================================================")
     uvicorn.run("line_bot_server:app", host="127.0.0.1", port=port, reload=False)
 

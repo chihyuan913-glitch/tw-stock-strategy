@@ -1201,6 +1201,8 @@
             <div class="flex items-center space-x-2">
               <h2 class="text-base font-bold text-white tracking-wide">盤中到價即時雷達盯盤池</h2>
               <span id="radarTableCount" class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold border border-emerald-500/30">0 檔監控中</span>
+              <span id="radarSseStatus" class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-mono border border-slate-700">即時推送：未連線</span>
+              <span id="radarSseLast" class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 text-xs font-mono border border-amber-500/30"></span>
               <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs border border-slate-700 flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 09:00 ~ 13:35 雲端自動盯盤
@@ -1636,6 +1638,7 @@
         }
       }
       lucide.createIcons();
+      if (typeof radarSseSync === 'function') radarSseSync(tab === 'radar');
     }
 
     // Toast 提示通知
@@ -2134,6 +2137,173 @@
         loadRadarWatchlist();
       }
     }, 20000);
+
+    // 盤中雷達 SSE 即時推送訂閱與退避重連 (20 秒輪詢保留作為備援)
+    let radarEventSource = null;
+    let radarSseFailCount = 0;
+    let radarSseReconnectTimer = null;
+    let radarSseDebounceTimer = null;
+    const RADAR_SSE_MAX_FAILS = 20;
+    const RADAR_SSE_MAX_BACKOFF_SEC = 60;
+    const RADAR_SSE_BACKOFF_STEPS = [3, 6, 12, 24, 48, 60];
+    const RADAR_EVENT_LABELS = {
+      ENTRY: '進場',
+      ADDON: '加碼',
+      TP1: '停利一',
+      TP2: '停利二',
+      STOP_LOSS: '停損'
+    };
+
+    function setRadarSseStatusText(txt) {
+      const el = document.getElementById('radarSseStatus');
+      if (el) el.textContent = txt;
+    }
+
+    function radarSseShouldRun() {
+      const viewRadar = document.getElementById('view-radar');
+      return Boolean(viewRadar && !viewRadar.classList.contains('hidden') && !document.hidden);
+    }
+
+    function stopRadarSse(reason) {
+      if (radarSseReconnectTimer) {
+        clearTimeout(radarSseReconnectTimer);
+        radarSseReconnectTimer = null;
+      }
+      if (radarEventSource) {
+        try {
+          radarEventSource.close();
+        } catch (e) {
+          // ignore
+        }
+        radarEventSource = null;
+      }
+      setRadarSseStatusText('即時推送：暫停（20 秒輪詢備援）');
+    }
+
+    function scheduleRadarWatchlistRefresh() {
+      if (radarSseDebounceTimer) return;
+      radarSseDebounceTimer = setTimeout(() => {
+        radarSseDebounceTimer = null;
+        if (typeof loadRadarWatchlist === 'function') {
+          loadRadarWatchlist();
+        }
+      }, 1000);
+    }
+
+    function startRadarSse() {
+      if (typeof EventSource === 'undefined') {
+        setRadarSseStatusText('瀏覽器不支援，使用 20 秒輪詢');
+        return;
+      }
+      if (radarEventSource || !radarSseShouldRun()) {
+        return;
+      }
+      if (radarSseReconnectTimer) {
+        clearTimeout(radarSseReconnectTimer);
+        radarSseReconnectTimer = null;
+      }
+
+      const es = new EventSource('/api/radar/stream');
+      radarEventSource = es;
+
+      es.addEventListener('open', () => {
+        if (radarEventSource !== es) return;
+        radarSseFailCount = 0;
+        setRadarSseStatusText('即時推送：已連線');
+        if (typeof loadRadarWatchlist === 'function') {
+          loadRadarWatchlist();
+        }
+      });
+
+      es.addEventListener('status', (ev) => {
+        if (radarEventSource !== es) return;
+        try {
+          const payload = JSON.parse(ev.data || '{}');
+          if (payload.window === 'closed') {
+            setRadarSseStatusText('盤後待命（20 秒輪詢備援）');
+          } else if (payload.window === 'open') {
+            setRadarSseStatusText('即時推送：已連線');
+          }
+        } catch (e) {
+          // ignore invalid json
+        }
+      });
+
+      es.addEventListener('radar_alert', (ev) => {
+        if (radarEventSource !== es) return;
+        try {
+          const payload = JSON.parse(ev.data || '{}');
+          const code = String(payload.code || '').trim();
+          const rawEvent = String(payload.event || '').trim();
+          const tsRaw = String(payload.ts || '').trim();
+          if (!code || !rawEvent) return;
+          const evLabel = RADAR_EVENT_LABELS[rawEvent] || rawEvent;
+          let timePart = tsRaw;
+          if (tsRaw.indexOf('T') !== -1) {
+            timePart = tsRaw.split('T')[1].slice(0, 8);
+          }
+          const lastEl = document.getElementById('radarSseLast');
+          if (lastEl) {
+            lastEl.textContent = '最新到價：' + code + ' ' + evLabel + ' ' + timePart;
+          }
+          scheduleRadarWatchlistRefresh();
+        } catch (e) {
+          // ignore invalid json
+        }
+      });
+
+      es.addEventListener('error', () => {
+        try {
+          es.close();
+        } catch (e) {
+          // ignore
+        }
+        if (radarEventSource === es) {
+          radarEventSource = null;
+        }
+        radarSseFailCount += 1;
+        if (radarSseFailCount >= RADAR_SSE_MAX_FAILS) {
+          if (radarSseReconnectTimer) {
+            clearTimeout(radarSseReconnectTimer);
+            radarSseReconnectTimer = null;
+          }
+          setRadarSseStatusText('即時推送已停用（20 秒輪詢備援）');
+          return;
+        }
+        setRadarSseStatusText('即時推送：重連中');
+        const stepIdx = Math.min(radarSseFailCount - 1, RADAR_SSE_BACKOFF_STEPS.length - 1);
+        const baseSec = Math.min(RADAR_SSE_MAX_BACKOFF_SEC, RADAR_SSE_BACKOFF_STEPS[stepIdx]);
+        const waitMs = (baseSec + Math.random()) * 1000;
+        if (radarSseReconnectTimer) {
+          clearTimeout(radarSseReconnectTimer);
+        }
+        radarSseReconnectTimer = setTimeout(() => {
+          radarSseReconnectTimer = null;
+          if (radarSseShouldRun()) {
+            startRadarSse();
+          }
+        }, waitMs);
+      });
+    }
+
+    function radarSseSync(fromRadarTabSwitch) {
+      if (fromRadarTabSwitch && radarSseFailCount >= RADAR_SSE_MAX_FAILS) {
+        radarSseFailCount = 0;
+      }
+      if (radarSseShouldRun()) {
+        startRadarSse();
+      } else {
+        stopRadarSse('hidden_or_tab');
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      radarSseSync(false);
+    });
+    window.addEventListener('beforeunload', () => {
+      stopRadarSse('unload');
+    });
+    startRadarSse();
 
     // 渲染雷達卡片矩陣 (預設模式)
     function renderRadarCards(items) {

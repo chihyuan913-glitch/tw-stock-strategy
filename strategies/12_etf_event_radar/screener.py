@@ -275,10 +275,45 @@ def fetch_batch_quotes(etf_items: List[Dict[str, Any]], batch_size: int = 25) ->
             pass
     return quotes
 
+TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+
+
+def get_taipei_now() -> datetime.datetime:
+    try:
+        import market_schedule
+        now_dt = market_schedule.get_taiwan_now()
+        if now_dt.tzinfo is None:
+            return now_dt.replace(tzinfo=TZ_TW)
+        return now_dt.astimezone(TZ_TW)
+    except Exception:
+        return datetime.datetime.now(TZ_TW)
+
+
+def is_etf_premarket_window(now_dt: datetime.datetime = None) -> tuple[bool, str]:
+    """僅週一到週五（非休市日）台北時間 08:20:00 至 08:59:59 允許策略 12 早鳥推播。"""
+    dt = get_taipei_now() if now_dt is None else now_dt
+    tw = dt.replace(tzinfo=TZ_TW) if dt.tzinfo is None else dt.astimezone(TZ_TW)
+    if tw.weekday() > 4:
+        return False, f"週末非早鳥推播時段 ({tw.strftime('%Y-%m-%d %H:%M:%S')})"
+    try:
+        import twse_calendar
+        import dashboard_contract
+        cal = twse_calendar.load_snapshot()
+        if dashboard_contract.is_scheduled_session(tw.date(), cal) is False:
+            return False, f"休市日非早鳥推播時段 ({tw.strftime('%Y-%m-%d')})"
+    except Exception:
+        pass
+    hm = (tw.hour, tw.minute, tw.second)
+    if (8, 20, 0) <= hm <= (8, 59, 59):
+        return True, f"台北平日早鳥時段 ({tw.strftime('%H:%M:%S')})"
+    return False, f"非台北 08:20:00-08:59:59 早鳥推播時段 ({tw.strftime('%H:%M:%S')})"
+
+
 def run_screener(send_line: bool = False, is_replay: bool = False, export_path: str = None) -> List[Dict[str, Any]]:
-    """執行 08:20 盤前早鳥跨市場預警快篩"""
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    print(f"[{now_str}] 啟動策略 12：08:20 盤前早鳥跨市場事件預警器...")
+    """執行盤前早鳥跨市場預警快篩"""
+    now_tw = get_taipei_now()
+    now_str = now_tw.strftime("%Y-%m-%d %H:%M")
+    print(f"[{now_str}] 啟動策略 12：盤前早鳥跨市場事件預警器...")
 
     universe = load_etf_universe()
     benchmarks = fetch_overseas_benchmarks(is_replay_mode=is_replay)
@@ -377,8 +412,14 @@ def run_screener(send_line: bool = False, is_replay: bool = False, export_path: 
 
     # 產出 LINE / Telegram 推播卡
     if send_line and candidates:
+        ok_win, win_reason = is_etf_premarket_window(now_tw)
+        if not ok_win:
+            print(f"略過策略 12 早鳥推播：{win_reason}")
+            return candidates
+
         lines = [
-            f"🌅【08:20 盤前早鳥跨市場預警 (策略 12)】",
+            f"🌅【{now_tw.strftime('%H:%M')} 盤前早鳥跨市場預警 (策略 12)】",
+            f"產出時間：{now_str} (台北時間)",
             f"海外前夜結算 + 晨間 Globex 期貨動能・鎖定 {len(candidates)} 檔關鍵標的：",
             ""
         ]

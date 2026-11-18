@@ -28,12 +28,16 @@ def parse_mis_quote_item(
     v_val = item.get("v", "-")
 
     price = None
+    price_source = None
     if z_val and z_val != "-":
         price = float(z_val)
+        price_source = "z"
     elif trade_z and trade_z != "-":
         price = float(trade_z)
+        price_source = "trade_z"
     elif y_val and y_val != "-":
         price = float(y_val)
+        price_source = "y"
 
     prev_close = float(y_val) if (y_val and y_val != "-") else price
     change = round(price - prev_close, 2) if (price is not None and prev_close is not None) else 0.0
@@ -53,4 +57,5 @@ def parse_mis_quote_item(
         "time": feed_time or fallback_clock,
         "feed_time": feed_time,
         "feed_date": item.get("d") or None,
+        "price_source": price_source,
     }

@@ -78,7 +78,7 @@ jobs:
           python run_all.py --line
 
       - name: 自動同步最新選股報表與明日買賣建議回 Git 倉庫
-        if: steps.check_window.outputs.in_window == 'true'
+        if: always() && steps.check_window.outputs.in_window == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

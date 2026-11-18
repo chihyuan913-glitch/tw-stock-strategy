@@ -55,9 +55,14 @@ jobs:
           TW_TIME=$(TZ="Asia/Taipei" date +%H%M)
           TW_HOUR=$(TZ="Asia/Taipei" date +%H)
           TW_MIN=$(TZ="Asia/Taipei" date +%M)
-          echo "[+] 當前台北時間 (UTC+8): ${TW_HOUR}:${TW_MIN} (數值: ${TW_TIME}) | 指定階段: ${STAGE}"
+          TW_DOW=$(TZ="Asia/Taipei" date +%u)
+          echo "[+] 當前台北時間 (UTC+8): ${TW_HOUR}:${TW_MIN} (數值: ${TW_TIME}, 星期: ${TW_DOW}) | 指定階段: ${STAGE}"
 
           if [ "$STAGE" = "premarket" ]; then
+            if [ "$TW_DOW" -gt 5 ] || [ "$TW_TIME" -lt 0820 ] || [ "$TW_TIME" -gt 0859 ]; then
+              echo "[*] [時段守衛] 台北時間 ${TW_HOUR}:${TW_MIN} (星期 ${TW_DOW}) 非平日 0820-0859 早鳥窗，跳過手動 premarket 推播。"
+              exit 0
+            fi
             echo "[+] 手動指定 premarket，啟動盤前早鳥快篩..."
             python strategies/12_etf_event_radar/screener.py --line
           elif [ "$STAGE" = "confirm" ]; then
@@ -69,12 +74,19 @@ jobs:
             python strategies/12_etf_event_radar/intraday_scanner.py --confirm --line
           else
             # auto 自動模式判定規則：
-            # 1. 09:00 之前 (例如 08:20 排程)：執行盤前早鳥 (screener.py)
-            # 2. 09:00 ~ 13:35 (例如 09:02 排程)：執行開盤確認 (intraday_scanner.py --confirm --line)
-            # 3. 13:35 之後 (例如 GitHub 排程嚴重延遲至下午)：直接跳過，不跑 confirm、不跑 premarket，以成功碼結束
-            if [ "$TW_TIME" -lt 0900 ]; then
-              echo "[+] 台北時間 09:00 之前 (${TW_HOUR}:${TW_MIN})，啟動 08:20 盤前早鳥跨市場預警快篩..."
+            # 1. 平日 0820-0859：執行盤前早鳥 (screener.py --line)
+            # 2. 0000-0819（或週末早鳥）：視為延誤或非交易早鳥，跳過 exit 0
+            # 3. 0900-1335：執行開盤確認 (intraday_scanner.py --confirm --line)
+            # 4. 1335 之後：直接跳過，以成功碼結束
+            if [ "$TW_DOW" -le 5 ] && [ "$TW_TIME" -ge 0820 ] && [ "$TW_TIME" -le 0859 ]; then
+              echo "[+] 台北平日 0820-0859 (${TW_HOUR}:${TW_MIN})，啟動盤前早鳥跨市場預警快篩..."
               python strategies/12_etf_event_radar/screener.py --line
+            elif [ "$TW_TIME" -lt 0820 ]; then
+              echo "[*] [時段守衛] 台北時間 ${TW_HOUR}:${TW_MIN} 早於 0820 早鳥視窗（或為延誤觸發），跳過不推播。"
+              exit 0
+            elif [ "$TW_TIME" -lt 0900 ]; then
+              echo "[*] [時段守衛] 週末非交易早鳥時段 (${TW_HOUR}:${TW_MIN})，跳過不推播。"
+              exit 0
             elif [ "$TW_TIME" -le 1335 ]; then
               echo "[+] 台北時間 09:00~13:35 之間 (${TW_HOUR}:${TW_MIN})，啟動 09:02 開盤實盤確認與下單指令產出..."
               python strategies/12_etf_event_radar/intraday_scanner.py --confirm --line

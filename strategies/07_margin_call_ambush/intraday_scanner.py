@@ -316,8 +316,11 @@ def load_targets() -> dict:
             if targets:
                 print(f"[✓] 已自 result.csv 載入 {len(targets)} 檔融資斷頭與浮額清洗監控標的。")
                 return targets
+            print("result.csv 今日無有效標的，盤中雷達待命，不建立示範母池")
+            return {}
         except Exception as e:
-            print(f"[!] 讀取 result.csv 失敗: {e}，將建立備援示範池...")
+            print(f"[!] 讀取 result.csv 失敗: {e}，不建立示範母池")
+            return {}
 
     # 若無 result.csv 則建立代表性備援池
     demo_codes = ['2603', '2330']

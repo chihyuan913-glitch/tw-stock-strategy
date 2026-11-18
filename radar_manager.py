@@ -97,7 +97,7 @@ def get_radar_status() -> str:
     is_trading_hour = (weekday < 5 and 900 <= t_int <= 1335)
 
     trading_status = "🟢 盤中交易時段 (即時輪詢盯盤中)" if is_trading_hour else "🟡 非交易時段 (待開盤 09:00 自動啟動)"
-    target_desc = f"專屬群組 [{channel_id[:10]}...]" if channel_id else "預設全域視窗 (未鎖定專屬群組)"
+    target_desc = "專屬群組（已綁定）" if channel_id else "預設全域視窗 (未鎖定專屬群組)"
 
     lines = [
         "📡【台股盤中到價自動監控雷達・系統運作狀態】",
@@ -585,17 +585,21 @@ def get_themes_summary() -> str:
 _QUOTE_CACHE = {}
 _QUOTE_CACHE_TIME = 0.0
 
-def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict:
+def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0, *, limiter=None, opener=None) -> dict:
     """
     向證交所/櫃買中心 mis.twse API 批次查詢即時行情
     支援 trade.z / z / y / a / b 自動解析
-    具備 3 秒 TTL 短暫記憶體快取防高頻請求
+    具備 3 秒 TTL 短暫記憶體快取防高頻請求，並整合限流與退避機制
     """
     global _QUOTE_CACHE, _QUOTE_CACHE_TIME
+    import socket
     import time
+    import urllib.error
+    import intraday_speed
+
     now_t = time.time()
 
-    clean_codes = [str(c).strip() for c in codes if str(c).strip()]
+    clean_codes = list(dict.fromkeys(str(c).strip() for c in codes if str(c).strip()))
     if not clean_codes:
         return {}
 
@@ -604,64 +608,91 @@ def fetch_batch_realtime_quotes(codes: list, max_cache_sec: float = 3.0) -> dict
         if all(c in _QUOTE_CACHE for c in clean_codes):
             return {c: _QUOTE_CACHE[c] for c in clean_codes}
 
-    now_tw = datetime.datetime.now(TZ_TW)
+    active_limiter = limiter or intraday_speed.get_mis_limiter()
+    active_opener = opener or urllib.request.urlopen
+    timeout_sec = intraday_speed.get_int("TW_MIS_TIMEOUT_SEC")
+
+    now_tw = intraday_speed.taipei_now()
     time_str = now_tw.strftime('%H:%M:%S')
 
     quotes = {}
     chunk_size = 15  # 每 15 檔一包，杜絕 mis.twse URL 逾時與截斷問題
     for i in range(0, len(clean_codes), chunk_size):
+        if not active_limiter.acquire():
+            break
         chunk = clean_codes[i:i + chunk_size]
         channel_str = "|".join([f"tse_{c}.tw|otc_{c}.tw" for c in chunk])
         url = f"https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch={channel_str}&json=1&delay=0"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
         try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with active_opener(req, timeout=timeout_sec) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                from mis_quote import parse_mis_quote_item
-                for item in data.get('msgArray', []):
-                    quote_obj = parse_mis_quote_item(item, set(clean_codes), fallback_clock=time_str)
-                    if not quote_obj:
-                        continue
-                    c = quote_obj['code']
-                    quotes[c] = quote_obj
-                    _QUOTE_CACHE[c] = quote_obj
-        except Exception as e:
+            active_limiter.report_success()
+            fetched_mono = intraday_speed.mono_now()
+            from mis_quote import parse_mis_quote_item
+            for item in data.get('msgArray', []):
+                quote_obj = parse_mis_quote_item(item, set(clean_codes), fallback_clock=time_str)
+                if not quote_obj:
+                    continue
+                quote_obj["_fetched_at"] = fetched_mono
+                c = quote_obj['code']
+                quotes[c] = quote_obj
+                _QUOTE_CACHE[c] = quote_obj
+        except (urllib.error.HTTPError, urllib.error.URLError, socket.timeout, TimeoutError, json.JSONDecodeError, Exception) as e:
+            active_limiter.report_failure()
             print(f"[!] 批次查詢現價失敗 ({chunk}): {e}")
+            break
 
-    _QUOTE_CACHE_TIME = now_t
+    if quotes:
+        _QUOTE_CACHE_TIME = now_t
     for c in clean_codes:
         if c not in quotes and c in _QUOTE_CACHE:
             quotes[c] = _QUOTE_CACHE[c]
 
     return quotes
 
-def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
+def scan_and_generate_alerts(token: str, default_user_id: str = "", *, now_tw=None, codes=None, advisor=None) -> list:
     """
-    執行單次盤中到價巡邏，偵測觸發事件並自動推送 LINE
+    執行單次盤中到價巡邏，偵測觸發事件並自動推送
     回傳觸發事件清單
     """
+    import intraday_speed
+    import order_hint
+
+    now_tw = intraday_speed.to_taipei(now_tw or intraday_speed.taipei_now())
+    allowed, _ = intraday_speed.is_radar_push_allowed(now_tw)
+    if not allowed:
+        return []
+
     watchlist = load_watchlist()
     if not watchlist:
         return []
 
-    now_tw = datetime.datetime.now(TZ_TW)
     today_str = now_tw.strftime('%Y-%m-%d')
     time_str = now_tw.strftime('%H:%M:%S')
 
-    codes = list(watchlist.keys())
-    quotes = fetch_batch_realtime_quotes(codes)
+    scan_codes = list(watchlist.keys())
+    if codes is not None:
+        code_set = {str(c).strip() for c in codes}
+        scan_codes = [c for c in scan_codes if c in code_set]
+    if not scan_codes:
+        return []
+
+    quotes = fetch_batch_realtime_quotes(scan_codes)
 
     triggered_alerts = []
     watchlist_updated = False
 
-    for code, item in watchlist.items():
+    for code in scan_codes:
+        item = watchlist[code]
         if code not in quotes:
             continue
 
         q = quotes[code]
-        curr_p = q.get('price')
-        if not curr_p:
+        valid_q, _ = order_hint.quote_is_valid(q, now_tw, intraday_speed.mono_now())
+        if not valid_q:
             continue
+        curr_p = q['price']
         prev_p = q.get('prev_close', curr_p)
         name = item.get('name', q.get('name') or code)
         entry_price = item.get('entry_price', item.get('entry_high', item.get('base_price', 0)))
@@ -809,6 +840,17 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
                         'guide': f'現價 {curr_p:.2f} 元 處於建議進場上限 {entry_price:.2f} 元 以下，且穩守防守線！\n當前潛在盈虧比高達 1 : {rr_ratio:.1f}，未過度追高，可直接以現價或限價立即進場建倉！'
                     }
         if event_info and target_dest:
+            hint = order_hint.build_order_hint(
+                item,
+                q,
+                event_info['type'],
+                is_short,
+                now_tw=now_tw,
+                mono_now=intraday_speed.mono_now(),
+                advisor=advisor,
+            )
+            if hint is None:
+                continue
             rt_dict = {
                 'price': curr_p,
                 'high': curr_p,
@@ -816,22 +858,23 @@ def scan_and_generate_alerts(token: str, default_user_id: str = "") -> list:
                 'time': time_str,
                 'diff_pct': diff_pct
             }
+            ledger_path = intraday_speed.ledger_dir()
             # 優先採用旗艦高對比 Flex Message 大字體卡片
             flex_card = build_price_alert_card(
-                item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR"
+                item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR", order_hint=hint
             )
-            success = send_to_line(flex_card, target_id=target_dest)
+            success = send_to_line(flex_card, target_id=target_dest, intraday_ledger_dir=ledger_path)
             if not success:
                 # 雙軌備援：自然留白乾淨純文字
                 clean_text = format_clean_price_alert_text(
-                    item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR"
+                    item, rt_dict, event_info['type'], event_info['badge'], event_info['guide'], strategy_id="RADAR", order_hint=hint
                 )
-                success = send_to_line(clean_text, target_id=target_dest)
+                success = send_to_line(clean_text, target_id=target_dest, intraday_ledger_dir=ledger_path)
 
             if success:
-                print(f"[✓] 成功推送到價警訊至 [{target_dest[:8]}...]: {code} {event_info['type']}", flush=True)
+                print(f"[✓] 成功推送到價警訊至 [已綁定目標]: {code} {event_info['type']}", flush=True)
                 alerted.append(event_info['type'])
-                item['last_push_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                item['last_push_at'] = now_tw.strftime('%Y-%m-%d %H:%M:%S')
                 item['last_push_event'] = event_info['type']
                 if event_info['type'] in ('ENTRY', 'ADDON', 'TP1', 'TP2'):
                     item['has_entered'] = True

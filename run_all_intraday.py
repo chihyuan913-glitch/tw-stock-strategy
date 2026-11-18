@@ -14,6 +14,7 @@ import sys
 import argparse
 import subprocess
 import datetime
+import threading
 from pathlib import Path
 
 # Windows 命令列編碼保護
@@ -129,6 +130,279 @@ def run_intraday_single(strat, extra_args):
         return False
 
 TZ_TW = datetime.timezone(datetime.timedelta(hours=8))
+_WEB_TRIGGER_LOCK = threading.Lock()
+
+
+def _env_int(name: str, default: int, lo: int, hi: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        try:
+            import line_sender
+            env_map = line_sender.load_env()
+            if isinstance(env_map, dict):
+                raw = env_map.get(name)
+        except Exception:
+            raw = None
+    if raw is None or str(raw).strip() == "":
+        val = default
+    else:
+        try:
+            val = int(str(raw).strip())
+        except Exception:
+            val = default
+    if val < lo:
+        return lo
+    if val > hi:
+        return hi
+    return val
+
+
+def _default_kill_tree(pid: int, proc=None) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    else:
+        import signal
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except Exception:
+            if proc is not None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+
+def _default_popen(cmd, cwd=None, env=None):
+    if os.name == "nt":
+        return subprocess.Popen(cmd, cwd=cwd, env=env)
+    return subprocess.Popen(cmd, cwd=cwd, env=env, start_new_session=True)
+
+
+def run_once_parallel(
+    targets,
+    *,
+    now_fn=None,
+    popen_fn=None,
+    sleep_fn=None,
+    kill_tree_fn=None,
+    concurrency=None,
+    stagger=None,
+    child_timeout=None,
+) -> dict:
+    import time
+    import intraday_speed
+    import mis_shared_gate
+
+    _now = now_fn or intraday_speed.taipei_now
+    _sleep = sleep_fn or time.sleep
+    _popen = popen_fn or _default_popen
+
+    def _kill(pid: int, proc=None):
+        if kill_tree_fn is not None:
+            kill_tree_fn(pid)
+        else:
+            _default_kill_tree(pid, proc)
+
+    target_list = list(targets or [])
+    now0 = intraday_speed.to_taipei(_now())
+    ok_win, reason_win = intraday_speed.is_runner_window(now0)
+    if not ok_win:
+        print(f"[盤中時段保護] {reason_win}，未啟動任何單次掃描子行程。")
+        return {
+            "started": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "timed_out": 0,
+            "skipped_window": len(target_list),
+            "reason": reason_win,
+        }
+
+    eff_conc = (
+        _env_int("TW_INTRADAY_ONCE_CONCURRENCY", 3, 1, 6)
+        if concurrency is None
+        else max(1, min(6, int(concurrency)))
+    )
+    eff_stagger = float(
+        intraday_speed.get_int("TW_SCANNER_STAGGER_SEC") if stagger is None else stagger
+    )
+    eff_timeout = float(
+        _env_int("TW_INTRADAY_ONCE_TIMEOUT_SEC", 180, 30, 900)
+        if child_timeout is None
+        else child_timeout
+    )
+
+    start_date = now0.date()
+    bootstrap_path = ROOT_DIR / "intraday_child_bootstrap.py"
+    ledger_path = str(intraday_speed.ledger_dir())
+    gate_path = str(mis_shared_gate.shared_gate_dir())
+
+    queue = list(target_list)
+    active = []
+    started = 0
+    succeeded = 0
+    failed = 0
+    timed_out = 0
+    has_launched_any = False
+    window_closed = False
+    virtual_elapsed = 0.0
+
+    def _reap_finished():
+        nonlocal succeeded, failed
+        still_running = []
+        for item in active:
+            rc = item["proc"].poll()
+            if rc is None:
+                still_running.append(item)
+            else:
+                if rc == 0:
+                    succeeded += 1
+                else:
+                    failed += 1
+        active[:] = still_running
+
+    def _check_window_and_timeouts() -> bool:
+        nonlocal window_closed, timed_out
+        curr_dt = intraday_speed.to_taipei(_now())
+        in_win, _ = intraday_speed.is_runner_window(curr_dt)
+        if curr_dt.date() != start_date or curr_dt.time() >= datetime.time(13, 30, 0) or not in_win:
+            window_closed = True
+            for item in list(active):
+                if not item["killed"]:
+                    _kill(item["pid"], item["proc"])
+                    item["killed"] = True
+            active.clear()
+            return False
+
+        remaining = []
+        for item in active:
+            age_dt = (curr_dt - item["start_dt"]).total_seconds()
+            age_virt = virtual_elapsed - item["start_virt"]
+            age = max(age_dt, age_virt)
+            if age >= eff_timeout and not item["killed"]:
+                _kill(item["pid"], item["proc"])
+                item["killed"] = True
+                timed_out += 1
+            else:
+                remaining.append(item)
+        active[:] = remaining
+        return True
+
+    while queue or active:
+        _reap_finished()
+        if not _check_window_and_timeouts():
+            break
+
+        while queue and not window_closed and len(active) < eff_conc:
+            if has_launched_any and eff_stagger > 0:
+                _sleep(eff_stagger)
+                virtual_elapsed += eff_stagger
+                _reap_finished()
+                if not _check_window_and_timeouts():
+                    break
+                if len(active) >= eff_conc:
+                    break
+
+            curr_dt = intraday_speed.to_taipei(_now())
+            in_win, _ = intraday_speed.is_runner_window(curr_dt)
+            if curr_dt.date() != start_date or curr_dt.time() >= datetime.time(13, 30, 0) or not in_win:
+                window_closed = True
+                for item in list(active):
+                    if not item["killed"]:
+                        _kill(item["pid"], item["proc"])
+                        item["killed"] = True
+                active.clear()
+                break
+
+            strat = queue.pop(0)
+            has_launched_any = True
+            cmd = [sys.executable, str(bootstrap_path), str(strat["script"]), "--once"]
+            child_env = os.environ.copy()
+            child_env["TW_RADAR_STRICT_WINDOW"] = "1"
+            child_env["TW_INTRADAY_LEDGER_DIR"] = ledger_path
+            child_env["TW_MIS_SHARED_DIR"] = gate_path
+
+            try:
+                proc = _popen(cmd, cwd=str(strat["cwd"]), env=child_env)
+                started += 1
+                active.append({
+                    "strat": strat,
+                    "proc": proc,
+                    "pid": getattr(proc, "pid", None),
+                    "start_dt": curr_dt,
+                    "start_virt": virtual_elapsed,
+                    "killed": False,
+                })
+            except Exception as exc:
+                print(f"[!] 啟動失敗 ({strat.get('id', 'unknown')}): {type(exc).__name__}")
+                failed += 1
+
+        _reap_finished()
+        if not active and (not queue or window_closed):
+            break
+
+        if active:
+            _sleep(1)
+            virtual_elapsed += 1.0
+            _reap_finished()
+            if not _check_window_and_timeouts():
+                break
+
+    skipped_window = len(queue)
+    summary = {
+        "started": started,
+        "succeeded": succeeded,
+        "failed": failed,
+        "timed_out": timed_out,
+        "skipped_window": skipped_window,
+    }
+    print(
+        f"[盤中單次平行總結] 啟動: {started}, 成功: {succeeded}, 失敗: {failed}, "
+        f"逾時: {timed_out}, 未啟動: {skipped_window}"
+    )
+    return summary
+
+
+def web_trigger_once(*, now_fn=None, runner=None) -> tuple[bool, str]:
+    import intraday_speed
+
+    _now = now_fn or intraday_speed.taipei_now
+    now_dt = intraday_speed.to_taipei(_now())
+    ok_win, _ = intraday_speed.is_runner_window(now_dt)
+    if not ok_win:
+        return False, "非盤中時段（台北 08:58–13:30 交易日），未啟動盤中掃描"
+
+    if not _WEB_TRIGGER_LOCK.acquire(blocking=False):
+        return False, "上一輪盤中掃描仍在執行，未重複啟動"
+
+    conc = _env_int("TW_INTRADAY_ONCE_CONCURRENCY", 3, 1, 6)
+    real_runner = runner or (
+        lambda: subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--once"],
+            timeout=900,
+            check=False,
+        )
+    )
+
+    def _bg():
+        try:
+            real_runner()
+        except Exception:
+            pass
+        finally:
+            try:
+                _WEB_TRIGGER_LOCK.release()
+            except RuntimeError:
+                pass
+
+    t = threading.Thread(target=_bg, daemon=True)
+    t.start()
+    return True, f"已在背景啟動全策略盤中到價掃描（平行上限 {conc} 支）"
+
 
 def main():
     parser = argparse.ArgumentParser(description="台股總指揮中心 - 全策略盤中到價即時雷達總調度")
@@ -181,8 +455,8 @@ def main():
     else:
         extra_args.extend(["--interval", str(args.interval)])
 
-    # 單次巡邏或推播測試：循序執行
-    if args.once or args.test_push:
+    # 單次巡邏或推播測試
+    if args.test_push:
         success = 0
         for strat in targets:
             if run_intraday_single(strat, extra_args):
@@ -191,6 +465,8 @@ def main():
         print("\n" + "=" * 70)
         print(f"🏁 全策略到價調度總結: 完成 {success}/{len(targets)} 項策略。")
         print("=" * 70)
+    elif args.once:
+        run_once_parallel(targets)
     else:
         # 常駐輪詢監控模式：平行啟動所有策略雷達行程，各自獨立盯盤至 13:35
         print(f"\n[🚀] 平行啟動全策略 ({len(targets)} 項) 盤中即時雷達行程...")

@@ -39,17 +39,21 @@ def get_twse_tick_size(price: float) -> float:
     - 500 <= 股價 < 1000 元：1.00 元
     - 股價 >= 1000 元：5.00 元
     """
-    if price < 0.01:
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
         return 0.01
-    elif price < 10.0:
+    if not math.isfinite(p) or p < 0.01:
         return 0.01
-    elif price < 50.0:
+    elif p < 10.0:
+        return 0.01
+    elif p < 50.0:
         return 0.05
-    elif price < 100.0:
+    elif p < 100.0:
         return 0.10
-    elif price < 500.0:
+    elif p < 500.0:
         return 0.50
-    elif price < 1000.0:
+    elif p < 1000.0:
         return 1.00
     else:
         return 5.00
@@ -62,8 +66,13 @@ def normalize_to_tick(price: float, direction: str = 'nearest') -> float:
     :param direction: 取整方向 ('nearest' 四捨五入, 'up' 無條件進位至下一檔, 'down' 無條件捨去至上一檔)
     :return: 完美合規之台股下單價格
     """
-    if price <= 0.0:
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(p) or p <= 0.0:
+        return 0.0
+    price = p
     
     tick = get_twse_tick_size(price)
     

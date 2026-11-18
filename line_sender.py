@@ -218,8 +218,7 @@ def send_telegram(
             success_all = False
 
     if success_all:
-        masked_chat = f"{str(chat_id)[:4]}***" if len(str(chat_id)) > 6 else str(chat_id)
-        print(f"[✓] Telegram 卡片戰報發送成功！目標: {masked_chat}")
+        print("[✓] Telegram 卡片戰報發送成功！目標：已設定的 Telegram 聊天室")
         return True
     return False
 
@@ -299,10 +298,9 @@ def send_line_messaging_api(tokens: list, to_id: str, message: str, target_label
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status == 200:
-                    masked_id = f"{to_id[:5]}...{to_id[-4:]}" if len(to_id) > 10 else to_id
                     label_info = f" [{target_label}]" if target_label else ""
                     token_info = f" (Token #{idx+1})" if len(tokens) > 1 else ""
-                    print(f"[✓] LINE Messaging API 推播發送成功！目標: {masked_id}{label_info}{token_info}")
+                    print(f"[✓] LINE Messaging API 推播發送成功！目標：已設定的 LINE 對象{label_info}{token_info}")
                     return True
                 else:
                     print(f"[!] LINE 推播失敗，狀態碼: {resp.status}")
@@ -414,7 +412,7 @@ def is_intraday_alert_message(message, task_type=None) -> bool:
     return False
 
 
-def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False, is_test: bool = False, task_type: str = None, **kwargs) -> bool:
+def send_to_line(message: str, strategy: str = None, target_id: str = None, force: bool = False, is_test: bool = False, task_type: str = None, intraday_ledger_dir=None, **kwargs) -> bool:
     """
     通用即時推播發送入口 (LINE 發送已停用，只走 Telegram；Discord 維持原行為)：
     1. 支援 Telegram Bot (100% 永久免費・無每月則數限制・手機即時秒推)
@@ -439,14 +437,39 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
                 print(f"[🛑 時段守衛攔截] {reason_intra}")
                 return False
 
+        # 1.5 嚴格盤中時段守衛與跨行程去重帳本 (僅對盤中到價訊息生效)
+        claimed_info = None
+        if is_intraday_alert_message(message, task_type=task_type):
+            if os.environ.get("TW_RADAR_STRICT_WINDOW") == "1":
+                import intraday_speed
+
+                strict_ok, strict_reason = intraday_speed.is_radar_push_allowed(intraday_speed.taipei_now())
+                if not strict_ok:
+                    print(f"[嚴格時段攔截] {strict_reason}")
+                    return False
+
+            ledger_val = intraday_ledger_dir or os.environ.get("TW_INTRADAY_LEDGER_DIR")
+            if ledger_val and isinstance(message, dict) and message.get("_stock_code") and message.get("_alert_type"):
+                import intraday_speed
+
+                day_str = intraday_speed.taipei_now().strftime("%Y-%m-%d")
+                if not intraday_speed.claim_push(Path(ledger_val), message["_stock_code"], message["_alert_type"], day_str):
+                    print("[去重帳本] 同一事件今日已推播，略過")
+                    return True
+                claimed_info = (Path(ledger_val), message["_stock_code"], message["_alert_type"], day_str)
+
         # 2. 常規休市日守衛 (Non-Trading Day Push Suppression)
         # 盤後任務 (例如 21:15 盤後選股、每週優化等) 僅受休市日守門約束，不受收盤時段限制
         suppress, suppress_reason = should_suppress_push(force=force, task_type=task_type or "戰報推播")
         if suppress:
+            if claimed_info is not None:
+                import intraday_speed
+
+                intraday_speed.release_push(*claimed_info)
             print(f"[⏸️ 推播攔截] {suppress_reason}")
             return False
     except ImportError:
-        pass
+        claimed_info = None
     env = load_env()
     sid = str(strategy).strip() if strategy else ""
 
@@ -486,6 +509,10 @@ def send_to_line(message: str, strategy: str = None, target_id: str = None, forc
             any_success = True
 
     if not any_success:
+        if claimed_info is not None:
+            import intraday_speed
+
+            intraday_speed.release_push(*claimed_info)
         print("\n" + "!" * 65)
         print("【尚未設定任何有效推播管道或憑證額度已耗盡】")
         print(f"請在 {ENV_PATH} 中設定：")
@@ -732,7 +759,8 @@ def build_price_alert_card(
     event_type: str,
     event_title: str,
     event_desc: str,
-    strategy_id: str = "01"
+    strategy_id: str = "01",
+    order_hint: dict = None
 ) -> dict:
     code_check = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
     is_pri, pri_tag = is_priority_advisor_target(code_check)
@@ -1038,15 +1066,16 @@ def build_price_alert_card(
     }
 
     clean_alt = f"🚨【盤中雷達】{code} {name} 觸發【{event_title}】：現價 {format_price_val(price)} 元"
-    clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id)
-    tg_card = format_telegram_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id)
+    clean_text = format_clean_price_alert_text(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id, order_hint=order_hint)
+    tg_card = format_telegram_price_alert_card(target, rt, event_type, event_title, event_desc, strategy_id=strategy_id, order_hint=order_hint)
     return {
         "type": "flex",
         "altText": clean_alt,
         "contents": bubble,
         "_clean_text": clean_text,
         "_tg_card": tg_card,
-        "_stock_code": code
+        "_stock_code": code,
+        "_alert_type": event_type
     }
 
 def format_clean_price_alert_text(
@@ -1055,7 +1084,8 @@ def format_clean_price_alert_text(
     event_type: str,
     event_title: str,
     event_desc: str,
-    strategy_id: str = "01"
+    strategy_id: str = "01",
+    order_hint: dict = None
 ) -> str:
     code_check = str(target.get('code') or target.get('證券代號') or target.get('代號') or '')
     is_pri, pri_tag = is_priority_advisor_target(code_check)
@@ -1109,6 +1139,16 @@ def format_clean_price_alert_text(
         f"📍 監控標的：{code} {name} ｜ {stars}",
         f"🔥 觸發事件：【{event_title}】",
         f"💵 即時現價：{format_price_val(price)} 元 (今日高 {format_price_val(high_p)} / 低 {format_price_val(low_p)})",
+    ]
+    if order_hint:
+        lines.extend([
+            "📝【下單參數】僅供參考，系統不會下單",
+            f"• 代號：{order_hint.get('code', '')}　方向：{order_hint.get('direction', '')}　動作：{order_hint.get('action', '')}",
+            f"• 建議委託價：{order_hint.get('order_price', '')} 元（限價）",
+            f"• 建議張數：{order_hint.get('lots_text', '')}",
+            f"• 停損價：{order_hint.get('stop_text', '')}",
+        ])
+    lines.extend([
         "",
         "🎯 實戰操盤四大防線：",
         f"{meta['entry_label']}  {entry_str} 元  ({meta['entry_desc']})",
@@ -1118,7 +1158,7 @@ def format_clean_price_alert_text(
         "",
         "📊 即時量能與指標：",
         f"• 盤中量能：{vol:,} 張" if isinstance(vol, (int, float)) else f"• 盤中量能：{vol}",
-    ]
+    ])
     if og_risk:
         lines.append(f"• 隔日沖風控：{og_risk}")
     
@@ -1142,7 +1182,8 @@ def format_telegram_price_alert_card(
     event_type: str,
     event_title: str,
     event_desc: str,
-    strategy_id: str = "01"
+    strategy_id: str = "01",
+    order_hint: dict = None
 ) -> str:
     """產出 Telegram 原生高對比 HTML 卡片（含四大防線獨立區塊與狀態徽章）"""
     import html, datetime
@@ -1196,7 +1237,17 @@ def format_telegram_price_alert_card(
         f"🔥 <b>觸發事件：</b> <code>{html.escape(event_title)}</code>\n"
         f"💵 <b>即時現價：</b> <b>{format_price_val(price)} 元</b> (高 {format_price_val(high_p)} / 低 {format_price_val(low_p)})\n"
         f"</blockquote>\n"
-        f"<blockquote>"
+        + (
+            f"<blockquote>"
+            f"📝 <b>下單參數（僅供參考，系統不會下單）</b>\n"
+            f"• 代號：<code>{html.escape(str(order_hint.get('code', '')))}</code> ｜ 方向：<code>{html.escape(str(order_hint.get('direction', '')))}</code> ｜ 動作：<code>{html.escape(str(order_hint.get('action', '')))}</code>\n"
+            f"• 建議委託價：<code>{html.escape(str(order_hint.get('order_price', '')))} 元（限價）</code>\n"
+            f"• 建議張數：<code>{html.escape(str(order_hint.get('lots_text', '')))}</code>\n"
+            f"• 停損價：<code>{html.escape(str(order_hint.get('stop_text', '')))}</code>\n"
+            f"</blockquote>\n"
+            if order_hint else ""
+        )
+        + f"<blockquote>"
         f"🎯 <b>實戰操盤四大防線：</b>\n"
         f"• {meta['entry_label']}：<code>{entry_str} 元</code> ({meta['entry_desc']})\n"
         f"• {meta['addon_label']}：<code>{addon_str} 元</code> ({meta['addon_desc']})\n"

@@ -50,6 +50,87 @@ from trade_history_manager import GLOBAL_TRADE_HISTORY, _ensure_float, _calc_pnl
 from four_price_engine import apply_four_prices_to_record, normalize_to_tick
 
 DEFAULT_RETENTION_DAYS = 5
+_CALENDAR_CACHE = {"key": None, "data": None}
+
+
+def _to_date(val: Any) -> datetime.date:
+    if isinstance(val, datetime.datetime):
+        return val.date()
+    if isinstance(val, datetime.date):
+        return val
+    return datetime.date.fromisoformat(normalize_date_str(val))
+
+
+def effective_retention_days(max_days: Optional[int] = None) -> int:
+    """讀取 TW_RETENTION_TRADING_DAYS（1-60）優先，否則 max_days，再否則 DEFAULT_RETENTION_DAYS。"""
+    raw = os.environ.get("TW_RETENTION_TRADING_DAYS")
+    if raw is None or not str(raw).strip():
+        try:
+            from line_sender import load_env
+            env_map = load_env() or {}
+            raw = env_map.get("TW_RETENTION_TRADING_DAYS")
+        except Exception:
+            raw = None
+    if raw is not None and str(raw).strip():
+        try:
+            v = int(str(raw).strip())
+            return max(1, min(60, v))
+        except Exception:
+            pass
+    if max_days is not None:
+        try:
+            v = int(max_days)
+            return max(1, min(60, v))
+        except Exception:
+            pass
+    return DEFAULT_RETENTION_DAYS
+
+
+def _get_cached_calendar() -> dict:
+    try:
+        import twse_calendar
+        meta_p = ROOT_DIR / "dashboard_twse_calendar.json"
+        pay_p = ROOT_DIR / "dashboard_twse_calendar.payload.json"
+        m1 = meta_p.stat().st_mtime if meta_p.exists() else None
+        m2 = pay_p.stat().st_mtime if pay_p.exists() else None
+        key = (m1, m2)
+        if _CALENDAR_CACHE["key"] == key and _CALENDAR_CACHE["data"] is not None:
+            return _CALENDAR_CACHE["data"]
+        snap = twse_calendar.load_snapshot()
+        _CALENDAR_CACHE["key"] = key
+        _CALENDAR_CACHE["data"] = snap
+        return snap
+    except Exception:
+        return {}
+
+
+def is_trading_day_for_retention(d: Any, calendar: Optional[dict] = None) -> bool:
+    """依離線 TWSE 日曆判斷是否為交易日；超出涵蓋或不可信時退回週一至週五。"""
+    day = _to_date(d)
+    cal = _get_cached_calendar() if calendar is None else calendar
+    try:
+        from dashboard_contract import is_scheduled_session
+        res = is_scheduled_session(day, cal if isinstance(cal, dict) else {})
+        if res is not None:
+            return bool(res)
+    except Exception:
+        pass
+    return day.weekday() < 5
+
+
+def retention_cutoff(today: Any, n: int, calendar: Optional[dict] = None) -> datetime.date:
+    """從 today 往回數第 n 個交易日（today 為交易日則算第 1 天）。"""
+    cur = _to_date(today)
+    target = max(1, min(60, int(n)))
+    cal = _get_cached_calendar() if calendar is None else calendar
+    cnt = 0
+    for _ in range(3650):
+        if is_trading_day_for_retention(cur, calendar=cal):
+            cnt += 1
+            if cnt >= target:
+                return cur
+        cur -= datetime.timedelta(days=1)
+    return cur
 
 
 def normalize_date_str(date_val: Any) -> str:
@@ -231,16 +312,11 @@ def merge_rolling_records(
     # 步驟一：處理既有名冊標的之生命週期流轉
     # --------------------------------------------------------------------------
     retained_exist_rows = []
-    
-    # 收集現有名冊中所有出現過的日期，預估保留交易日
-    existing_dates = set()
-    for r in exist_dict.values():
-        d = r.get("選股日期")
-        if d:
-            existing_dates.add(normalize_date_str(d))
-    existing_dates.add(today_norm)
-    all_sorted_dates = sorted(list(existing_dates), reverse=True)
-    valid_retained_dates = all_sorted_dates[:max_days]
+    eff_days = effective_retention_days(max_days)
+    today_date = _to_date(today_norm)
+    cal_snap = _get_cached_calendar()
+    cutoff_date = retention_cutoff(today_date, eff_days, calendar=cal_snap)
+    cutoff_str = cutoff_date.strftime("%Y-%m-%d")
 
     for c, old_r in exist_dict.items():
         # 若今日已再次被新策略選中，稍後由今日新資料統一處理 (避免覆蓋前遺漏歷程)
@@ -265,14 +341,14 @@ def merge_rolling_records(
                 retained_exist_rows.append(old_r)
                 continue
 
-        # (B) 檢核是否已逾 5 個交易日滾動水位期限
+        # (B) 檢核是否已逾 N 個交易日滾動水位期限
         old_pick_date = normalize_date_str(old_r.get("選股日期"))
-        if old_pick_date not in valid_retained_dates:
-            # ➔ 5 日週期屆滿，正式除帳並歸檔戰績庫！
+        if old_pick_date < cutoff_str:
+            # ➔ N 交易日週期屆滿，正式除帳並歸檔戰績庫！
             curr_p = get_current_stock_price(old_r)
             old_r["exit_date"] = today_norm
             old_r["exit_price"] = curr_p if curr_p > 0 else get_entry_price(old_r)
-            old_r["exit_reason"] = f"5 交易日週期屆滿出清 (入選日 {old_pick_date})"
+            old_r["exit_reason"] = f"{eff_days} 交易日週期屆滿出清 (入選日 {old_pick_date})"
             old_r["strategy_id"] = strategy_id or old_r.get("strategy_id") or ""
             GLOBAL_TRADE_HISTORY.record_closed_trade(old_r)
             continue
@@ -380,26 +456,41 @@ def merge_rolling_records(
     # --------------------------------------------------------------------------
     combined_rows = processed_new_rows + retained_exist_rows
     if not combined_rows:
-        return pd.DataFrame()
+        union_cols = list(new_df.columns)
+        for col in exist_df.columns:
+            if col not in union_cols:
+                union_cols.append(col)
+        if not union_cols:
+            union_cols = [
+                "證券代號", "證券名稱", "選股日期", "入選天數", "狀態標註",
+                "生命週期狀態", "第一次進場價位", "第一次停利價位",
+                "第二次進場價位", "第二次停利價位", "操盤階段"
+            ]
+        return pd.DataFrame(columns=union_cols)
 
     combined_df = pd.DataFrame(combined_rows)
 
-    # 水位防守
-    all_dates = sorted(list({normalize_date_str(d) for d in combined_df["選股日期"].dropna()}), reverse=True)
-    retained_dates = all_dates[:max_days]
-    date_to_t_badge = {}
-    for idx, d in enumerate(retained_dates):
-        if idx == 0 and d == today_norm:
-            date_to_t_badge[d] = "T+0"
-        else:
-            date_to_t_badge[d] = f"T+{idx}"
-
+    # 水位防守（依交易日 cutoff_str 與 T+k 計算）
     combined_df["選股日期"] = combined_df["選股日期"].apply(normalize_date_str)
-    
-    # 保留有效交易日內，或處於待剔除保留狀態之記錄
-    is_in_date = combined_df["選股日期"].isin(retained_dates)
+    is_in_date = combined_df["選股日期"] >= cutoff_str
     is_pending_rem = combined_df["生命週期狀態"] == "PENDING_REMOVAL"
     combined_df = combined_df[is_in_date | is_pending_rem].copy()
+
+    def _trading_days_between(pick_str: str) -> int:
+        p_date = _to_date(pick_str)
+        if p_date >= today_date:
+            return 0
+        k = 0
+        cur = p_date + datetime.timedelta(days=1)
+        while cur <= today_date:
+            if is_trading_day_for_retention(cur, calendar=cal_snap):
+                k += 1
+            cur += datetime.timedelta(days=1)
+        return k
+
+    date_to_t_badge = {}
+    for d in combined_df["選股日期"].dropna().unique():
+        date_to_t_badge[d] = f"T+{_trading_days_between(d)}"
 
     def _assign_t_badge(row):
         d = row.get("選股日期", "")
@@ -422,9 +513,9 @@ def merge_rolling_records(
         "第一次進場價位", "第一次停利價位", "第二次進場價位", "第二次停利價位"
     ]
     cols = list(combined_df.columns)
-    for c_item in core_front_cols:
-        if c_item in cols:
-            cols.remove(c_item)
+    present_front = [c_item for c_item in core_front_cols if c_item in cols]
+    for c_item in present_front:
+        cols.remove(c_item)
 
     name_idx = -1
     for idx, c in enumerate(cols):
@@ -434,10 +525,10 @@ def merge_rolling_records(
 
     if name_idx != -1:
         insert_pos = name_idx + 1
-        for offset, c_item in enumerate(core_front_cols):
+        for offset, c_item in enumerate(present_front):
             cols.insert(insert_pos + offset, c_item)
     else:
-        cols = core_front_cols + cols
+        cols = present_front + cols
 
     combined_df = combined_df[cols]
 
