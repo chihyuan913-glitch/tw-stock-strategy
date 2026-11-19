@@ -1607,9 +1607,9 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
         return {"message": "已在背景啟動全策略盤後選股 (run_all.py)！"}
 
     elif action_name == "run_radar":
-        from run_all_intraday import web_trigger_once
-        _ok, msg = web_trigger_once()
-        return {"message": msg}
+        from run_all_intraday import get_web_trigger_status, web_trigger_once
+        ok, msg = web_trigger_once()
+        return {"ok": ok, "message": msg, "trigger_status": get_web_trigger_status()}
 
     elif action_name == "run_optimizer":
         def _task():
@@ -1637,6 +1637,19 @@ async def trigger_action_endpoint(action_name: str, background_tasks: Background
         return {"message": "已發送 LINE 測試訊息至總指揮窗口！"}
 
     return {"message": f"未知的動作: {action_name}"}
+
+
+@app.get("/api/action/run_radar/status")
+async def get_run_radar_status_endpoint(request: Request):
+    """查詢最近一次盤中掃描觸發與逾時狀態（外網須具備管理員金鑰）"""
+    import access_guard
+    if access_guard.is_external(request.scope) and not access_guard.admin_key_ok(request.headers):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "forbidden", "message": "外網唯讀：此操作僅限本機執行"},
+        )
+    from run_all_intraday import get_web_trigger_status
+    return get_web_trigger_status()
 
 # --------------------------------------------------------------------------
 # FinLab Studio 風格 AI 量化策略助理與回測工作台 API

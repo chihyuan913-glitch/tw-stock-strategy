@@ -11,6 +11,7 @@
 
 import os
 import sys
+import json
 import argparse
 import subprocess
 import datetime
@@ -30,6 +31,57 @@ if hasattr(sys.stderr, 'reconfigure'):
         pass
 
 ROOT_DIR = Path(__file__).resolve().parent
+WEB_TRIGGER_LOG_PATH = ROOT_DIR / "cache" / "web_trigger_timeout.log"
+WEB_TRIGGER_STATUS_PATH = ROOT_DIR / "cache" / "web_trigger_status.json"
+_WEB_TRIGGER_STATUS_LOCK = threading.Lock()
+_DEFAULT_WEB_TRIGGER_STATUS = {
+    "status": "idle",
+    "timed_out": False,
+    "timeout_sec": 900.0,
+    "pid": None,
+    "started_at": None,
+    "finished_at": None,
+    "message": "尚未觸發",
+}
+_WEB_TRIGGER_STATUS = dict(_DEFAULT_WEB_TRIGGER_STATUS)
+
+
+def _reset_web_trigger_state_for_test() -> None:
+    with _WEB_TRIGGER_STATUS_LOCK:
+        _WEB_TRIGGER_STATUS.clear()
+        _WEB_TRIGGER_STATUS.update(_DEFAULT_WEB_TRIGGER_STATUS)
+
+
+def _write_web_trigger_log(msg: str) -> None:
+    ts = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).isoformat()
+    line = f"[{ts}] {msg}"
+    print(line, flush=True)
+    try:
+        WEB_TRIGGER_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with WEB_TRIGGER_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
+def _update_web_trigger_status(**fields) -> dict:
+    with _WEB_TRIGGER_STATUS_LOCK:
+        _WEB_TRIGGER_STATUS.update(fields)
+        snap = dict(_WEB_TRIGGER_STATUS)
+    try:
+        WEB_TRIGGER_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        WEB_TRIGGER_STATUS_PATH.write_text(
+            json.dumps(snap, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+    return snap
+
+
+def get_web_trigger_status() -> dict:
+    with _WEB_TRIGGER_STATUS_LOCK:
+        return dict(_WEB_TRIGGER_STATUS)
 
 INTRADAY_STRATEGIES = [
     {
@@ -367,7 +419,14 @@ def run_once_parallel(
     return summary
 
 
-def web_trigger_once(*, now_fn=None, runner=None) -> tuple[bool, str]:
+def web_trigger_once(
+    *,
+    now_fn=None,
+    runner=None,
+    timeout_sec: float = 900.0,
+    popen_fn=None,
+    kill_tree_fn=None,
+) -> tuple[bool, str]:
     import intraday_speed
 
     _now = now_fn or intraday_speed.taipei_now
@@ -380,19 +439,95 @@ def web_trigger_once(*, now_fn=None, runner=None) -> tuple[bool, str]:
         return False, "上一輪盤中掃描仍在執行，未重複啟動"
 
     conc = _env_int("TW_INTRADAY_ONCE_CONCURRENCY", 3, 1, 6)
-    real_runner = runner or (
-        lambda: subprocess.run(
-            [sys.executable, str(Path(__file__).resolve()), "--once"],
-            timeout=900,
-            check=False,
-        )
+    eff_timeout = float(timeout_sec)
+    started_iso = now_dt.isoformat()
+    start_msg = f"已在背景啟動全策略盤中到價掃描（平行上限 {conc} 支）"
+    _update_web_trigger_status(
+        status="running",
+        timed_out=False,
+        timeout_sec=eff_timeout,
+        pid=None,
+        started_at=started_iso,
+        finished_at=None,
+        message=start_msg,
     )
+
+    def _finish_iso() -> str:
+        return intraday_speed.to_taipei(_now()).isoformat()
 
     def _bg():
         try:
-            real_runner()
-        except Exception:
-            pass
+            if runner is not None:
+                runner()
+                _update_web_trigger_status(
+                    status="completed",
+                    timed_out=False,
+                    finished_at=_finish_iso(),
+                    message="盤中掃描完成",
+                )
+                return
+
+            _popen = popen_fn or _default_popen
+            _kill = kill_tree_fn or _default_kill_tree
+            proc = _popen(
+                [sys.executable, str(Path(__file__).resolve()), "--once"],
+                cwd=str(ROOT_DIR),
+                env=os.environ.copy(),
+            )
+            pid = getattr(proc, "pid", None)
+            _update_web_trigger_status(pid=pid)
+
+            try:
+                proc.wait(timeout=eff_timeout)
+                _update_web_trigger_status(
+                    status="completed",
+                    timed_out=False,
+                    finished_at=_finish_iso(),
+                    message=f"盤中掃描完成 (PID={pid})",
+                )
+            except subprocess.TimeoutExpired:
+                if proc.poll() is not None:
+                    _update_web_trigger_status(
+                        status="completed",
+                        timed_out=False,
+                        finished_at=_finish_iso(),
+                        message=f"盤中掃描於逾時邊界完成 (PID={pid})",
+                    )
+                    return
+
+                kill_err_note = ""
+                if pid is not None:
+                    try:
+                        _kill(pid, proc)
+                    except ProcessLookupError:
+                        pass
+                    except Exception as ke:
+                        kill_err_note = f"；殺樹異常: {ke}"
+                try:
+                    proc.wait()
+                except Exception:
+                    pass
+
+                timeout_msg = (
+                    f"盤中掃描逾時（{eff_timeout:g} 秒），已終止子程式樹 PID={pid}"
+                    + kill_err_note
+                )
+                _write_web_trigger_log(timeout_msg)
+                _update_web_trigger_status(
+                    status="timeout",
+                    timed_out=True,
+                    finished_at=_finish_iso(),
+                    message=timeout_msg,
+                )
+        except Exception as exc:
+            err_msg = f"盤中掃描執行異常: {exc}"
+            _write_web_trigger_log(err_msg)
+            _update_web_trigger_status(
+                status="error",
+                timed_out=False,
+                finished_at=_finish_iso(),
+                message=err_msg,
+            )
         finally:
             try:
                 _WEB_TRIGGER_LOCK.release()
@@ -401,7 +536,7 @@ def web_trigger_once(*, now_fn=None, runner=None) -> tuple[bool, str]:
 
     t = threading.Thread(target=_bg, daemon=True)
     t.start()
-    return True, f"已在背景啟動全策略盤中到價掃描（平行上限 {conc} 支）"
+    return True, start_msg
 
 
 def main():
